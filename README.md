@@ -1,4 +1,4 @@
-# 🦦 OtterNest · 小水獭窝
+# 🦦 OtterNest · 水獭窝
 
 > **个人自托管的分布式 AI 团队操作系统**  
 > Personal AI Team OS · Local-first ownership, distributed execution.
