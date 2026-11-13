@@ -596,6 +596,8 @@ def approve_decision(decision_id: str, actor: Actor = Depends(authenticate), db:
         raise HTTPException(404, "Decision not found")
     if d.status != "proposed":
         raise Conflict("Decision is not proposed")
+    from .governance import require_auto_review_quorum
+    require_auto_review_quorum(db, d)
     state = db.get(DecisionDeliberation, d.id)
     if state is not None and state.status != "closed":
         raise Conflict("Second round must close before approval")

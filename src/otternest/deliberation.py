@@ -1,12 +1,13 @@
 """At most two rounds of independent, owner-controlled decision review."""
 from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .db import get_session
 from .governance import _decision, _review_public
-from .models import DecisionDeliberation, DecisionRebuttal, DecisionReview, now
+from .models import (DecisionDeliberation, DecisionRebuttal, DecisionReview, DecisionAutoPolicy,
+                     Agent, Membership, now)
 from .security import Actor, authenticate, owner_only
 from .services import Conflict, emit, require_project
 
@@ -28,15 +29,68 @@ def _session(s):
             "status": s.status, "opened_at": s.opened_at,
             "closed_at": s.closed_at, "closing_note": s.closing_note}
 
-def _reply(r):
+def _reply(r, db: Session | None = None):
+    from .evidence import inspect_references
+    checks = inspect_references(db, r.project_id, r.evidence) if db is not None else []
     return {"id": r.id, "decision_id": r.decision_id, "agent_id": r.agent_id,
             "responds_to_review_id": r.responds_to_review_id, "stance": r.stance,
-            "reasoning": r.reasoning, "evidence": r.evidence,
+            "reasoning": r.reasoning, "evidence": r.evidence, "evidence_checks": checks,
             "evidence_verified": False, "created_at": r.created_at}
 
 def _participant(db, decision_id, actor):
     return bool(db.scalar(select(DecisionReview.id).where(
         DecisionReview.decision_id == decision_id, DecisionReview.agent_id == actor.id)))
+
+
+class AutoPolicyDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    reviewer_ids: list[str] = Field(min_length=2, max_length=8)
+
+    @field_validator("reviewer_ids")
+    @classmethod
+    def unique_reviewers(cls, ids: list[str]) -> list[str]:
+        if len(set(ids)) != len(ids):
+            raise ValueError("Reviewer IDs must be distinct")
+        return ids
+
+
+@router.post("/decisions/{decision_id}/deliberation/auto-policy", status_code=201)
+def configure_auto_policy(decision_id: str, body: AutoPolicyDraft,
+                          actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    owner_only(actor)
+    decision = _decision(db, decision_id, actor, lock=True)
+    if decision.status != "proposed" or db.get(DecisionAutoPolicy, decision.id) is not None:
+        raise Conflict("Only one automatic reviewer policy may be set for a proposed decision")
+    if db.scalar(select(DecisionReview.id).where(DecisionReview.decision_id == decision.id)):
+        raise Conflict("Reviewer roster must be fixed before first-round review")
+    participants = db.scalars(select(Membership.agent_id).join(
+        Agent, Membership.agent_id == Agent.id).where(
+        Membership.project_id == decision.project_id,
+        Membership.agent_id.in_(body.reviewer_ids),
+        Membership.role.in_(("reviewer", "worker", "manager", "advisor")),
+        Agent.enabled.is_(True))).all()
+    if set(participants) != set(body.reviewer_ids):
+        raise HTTPException(422, "Every invited reviewer must be enabled and in this project")
+    db.add(DecisionAutoPolicy(decision_id=decision.id, project_id=decision.project_id,
+                              reviewer_ids=body.reviewer_ids))
+    emit(db, actor, "decision.auto_review_configured", decision.id, decision.project_id,
+         {"reviewer_count": len(body.reviewer_ids)})
+    db.commit()
+    return {"decision_id": decision.id, "reviewer_ids": body.reviewer_ids,
+            "owner_approval_required": True, "max_rounds": 2}
+
+
+@router.get("/decisions/{decision_id}/deliberation/auto-policy")
+def get_auto_policy(decision_id: str, actor: Actor = Depends(authenticate),
+                    db: Session = Depends(get_session)):
+    owner_only(actor)
+    decision = _decision(db, decision_id, actor)
+    policy = db.get(DecisionAutoPolicy, decision.id)
+    if policy is None:
+        raise HTTPException(404, "No automatic reviewer policy")
+    return {"decision_id": decision.id, "reviewer_ids": policy.reviewer_ids,
+            "owner_approval_required": True, "max_rounds": 2}
+
 
 @router.post("/decisions/{decision_id}/deliberation/open", status_code=201)
 def open_second_round(decision_id: str, actor: Actor = Depends(authenticate),
@@ -47,6 +101,8 @@ def open_second_round(decision_id: str, actor: Actor = Depends(authenticate),
         raise Conflict("Decision must be proposed")
     if db.get(DecisionDeliberation, decision.id):
         raise Conflict("Second round already exists; no third round")
+    from .governance import require_auto_review_quorum
+    require_auto_review_quorum(db, decision)
     reviews = db.scalars(select(DecisionReview.agent_id).where(
         DecisionReview.decision_id == decision.id)).all()
     if len(set(reviews)) < 2:
@@ -79,8 +135,8 @@ def get_deliberation(decision_id: str, actor: Actor = Depends(authenticate),
         q = q.where(DecisionRebuttal.agent_id == actor.id)
     rebuttals = db.scalars(q.order_by(
         DecisionRebuttal.created_at, DecisionRebuttal.id)).all()
-    return {**_session(state), "first_round": [_review_public(r) for r in reviews],
-            "rebuttals": [_reply(r) for r in rebuttals]}
+    return {**_session(state), "first_round": [_review_public(r, db) for r in reviews],
+            "rebuttals": [_reply(r, db) for r in rebuttals]}
 
 @router.post("/decisions/{decision_id}/deliberation/rebuttals", status_code=201)
 def submit_rebuttal(decision_id: str, body: RebuttalDraft,
@@ -111,8 +167,18 @@ def submit_rebuttal(decision_id: str, body: RebuttalDraft,
     db.flush()
     emit(db, actor, "decision.rebuttal_submitted", decision.id, decision.project_id,
          {"rebuttal_id": reply.id, "responds_to_review_id": target.id})
+    policy = db.get(DecisionAutoPolicy, decision.id)
+    if policy:
+        respondents = set(db.scalars(select(DecisionRebuttal.agent_id).where(
+            DecisionRebuttal.decision_id == decision.id)))
+        if respondents == set(policy.reviewer_ids):
+            state.status = "closed"
+            state.closed_at = now()
+            state.closing_note = "Automatically closed after all invited reviewers replied; owner must resolve."
+            emit(db, actor, "decision.second_round_closed", decision.id, decision.project_id,
+                 {"automated": True, "owner_approval_required": True})
     db.commit()
-    return _reply(reply)
+    return _reply(reply, db)
 
 @router.post("/decisions/{decision_id}/deliberation/close")
 def close_second_round(decision_id: str, body: CloseDraft,
