@@ -93,14 +93,15 @@ p{margin:6px 0 10px}
   gap:24px;
   align-items:stretch;
 }
-.panel{
+.panel,.card{
   background:var(--card);
   border:1px solid var(--border);
-  border-radius:var(--radius);
+  border-radius:20px;
   padding:22px 24px;
   box-shadow:var(--shadow);
   margin-bottom:20px;
 }
+.panel-tight{margin-bottom:0}
 .login-brand{
   display:flex;
   align-items:center;
@@ -111,6 +112,21 @@ p{margin:6px 0 10px}
 .login-brand-left{display:flex;align-items:center;gap:14px}
 .login-brand-title{font-size:24px;font-weight:700;color:var(--text)}
 .login-mascot{width:84px;height:84px;object-fit:contain;flex-shrink:0}
+.login-alert{
+  margin-top:14px;
+  padding:12px 15px;
+  border-radius:14px;
+  background:#FEF1F1;
+  border:1px solid #FACACA;
+  color:#B91C1C;
+  font-size:15px;
+  font-weight:500;
+}
+.login-alert.info{
+  background:#F4F3FE;
+  border-color:#E1DFFA;
+  color:#3E3A7A;
+}
 .info-list{margin:14px 0 0;padding-left:20px}
 .info-list li{margin-bottom:12px;color:var(--text-soft);font-size:15px}
 
@@ -488,15 +504,9 @@ nav{
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:22px;
-  margin-bottom:22px;
+  margin-bottom:20px;
 }
-.card{
-  background:var(--card);
-  border:1px solid var(--border);
-  border-radius:20px;
-  padding:22px 24px;
-  box-shadow:var(--shadow);
-}
+.mid-grid>.card,.mid-grid>.panel,.grid-2>.card,.grid-2>.panel{margin-bottom:0}
 .card-head{
   display:flex;
   align-items:center;
@@ -505,6 +515,13 @@ nav{
   margin-bottom:16px;
   flex-wrap:wrap;
 }
+.card-title-group{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+}
+.card-title-icon{width:28px;height:28px;flex-shrink:0}
 .card-link{
   border:none;
   background:transparent;
@@ -803,7 +820,9 @@ table.task-table{
 }
 
 /* Shared cards, forms, buttons, tags */
-.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start}
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start;margin-bottom:20px}
+.grid-2:last-child{margin-bottom:0}
+.agents-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));gap:18px}
 .item-card{
   background:#FAFBFD;
   border:1px solid var(--border);
@@ -812,6 +831,7 @@ table.task-table{
   margin-top:14px;
 }
 .item-card:first-child{margin-top:6px}
+.agents-grid .item-card{margin-top:0;height:100%;display:flex;flex-direction:column;justify-content:space-between}
 .item-head{
   display:flex;
   justify-content:space-between;
@@ -825,17 +845,74 @@ table.task-table{
 .stack-grow>*{flex:1;min-width:190px}
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
 
-.mascot-banner{
+.page-hero{
+  position:relative;
+  overflow:hidden;
   display:flex;
   align-items:center;
-  gap:16px;
-  background:linear-gradient(135deg,#F5F3FE,#FFFFFF);
-  border:1px solid #E5E1FB;
-  border-radius:18px;
-  padding:14px 20px;
+  justify-content:space-between;
+  gap:18px;
+  background:linear-gradient(135deg,#EEEBFD 0%,#F6F7FE 65%,#EAE6FD 100%);
+  border:1px solid #E1DFFA;
+  border-radius:20px;
+  padding:18px 24px;
   margin-bottom:20px;
+  box-shadow:var(--shadow);
 }
-.mascot-banner img{width:64px;height:64px;object-fit:contain;flex-shrink:0}
+.page-hero-left{position:relative;z-index:2;max-width:680px;min-width:0}
+.page-hero-title{display:flex;align-items:center;gap:11px;font-size:21px;font-weight:700;color:var(--text)}
+.page-hero-sub{margin:6px 0 0;color:var(--text-soft);font-size:15px}
+.page-hero-pills{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+.page-hero-mascot{position:relative;z-index:2;width:96px;height:86px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 6px 14px rgba(80,74,155,.14))}
+.page-hero-wave{position:absolute;right:0;bottom:0;width:230px;height:78px;opacity:.72;pointer-events:none}
+.payload-details{margin-top:8px}
+.payload-details summary{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  cursor:pointer;
+  color:var(--accent);
+  font-size:14px;
+  font-weight:600;
+  list-style:none;
+}
+.payload-details summary::-webkit-details-marker{display:none}
+.totp-secret-box{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+  padding:14px 16px;
+  border-radius:14px;
+  background:#F6F5FE;
+  border:1px dashed #B9B4F6;
+  margin:12px 0;
+}
+.totp-code-key{
+  font-family:var(--mono);
+  font-size:17px;
+  font-weight:700;
+  letter-spacing:.08em;
+  color:var(--accent-deep);
+}
+.recovery-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+  margin:12px 0;
+}
+.recovery-chip{
+  text-align:center;
+  font-family:var(--mono);
+  font-size:15px;
+  font-weight:700;
+  padding:8px 10px;
+  border-radius:10px;
+  background:#FFFFFF;
+  border:1px solid #D8D4FA;
+  color:var(--text);
+}
 .empty-state{
   display:flex;
   flex-direction:column;
@@ -885,28 +962,29 @@ button,.btn{
 }
 button:hover{box-shadow:0 6px 18px rgba(89,85,233,.24)}
 button:active{transform:translateY(1px)}
-button.secondary{
+button.secondary,.btn.secondary{
   background:#FFFFFF;
   color:var(--text-soft);
   border-color:var(--border-strong);
   box-shadow:none;
+  text-decoration:none;
 }
-button.secondary:hover{background:#F5F4FD;color:var(--text);box-shadow:none}
-button.ghost{
+button.secondary:hover,.btn.secondary:hover{background:#F5F4FD;color:var(--text);box-shadow:none;text-decoration:none}
+button.ghost,.btn.ghost{
   background:#F4F5FB;
   color:var(--text-soft);
   border-color:transparent;
   box-shadow:none;
 }
-button.ghost:hover{background:#ECEBFA;color:var(--text);box-shadow:none}
-button.danger{
+button.ghost:hover,.btn.ghost:hover{background:#ECEBFA;color:var(--text);box-shadow:none}
+button.danger,.btn.danger{
   background:#FEF1F1;
   color:#B91C1C;
   border-color:#FACACA;
   box-shadow:none;
 }
-button.danger:hover{background:#FDE2E2;box-shadow:none}
-button.sm{padding:6px 12px;font-size:14px;border-radius:10px}
+button.danger:hover,.btn.danger:hover{background:#FDE2E2;box-shadow:none}
+button.sm,.btn.sm{padding:6px 12px;font-size:14px;border-radius:10px}
 
 .tag,.chip{
   display:inline-flex;
@@ -1061,9 +1139,9 @@ button.sm{padding:6px 12px;font-size:14px;border-radius:10px}
 }
 
 @media (max-width:1180px){
-  .kpi-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi-row,.recovery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .kanban-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .mid-grid,.grid-2,.meter-grid,.login-grid,.cmd-layout{grid-template-columns:1fr}
+  .mid-grid,.grid-2,.meter-grid,.login-grid,.cmd-layout,.agents-grid{grid-template-columns:1fr}
 }
 @media (max-width:860px){
   .app-shell{grid-template-columns:1fr}
@@ -1081,7 +1159,7 @@ button.sm{padding:6px 12px;font-size:14px;border-radius:10px}
 
 <div id="login" class="login-shell">
   <div class="login-grid">
-    <section class="panel">
+    <section class="panel panel-tight">
       <div class="login-brand">
         <div class="login-brand-left">
           <div class="brand-avatar" aria-hidden="true">
@@ -1089,37 +1167,96 @@ button.sm{padding:6px 12px;font-size:14px;border-radius:10px}
           </div>
           <div>
             <div class="login-brand-title">OtterNest · 控制台登录</div>
-            <div class="muted">AI Team OS · 多 Agent 任务治理与本地权威状态</div>
+            <div class="muted">AI Team OS · 账号会话与双重身份验证（2FA）</div>
           </div>
         </div>
         <img class="login-mascot" src="/assets/mascots/otter-wave.png" alt="欢迎水獭">
       </div>
-      <p class="muted">输入启动服务端时配置的管理员令牌，令牌仅保存在当前浏览器页面内存中。</p>
-      <form onsubmit="event.preventDefault();login();">
-        <label for="ownerToken">管理员访问令牌（OTTERNEST_OWNER_TOKEN）</label>
-        <div class="input-row">
-          <input id="ownerToken" type="password" autocomplete="off" placeholder="请输入管理员 Bearer 令牌" required>
-          <button type="button" class="secondary" onclick="toggleTokenVisibility(this)">显示</button>
+
+      <div class="segmented" style="margin-bottom:16px" role="tablist" aria-label="登录方式">
+        <button id="loginTabAccount" type="button" class="seg-btn active" onclick="switchLoginMode('account')">账号密码登录</button>
+        <button id="loginTabToken" type="button" class="seg-btn" onclick="switchLoginMode('token')">令牌直连</button>
+      </div>
+
+      <div id="accountLoginBox">
+        <div id="bootstrapBox" hidden>
+          <div class="callout" style="margin-bottom:12px">首次使用账号登录：请先凭部署令牌初始化管理员账号与密码，进入后可在「系统设置」开启 2FA 动态验证。</div>
+          <form onsubmit="event.preventDefault();bootstrapAccount(event);">
+            <label for="bootOwnerToken">初始化凭据（OTTERNEST_OWNER_TOKEN）</label>
+            <input id="bootOwnerToken" name="owner_token" type="password" autocomplete="off" placeholder="输入服务端部署令牌以核验身份" required>
+            <div class="grid-2" style="margin-bottom:0">
+              <div><label for="bootUsername">管理员用户名</label><input id="bootUsername" name="username" required minlength="3" maxlength="64" placeholder="例如：admin"></div>
+              <div><label for="bootDisplayName">显示名称</label><input id="bootDisplayName" name="display_name" maxlength="120" value="管理员"></div>
+            </div>
+            <label for="bootPassword">登录密码（至少 8 位）</label>
+            <input id="bootPassword" name="password" type="password" required minlength="8" maxlength="128" placeholder="请设置强密码">
+            <div class="actions">
+              <button type="submit">创建账号并登录</button>
+              <button type="button" class="secondary" onclick="switchLoginMode('token')">改用令牌直连</button>
+            </div>
+          </form>
         </div>
-        <div class="actions">
-          <button type="submit">连接控制台</button>
-          <a class="menu-item" style="width:auto;background:#F4F5FA;border:1px solid #E4E6F4" href="/api/docs" target="_blank" rel="noopener">OpenAPI 文档</a>
-        </div>
-      </form>
-      <div id="loginNotice" class="callout" style="margin-top:18px">
+
+        <form id="accountStep1" onsubmit="event.preventDefault();loginAccount(event);">
+          <label for="loginUsername">用户名</label>
+          <input id="loginUsername" name="username" type="text" autocomplete="username" placeholder="请输入管理员用户名" required>
+          <label for="loginPassword">登录密码</label>
+          <div class="input-row">
+            <input id="loginPassword" name="password" type="password" autocomplete="current-password" placeholder="请输入登录密码" required>
+            <button type="button" class="secondary" onclick="toggleInputVisibility('loginPassword', this)">显示</button>
+          </div>
+          <div class="actions">
+            <button type="submit">登录控制台</button>
+            <a class="btn secondary" href="/api/docs" target="_blank" rel="noopener">OpenAPI 文档</a>
+          </div>
+        </form>
+
+        <form id="accountStep2" hidden onsubmit="event.preventDefault();verify2FALogin(event);">
+          <div class="callout" style="margin-bottom:12px">
+            <strong>第二步：双重身份验证（2FA）</strong>
+            <div class="muted" id="mfaUserHint" style="margin-top:4px">请输入验证器 App 生成的 6 位动态验证码，或输入 8 位一次性备用恢复码。</div>
+          </div>
+          <label for="mfaCode">动态验证码 / 备用恢复码</label>
+          <input id="mfaCode" name="code" type="text" autocomplete="one-time-code" placeholder="例如：123456 或 AB12-CD34" required>
+          <div class="actions">
+            <button type="submit">验证并进入控制台</button>
+            <button type="button" class="secondary" onclick="resetMfaStep()">返回重新输入密码</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="tokenLoginBox" hidden>
+        <p class="muted">输入启动服务端时配置的管理员部署令牌，令牌仅保存在当前浏览器页面内存中。</p>
+        <form onsubmit="event.preventDefault();login();">
+          <label for="ownerToken">管理员访问令牌（OTTERNEST_OWNER_TOKEN）</label>
+          <div class="input-row">
+            <input id="ownerToken" type="password" autocomplete="off" placeholder="请输入管理员 Bearer 令牌" required>
+            <button type="button" class="secondary" onclick="toggleTokenVisibility(this)">显示</button>
+          </div>
+          <div class="actions">
+            <button type="submit">连接控制台</button>
+            <a class="btn secondary" href="/api/docs" target="_blank" rel="noopener">OpenAPI 文档</a>
+          </div>
+        </form>
+      </div>
+
+      <div id="loginFeedback" class="login-alert" hidden role="alert"></div>
+      <div id="loginNotice" class="callout" style="margin-top:16px">
         所有任务租约、预算、检查点、外部副作用对账及跨项目共享均以中央数据库为准。
       </div>
     </section>
 
-    <aside class="panel">
+    <aside class="panel panel-tight">
       <div class="card-head" style="margin-bottom:8px">
-        <h2>认证与上线部署边界</h2>
-        <img src="/assets/icons/SVG/功能/lock-安全权限.svg" width="34" height="34" alt="安全边界">
+        <div class="card-title-group">
+          <img class="card-title-icon" src="/assets/icons/SVG/功能/lock-安全权限.svg" alt="安全边界">
+          <h2>认证与安全保护机制</h2>
+        </div>
       </div>
       <ul class="info-list">
-        <li><strong>管理员会话（当前）</strong>：通过环境变量 <code>OTTERNEST_OWNER_TOKEN</code> 恒定时间校验，关闭页签即失效。</li>
-        <li><strong>Agent 独立凭据</strong>：注册时生成一次性 <code>on_agent_*</code> 令牌，数据库只保存 <code>SHA-256</code> 哈希，并按角色与 <code>lease_epoch</code> 隔离。</li>
-        <li><strong>生产上线前提</strong>：当前版本尚未内置企业 SSO / OAuth 与多管理员 RBAC；生产部署必须置于 HTTPS 与企业统一身份认证网关之后。</li>
+        <li><strong>账号登录与会话隔离</strong>：密码使用加盐 <code>scrypt</code> 哈希存储；登录后颁发 12 小时有限会话令牌，退出时服务端立即吊销。</li>
+        <li><strong>RFC 6238 双重身份验证（2FA）</strong>：支持 Google Authenticator、Apple 密码、1Password 等 TOTP 验证器与单次备用恢复码，并强制防重放与 5 次失败临时锁定。</li>
+        <li><strong>部署与自动化兼容</strong>：<code>OTTERNEST_OWNER_TOKEN</code> 仍可用于脚本/CLI 无头调用；生产部署请置于 HTTPS 网关之后。</li>
       </ul>
     </aside>
   </div>
@@ -1180,21 +1317,21 @@ button.sm{padding:6px 12px;font-size:14px;border-radius:10px}
             <span class="avatar-circle" aria-hidden="true">
               <img src="/assets/icons/SVG/装饰/水獭头像.svg" width="28" height="28" alt="管理员">
             </span>
-            <span>管理员</span>
+            <span id="userDisplayName">管理员</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="m6 9 6 6 6-6"/>
             </svg>
           </button>
           <div id="userMenu" class="user-popover" hidden>
-            <div class="user-popover-head">管理员会话 · 本地权威状态</div>
+            <div id="userPopoverHead" class="user-popover-head">管理员会话 · 本地权威状态</div>
             <button class="menu-item" type="button" onclick="toggleUserMenu();refresh()">
               <img src="/assets/icons/SVG/操作/refresh-刷新.svg" width="20" height="20" alt="">刷新实时数据
             </button>
             <a class="menu-item" href="/api/docs" target="_blank" rel="noopener" onclick="toggleUserMenu()">
               <img src="/assets/icons/SVG/操作/file-文件.svg" width="20" height="20" alt="">OpenAPI 接口文档
             </a>
-            <button class="menu-item" type="button" onclick="toggleUserMenu();setPage('settings')">
-              <img src="/assets/icons/SVG/功能/lock-安全权限.svg" width="20" height="20" alt="">连接与安全边界
+            <button class="menu-item" type="button" onclick="toggleUserMenu();goToSecuritySettings()">
+              <img src="/assets/icons/SVG/功能/lock-安全权限.svg" width="20" height="20" alt="">账号与 2FA 安全
             </button>
             <button class="menu-item danger-text" type="button" onclick="toggleUserMenu();logout()">退出控制台</button>
           </div>
@@ -1210,7 +1347,9 @@ button.sm{padding:6px 12px;font-size:14px;border-radius:10px}
 <script>
 let token="",project="",page="overview",projects=[],agents=[],currentPlan=null,searchQuery="";
 let taskFilter="all",taskViewMode="list",projectSubTab="projects",expandedTaskId="",showNewProjectForm=false,showNewTaskForm=false;
-let eventCategory="all";
+let eventCategory="all",loginMode="account",mfaChallengeToken="",mfaUsername="";
+let authStatus={account_configured:false,totp_enabled:false,token_configured:true};
+let cachedAccount=null,cachedAuthEvents=[],pendingTotpSetup=null,revealedRecoveryCodes=null;
 let cachedBriefing=null,cachedShares=[],cachedTasks=[],cachedEvents=[],cachedMembers=[],runtimesMap={},projectStatsMap={};
 
 const NAV_DEFS=[
@@ -1222,7 +1361,7 @@ const NAV_DEFS=[
   ['collaboration','协作与决策','/assets/icons/SVG/导航/network-协作调度.svg','发起团队决策、独立意见审查与二轮协同协商'],
   ['memories','记忆与知识','/assets/icons/SVG/导航/database-记忆与知识.svg','管理项目记忆修订、Skill 评估记录与跨项目知识发布'],
   ['events','事件与审计','/assets/icons/SVG/导航/chart-监控分析.svg','查看不可变项目审计事件流与详细变更载荷'],
-  ['settings','系统设置','/assets/icons/SVG/导航/gear-系统设置.svg','配置项目宪章硬预算、运行状态控制与无密文可携带导出']
+  ['settings','系统设置','/assets/icons/SVG/导航/gear-系统设置.svg','管理账号登录与 2FA 安全、项目宪章硬预算及无密文可携带导出']
 ];
 
 const CAP_LABELS={design:'设计',docs:'文档',coding:'开发',dev:'开发',testing:'测试',research:'调研',analysis:'分析'};
@@ -1248,10 +1387,135 @@ const api=async(path,method="GET",data)=>{
   return out;
 };
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const notice=(text,isError=false)=>{const el=document.getElementById('message');if(!el)return;el.textContent=text;el.className=isError?'error':''};
+const notice=(text,isError=false)=>{
+  const msg=document.getElementById('message');
+  if(msg){msg.textContent=text;msg.className=isError?'error':''}
+  const lf=document.getElementById('loginFeedback');
+  if(lf){
+    if(!text||!document.getElementById('login')||document.getElementById('login').hidden){
+      lf.hidden=true;lf.textContent='';
+    }else{
+      lf.hidden=false;lf.textContent=text;
+      lf.className=isError?'login-alert':'login-alert info';
+    }
+  }
+};
 const safe=async(fn)=>{try{await fn()}catch(e){notice(e.message,true)}};
 function tagCls(v){return 'tag tag-'+String(v||'').replace(/[^a-zA-Z0-9_-]/g,'')}
-function toggleTokenVisibility(btn){const inp=document.getElementById('ownerToken');const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'隐藏':'显示'}
+function toggleInputVisibility(id,btn){
+  const inp=document.getElementById(id);
+  if(!inp)return;
+  const show=inp.type==='password';
+  inp.type=show?'text':'password';
+  if(btn)btn.textContent=show?'隐藏':'显示';
+}
+function toggleTokenVisibility(btn){toggleInputVisibility('ownerToken',btn)}
+
+function switchLoginMode(mode){
+  loginMode=mode==='token'?'token':'account';
+  document.getElementById('loginTabAccount')?.classList.toggle('active',loginMode==='account');
+  document.getElementById('loginTabToken')?.classList.toggle('active',loginMode==='token');
+  const accBox=document.getElementById('accountLoginBox');
+  const tokBox=document.getElementById('tokenLoginBox');
+  if(accBox)accBox.hidden=loginMode!=='account';
+  if(tokBox)tokBox.hidden=loginMode!=='token';
+  renderLoginAccountView();
+  notice('');
+}
+
+function renderLoginAccountView(){
+  const boot=document.getElementById('bootstrapBox');
+  const s1=document.getElementById('accountStep1');
+  const s2=document.getElementById('accountStep2');
+  if(!boot||!s1||!s2)return;
+  if(mfaChallengeToken){
+    boot.hidden=true;s1.hidden=true;s2.hidden=false;
+    const hint=document.getElementById('mfaUserHint');
+    if(hint)hint.textContent=`正在验证账号 @${mfaUsername||'owner'}：请输入验证器 App 生成的 6 位动态验证码，或 8 位一次性备用恢复码。`;
+    return;
+  }
+  s2.hidden=true;
+  const configured=Boolean(authStatus?.account_configured);
+  boot.hidden=configured;
+  s1.hidden=!configured;
+}
+
+function resetMfaStep(){
+  mfaChallengeToken='';mfaUsername='';
+  const mc=document.getElementById('mfaCode');if(mc)mc.value='';
+  renderLoginAccountView();
+  notice('');
+}
+
+async function initAuthStatus(){
+  try{
+    const res=await fetch('/api/v1/auth/status');
+    if(res.ok){authStatus=await res.json()}
+  }catch(_){}
+  renderLoginAccountView();
+}
+
+async function completeLoginSuccess(newToken){
+  token=newToken;
+  mfaChallengeToken='';mfaUsername='';
+  const lp=document.getElementById('loginPassword');if(lp)lp.value='';
+  const mc=document.getElementById('mfaCode');if(mc)mc.value='';
+  const ot=document.getElementById('ownerToken');if(ot)ot.value='';
+  const bt=document.getElementById('bootOwnerToken');if(bt)bt.value='';
+  const bp=document.getElementById('bootPassword');if(bp)bp.value='';
+  document.getElementById('login').hidden=true;
+  document.getElementById('dashboard').hidden=false;
+  notice('');
+  await refresh();
+}
+
+async function authPost(path,body){
+  const res=await fetch('/api/v1'+path,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  const out=await res.json();
+  if(!res.ok)throw Error(out.detail||res.statusText);
+  return out;
+}
+
+async function bootstrapAccount(e){
+  await safe(async()=>{
+    const body=form(e);
+    const out=await authPost('/auth/bootstrap',body);
+    authStatus.account_configured=true;
+    await completeLoginSuccess(out.token);
+  });
+}
+
+async function loginAccount(e){
+  await safe(async()=>{
+    const body=form(e);
+    const out=await authPost('/auth/login',{username:body.username,password:body.password});
+    if(out.status==='mfa_required'){
+      mfaChallengeToken=out.challenge_token;
+      mfaUsername=out.user?.username||body.username;
+      renderLoginAccountView();
+      notice('密码校验通过，请完成第二步双重身份验证（2FA）。',false);
+      setTimeout(()=>document.getElementById('mfaCode')?.focus(),40);
+      return;
+    }
+    await completeLoginSuccess(out.token);
+  });
+}
+
+async function verify2FALogin(e){
+  await safe(async()=>{
+    const body=form(e);
+    if(!mfaChallengeToken)throw Error('认证会话已重置，请重新输入账号密码');
+    const out=await authPost('/auth/2fa/verify',{challenge_token:mfaChallengeToken,code:body.code});
+    await completeLoginSuccess(out.token);
+    if(out.used_recovery_code){
+      notice(`已使用一次性备用恢复码登录（剩余 ${out.user?.recovery_codes_remaining??0} 个恢复码）`);
+    }
+  });
+}
 
 document.addEventListener('keydown',e=>{
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){
@@ -1278,21 +1542,30 @@ async function login(){
   await safe(async()=>{
     token=document.getElementById('ownerToken').value;
     await api('/me');
-    document.getElementById('ownerToken').value='';
-    document.getElementById('login').hidden=true;
-    document.getElementById('dashboard').hidden=false;
-    notice('');
-    await refresh();
+    await completeLoginSuccess(token);
   });
 }
-function logout(){
-  token='';
+async function logout(msg=''){
+  const curTok=token;
+  if(curTok&&curTok.startsWith('on_session_')){
+    try{
+      await fetch('/api/v1/auth/logout',{method:'POST',headers:{'Authorization':'Bearer '+curTok}});
+    }catch(_){}
+  }
+  token='';mfaChallengeToken='';mfaUsername='';pendingTotpSetup=null;revealedRecoveryCodes=null;cachedAccount=null;cachedAuthEvents=[];
   cachedBriefing=null;cachedShares=[];cachedTasks=[];cachedEvents=[];cachedMembers=[];runtimesMap={};projectStatsMap={};
   document.getElementById('dashboard').hidden=true;
   document.getElementById('login').hidden=false;
   document.getElementById('view').textContent='';
-  notice('');
+  await initAuthStatus();
+  switchLoginMode('account');
+  if(msg)notice(msg,false);else notice('');
 }
+function goToSecuritySettings(){
+  setPage('settings');
+  setTimeout(()=>document.getElementById('securityCard')?.scrollIntoView({behavior:'smooth',block:'start'}),120);
+}
+window.addEventListener('DOMContentLoaded',initAuthStatus);
 
 function pendingApprovalsCount(){
   const pa=cachedBriefing?.pending_owner_actions||{};
@@ -1327,8 +1600,17 @@ function onSearchInput(v){
 
 async function refresh(){
   await safe(async()=>{
-    projects=await api('/projects');
-    agents=await api('/agents');
+    const [projs,ags,acc,authEv]=await Promise.all([api('/projects'),api('/agents'),api('/auth/account').catch(()=>null),api('/auth/events').catch(()=>[])]);
+    projects=projs;agents=ags;cachedAccount=acc;cachedAuthEvents=Array.isArray(authEv)?authEv:[];
+    if(acc){authStatus.account_configured=Boolean(acc.account_configured);authStatus.totp_enabled=Boolean(acc.user?.totp_enabled)}
+    const dnEl=document.getElementById('userDisplayName');
+    if(dnEl)dnEl.textContent=acc?.user?.display_name||'管理员';
+    const popEl=document.getElementById('userPopoverHead');
+    if(popEl){
+      const modeTxt=acc?.auth_method==='session'?'账号会话':'部署令牌直连';
+      const mfaTxt=acc?.user?.totp_enabled?' · 2FA 已启用':' · 未启用 2FA';
+      popEl.textContent=(acc?.user?.username?`@${acc.user.username} · `:'')+modeTxt+mfaTxt;
+    }
     const sel=document.getElementById('projectSelect');
     const current=project||sel.value;
     sel.innerHTML='<option value="">选择项目</option>'+projects.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
@@ -1385,6 +1667,23 @@ function formatEventItem(e,taskNameById){
   const k=e.kind||'';
   const p=e.payload||{};
   const taskName=p.title||taskNameById[e.subject_id]||'';
+  if(k.startsWith('owner.')){
+    const labels={
+      'owner.bootstrapped':'初始化了管理员登录账号',
+      'owner.login_succeeded':'管理员账号登录成功',
+      'owner.login_failed':'管理员登录密码校验失败',
+      'owner.2fa_enabled':'已启用双重身份验证（2FA）',
+      'owner.2fa_disabled':'已停用双重身份验证（2FA）',
+      'owner.2fa_failed':'双重身份验证动态码校验失败',
+      'owner.2fa_recovery_used':'使用一次性备用恢复码完成 2FA 登录',
+      'owner.2fa_recovery_regenerated':'已重新生成 8 组 2FA 备用恢复码',
+      'owner.password_changed':'修改了管理员登录密码并吊销旧会话',
+      'owner.session_revoked':'管理员已退出当前账号会话',
+      'owner.sessions_revoked_all':'已注销所有管理员活动会话'
+    };
+    const isWarn=k.includes('failed')||k.includes('disabled');
+    return{icon:isWarn?'/assets/icons/SVG/状态/alert-失败.svg':'/assets/icons/SVG/功能/lock-安全权限.svg',text:labels[k]||`管理员认证事件（${k}）`};
+  }
   if(k.includes('completed')||k.includes('accepted'))return{icon:'/assets/icons/SVG/状态/check-已完成.svg',text:taskName?`任务「${taskName}」已完成`:'任务已验收完成'};
   if(k.includes('review')||k.includes('deliberation')||k.includes('opinion'))return{icon:'/assets/icons/SVG/功能/repeat-A2A协作.svg',text:p.stance?`收到新的 Agent 意见（${p.stance}）`:'收到新的 Agent 独立意见'};
   if(k.includes('command')||k.includes('plan'))return{icon:'/assets/icons/SVG/功能/sparkle-智能规划.svg',text:p.action?`创建了新的操作计划（${p.action}）`:'创建了新的操作计划'};
@@ -1433,6 +1732,42 @@ function statusBadge(s){
     waiting_dependencies:'待依赖',blocked:'已阻塞',completed:'已完成',cancelled:'已取消'
   };
   return `<span class="${tagCls(s)}">${esc(labels[s]||s)}</span>`;
+}
+function projectStatusBadge(s){
+  const labels={active:'运行中',paused:'已暂停',archived:'已归档'};
+  return `<span class="${tagCls(s)}">${esc(labels[s]||s)}</span>`;
+}
+function sideEffectStatusBadge(s){
+  const labels={pending:'待登记',unknown:'状态未知',verified_executed:'已核对执行',verified_not_executed:'已核对未执行'};
+  return `<span class="${tagCls(s)}">${esc(labels[s]||s)}</span>`;
+}
+function knowledgeStatusBadge(s,prefix=''){
+  const labels={proposed:'待发布审批',published:'已发布',archived:'已归档'};
+  return `<span class="${tagCls(s)}">${esc(prefix)}${esc(labels[s]||s)}</span>`;
+}
+function decisionStatusBadge(s){
+  const labels={proposed:'待裁决',approved:'已裁决',resolved:'已裁决',rejected:'已驳回'};
+  return `<span class="${tagCls(s)}">${esc(labels[s]||s)}</span>`;
+}
+function stanceBadge(s){
+  const labels={support:'支持',concern:'保留关注',alternative:'替代方案',oppose:'反对'};
+  return `<span class="${tagCls(s)}">${esc(labels[s]||s)}</span>`;
+}
+function verdictBadge(v){
+  const labels={pass:'评估通过',concern:'存在隐患',fail:'未通过'};
+  return `<span class="${tagCls(v)}">${esc(labels[v]||v)}</span>`;
+}
+function itemKindLabel(k){return k==='skill'?'Skill':(k==='memory'?'项目记忆':String(k||''))}
+function pageHero(iconSrc,title,subtitle,mascotSrc,pillsHtml=''){
+  return `<section class="page-hero">
+    <div class="page-hero-left">
+      <div class="page-hero-title"><img src="${iconSrc}" width="32" height="32" alt=""><span>${esc(title)}</span></div>
+      <p class="page-hero-sub">${esc(subtitle)}</p>
+      ${pillsHtml?`<div class="page-hero-pills">${pillsHtml}</div>`:''}
+    </div>
+    <img class="page-hero-mascot" src="${mascotSrc}" alt="">
+    <img class="page-hero-wave" src="/assets/icons/SVG/装饰/水波装饰.svg" alt="" aria-hidden="true">
+  </section>`;
 }
 
 function taskProgressPct(t){
@@ -1775,49 +2110,67 @@ async function render(){
 
   if(page==='agents'){
     const filteredAgents=agents.filter(a=>!q||a.name.toLowerCase().includes(q)||(a.platform||'').toLowerCase().includes(q));
+    const onlineAgents=filteredAgents.filter(a=>isAgentOnline(a.id)).length;
+    const modeLabel={manual:'人工接入',polling:'主动轮询',remote:'远端 A2A/Webhook'};
     root.innerHTML=`
-    <div class="panel">
+    ${pageHero(
+      '/assets/icons/SVG/导航/bot-Agent管理.svg',
+      'Agent 目录与执行环境',
+      '声明能力不等于已验证能力；运行实例状态由节点主动心跳上报。',
+      '/assets/mascots/otter-laptop.png',
+      `<span class="tag tag-info">已筛选 ${esc(filteredAgents.length)} 个节点</span><span class="tag ${onlineAgents>0?'tag-ok':'tag-warn'}">在线心跳 ${esc(onlineAgents)} 个</span>`
+    )}
+    <div class="card">
       <div class="card-head">
-        <div>
-          <h2>Agent 目录与执行环境</h2>
-          <p class="muted" style="margin:4px 0 0">声明能力不等于已验证能力；运行实例状态由节点主动心跳上报。</p>
+        <div class="card-title-group">
+          <img class="card-title-icon" src="/assets/icons/SVG/导航/bot-Agent管理.svg" alt="">
+          <h2>已注册 Agent 节点</h2>
         </div>
-        <span class="tag tag-info">共 ${esc(filteredAgents.length)} 个 Agent</span>
+        <span class="chip">共 ${esc(filteredAgents.length)} 个节点</span>
       </div>
-      ${filteredAgents.map(a=>{
+      ${filteredAgents.length?`<div class="agents-grid">${filteredAgents.map(a=>{
         const online=isAgentOnline(a.id);
         return item(`
-        <div class="item-head">
-          <div class="stack">
-            <div class="otter-avatar"><img src="${agentMascot(a)}" alt="${esc(a.name)}"></div>
-            <div>
-              <div class="stack">
-                <span class="item-title">${esc(a.name)}</span>
-                <span class="chip">${esc(a.platform)}</span>
-                <span class="chip">${esc(a.execution_mode)}</span>
-                <span class="tag ${online?'tag-ok':'tag-warn'}">
-                  <img src="/assets/icons/SVG/状态/${online?'check-在线':'ban-离线'}.svg" width="16" height="16" alt="">
-                  ${online?'在线心跳':'未上报心跳'}
-                </span>
+        <div>
+          <div class="item-head">
+            <div class="stack">
+              <div class="otter-avatar"><img src="${agentMascot(a)}" alt="${esc(a.name)}"></div>
+              <div>
+                <div class="stack">
+                  <span class="item-title">${esc(a.name)}</span>
+                  <span class="chip">${esc(a.platform)}</span>
+                  <span class="chip">${esc(modeLabel[a.execution_mode]||a.execution_mode)}</span>
+                  <span class="tag ${online?'tag-ok':'tag-warn'}">
+                    <img src="/assets/icons/SVG/状态/${online?'check-在线':'ban-离线'}.svg" width="16" height="16" alt="">
+                    ${online?'在线心跳':'未上报心跳'}
+                  </span>
+                </div>
+                <div class="muted" style="margin-top:4px">ID：<code>${esc(a.id)}</code></div>
               </div>
-              <div class="muted" style="margin-top:4px">ID：<code>${esc(a.id)}</code></div>
             </div>
+            <span class="tag ${a.enabled?'tag-ok':'tag-bad'}">${a.enabled?'已启用':'已禁用'}</span>
           </div>
-          <span class="tag ${a.enabled?'tag-ok':'tag-bad'}">${a.enabled?'已启用':'已禁用'}</span>
+          <div><span class="muted">声明能力：</span>${(a.declared_capabilities||[]).length?(a.declared_capabilities||[]).map(c=>`<span class="chip">${esc(capLabel(c))} (${esc(c)})</span>`).join(' '):'<span class="muted">无</span>'}</div>
+          <div style="margin-top:8px"><span class="muted">已验证能力：</span>${(a.verified_capabilities||[]).length?(a.verified_capabilities||[]).map(c=>`<span class="tag tag-ok">${esc(capLabel(c))}</span>`).join(' '):'<span class="muted">尚未验证</span>'}</div>
         </div>
-        <div><span class="muted">声明能力：</span>${(a.declared_capabilities||[]).length?(a.declared_capabilities||[]).map(c=>`<span class="chip">${esc(capLabel(c))} (${esc(c)})</span>`).join(' '):'<span class="muted">无</span>'}</div>
-        <div style="margin-top:8px"><span class="muted">已验证能力：</span>${(a.verified_capabilities||[]).length?(a.verified_capabilities||[]).map(c=>`<span class="tag tag-ok">${esc(capLabel(c))}</span>`).join(' '):'<span class="muted">尚未验证</span>'}</div>
-        <div class="actions">
-          <button class="secondary sm" onclick="showRuntimes('${esc(a.id)}')"><img src="/assets/icons/SVG/功能/server-运行实例.svg" width="18" height="18" alt="">查看与注册运行实例</button>
-          <button class="secondary sm" onclick="verifyCapabilities('${esc(a.id)}')">核验能力</button>
-        </div>
-        <div id="runtime-${esc(a.id)}"></div>`);
-      }).join('')||`<div class="empty-state"><img src="/assets/mascots/otter-sleep.png" alt=""><p class="muted">暂无已注册 Agent</p></div>`}
+        <div>
+          <div class="actions">
+            <button class="secondary sm" onclick="showRuntimes('${esc(a.id)}')"><img src="/assets/icons/SVG/功能/server-运行实例.svg" width="18" height="18" alt="">查看与注册运行实例</button>
+            <button class="secondary sm" onclick="verifyCapabilities('${esc(a.id)}')">核验能力</button>
+          </div>
+          <div id="runtime-${esc(a.id)}"></div>
+        </div>`);
+      }).join('')}</div>`:`<div class="empty-state"><img src="/assets/mascots/otter-sleep.png" alt=""><p class="muted">暂无已注册 Agent</p></div>`}
     </div>
     <div class="grid-2">
       ${project?`
-      <div class="panel">
-        <h2>将 Agent 加入当前项目</h2>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title-group">
+            <img class="card-title-icon" src="/assets/icons/SVG/功能/repeat-A2A协作.svg" alt="">
+            <h2>将 Agent 加入当前项目</h2>
+          </div>
+        </div>
         <form onsubmit="addMember(event)">
           <label>选择 Agent</label>
           <select name="agent_id">${agents.filter(a=>a.enabled).map(a=>`<option value="${esc(a.id)}">${esc(a.name)}（${esc(a.platform)}）</option>`).join('')}</select>
@@ -1826,8 +2179,13 @@ async function render(){
           <div class="actions"><button type="submit">分配项目权限</button></div>
         </form>
       </div>`:''}
-      <div class="panel">
-        <h2>注册新 Agent</h2>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title-group">
+            <img class="card-title-icon" src="/assets/icons/SVG/功能/sparkle-智能规划.svg" alt="">
+            <h2>注册新 Agent</h2>
+          </div>
+        </div>
         <form onsubmit="createAgent(event)">
           <label>名称</label><input name="name" required placeholder="例如：codex-runner">
           <label>平台标识</label><input name="platform" required placeholder="例如：codex / gemini / muse">
@@ -1844,7 +2202,8 @@ async function render(){
   }
 
   if(!project){
-    root.innerHTML='<div class="panel"><h2>尚未选择项目</h2><p class="muted">请先在「项目与任务」页创建或选择一个工作项目。</p><div class="actions"><button onclick="setPage(\'projects\')">前往项目与任务</button></div></div>';
+    const emptyProjHtml=`<div class="card empty-state"><img src="/assets/mascots/otter-sleep.png" alt="尚未选择项目"><h2>尚未选择工作项目</h2><p class="muted">请先在「项目与任务」页创建或选择一个工作项目，再管理任务、调度与项目设置。</p><div class="actions"><button type="button" onclick="setPage('projects')">前往项目与任务</button></div></div>`;
+    root.innerHTML=page==='settings'?`${emptyProjHtml}${renderSecurityCard()}`:emptyProjHtml;
     return;
   }
 
@@ -1893,10 +2252,10 @@ async function render(){
           <img class="cmd-hero-wave" src="/assets/icons/SVG/装饰/水波装饰.svg" alt="" aria-hidden="true">
         </div>
 
-        <div class="panel">
+        <div class="card">
           <div class="card-head">
-            <div class="stack">
-              <img src="/assets/icons/SVG/功能/paper-plane-AI指挥.svg" width="30" height="30" alt="">
+            <div class="card-title-group">
+              <img class="card-title-icon" src="/assets/icons/SVG/功能/paper-plane-AI指挥.svg" alt="">
               <h2>给 AI 团队下达指令</h2>
             </div>
             <div class="segmented">
@@ -1924,7 +2283,7 @@ async function render(){
             <div class="grid-2">
               <div>
                 <label>目标任务</label>
-                <select name="task_id" required>${tasks.map(t=>`<option value="${esc(t.id)}">${esc(t.title)} · ${esc(t.status)} · v${esc(t.version)}</option>`).join('')}</select>
+                <select name="task_id" required>${tasks.map(t=>`<option value="${esc(t.id)}">${esc(t.title)} · v${esc(t.version)}</option>`).join('')}</select>
               </div>
               <div>
                 <label>管理动作</label>
@@ -1951,9 +2310,9 @@ async function render(){
           </form>`}
         </div>
 
-        <div id="commandPreview" class="panel" aria-live="polite">
+        <div id="commandPreview" class="card" aria-live="polite">
           <div class="card-head">
-            <div class="stack"><img src="/assets/icons/SVG/导航/clipboard-check-任务中心.svg" width="30" height="30" alt=""><h2>执行计划（待确认）</h2></div>
+            <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/导航/clipboard-check-任务中心.svg" alt=""><h2>执行计划（待确认）</h2></div>
             <span class="tag tag-info">两段式安全门禁</span>
           </div>
           <p class="muted">在上方输入指令或选择结构化操作后，此处将显示待确认的执行计划详情。确认提交前不会修改数据库状态。</p>
@@ -1967,9 +2326,9 @@ async function render(){
           </div>
         </div>
 
-        <div class="panel">
+        <div class="card">
           <div class="card-head">
-            <div class="stack"><img src="/assets/icons/SVG/导航/bot-Agent管理.svg" width="30" height="30" alt=""><h2>Agent 实时状态</h2></div>
+            <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/导航/bot-Agent管理.svg" alt=""><h2>Agent 实时状态</h2></div>
             <button class="card-link" type="button" onclick="setPage('agents')">前往全部 Agent →</button>
           </div>
           <div class="agent-rows">
@@ -1992,9 +2351,9 @@ async function render(){
       </div>
 
       <aside class="cmd-rail">
-        <div class="panel">
+        <div class="card">
           <div class="card-head">
-            <div class="stack"><img src="/assets/icons/SVG/操作/bell-通知.svg" width="28" height="28" alt=""><h2>审批提醒</h2></div>
+            <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/操作/bell-通知.svg" alt=""><h2>审批提醒</h2></div>
             <span class="nav-badge">${esc(pendingApprovalsCount())}</span>
           </div>
           ${alertItems.map(al=>`
@@ -2004,9 +2363,9 @@ async function render(){
             </div>`).join('')||`<div class="empty-state" style="padding:18px 8px"><img src="/assets/mascots/otter-celebrate.png" style="width:80px;height:80px" alt=""><p class="muted">暂无待审批提醒</p></div>`}
         </div>
 
-        <div class="panel">
+        <div class="card">
           <div class="card-head">
-            <h2>最近活动</h2>
+            <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/导航/chart-监控分析.svg" alt=""><h2>最近活动</h2></div>
             <button class="card-link" type="button" onclick="setPage('events')">查看全部 →</button>
           </div>
           <div class="timeline">
@@ -2020,8 +2379,11 @@ async function render(){
           </div>
         </div>
 
-        <div class="panel">
-          <div class="card-head"><h2>Agent 能力概览</h2><span class="chip">${esc(agents.length)} 节点</span></div>
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/功能/sparkle-智能规划.svg" alt=""><h2>Agent 能力概览</h2></div>
+            <span class="chip">${esc(agents.length)} 节点</span>
+          </div>
           ${capGroups.map(g=>{
             const count=agents.filter(a=>(a.verified_capabilities||a.declared_capabilities||[]).some(c=>g.keys.includes(c))).length;
             return `<div class="cap-stat-row">
@@ -2051,24 +2413,31 @@ async function render(){
     const pendingKnowledge=[...ms.filter(m=>m.status==='proposed').map(m=>({kind:'memory',id:m.id,title:m.title,body:m.content})),...sks.filter(s=>s.status==='proposed').map(s=>({kind:'skill',id:s.id,title:s.name,body:s.content}))];
     const totalPending=needApproval.length+unreconciledSes.length+pendingShares.length+pendingDecisions.length+pendingKnowledge.length;
 
+    const approvalsHero=pageHero(
+      '/assets/icons/SVG/导航/shield-check-审批管理.svg',
+      '操作与知识审批中心',
+      '覆盖高风险任务授权、成果验收、unknown 外部副作用核对及跨项目知识共享审批。',
+      totalPending===0?'/assets/mascots/otter-celebrate.png':'/assets/mascots/otter-checklist.png',
+      totalPending===0
+        ?'<span class="tag tag-ok">当前无待审批项</span>'
+        :`<span class="tag tag-warn">待复核 ${esc(totalPending)} 项</span><span class="chip">任务 ${esc(needApproval.length)}</span><span class="chip">副作用 ${esc(unreconciledSes.length)}</span><span class="chip">共享与知识 ${esc(pendingShares.length+pendingDecisions.length+pendingKnowledge.length)}</span>`
+    );
+
     if(totalPending===0){
-      root.innerHTML=`<div class="card empty-state"><img src="/assets/mascots/otter-celebrate.png" alt="已清空待审批"><h2>所有待审批事项已处理完毕</h2><p class="muted">当前项目不存在待授权高风险任务、未核对外部副作用或待审批共享提案。</p></div>`;
+      root.innerHTML=`${approvalsHero}<div class="card empty-state"><img src="/assets/mascots/otter-celebrate.png" alt="已清空待审批"><h2>所有待审批事项已处理完毕</h2><p class="muted">当前项目不存在待授权高风险任务、未核对外部副作用或待审批共享提案。</p></div>`;
       return;
     }
 
     root.innerHTML=`
-    <div class="mascot-banner">
-      <img src="/assets/mascots/otter-checklist.png" alt="审批清单水獭">
-      <div>
-        <div class="item-title">待审批中心 · 当前共 ${esc(totalPending)} 项需管理员复核</div>
-        <p class="muted" style="margin:2px 0 0">覆盖高风险任务授权、成果验收、unknown 外部副作用核对及跨项目知识共享审批。</p>
-      </div>
-    </div>
+    ${approvalsHero}
     <div class="grid-2">
-      <div class="panel">
-        <div class="card-head"><h2>任务授权、验收与阻塞</h2><span class="tag tag-warn">${esc(needApproval.length)} 项</span></div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/导航/clipboard-check-任务中心.svg" alt=""><h2>任务授权、验收与阻塞</h2></div>
+          <span class="tag tag-warn">${esc(needApproval.length)} 项</span>
+        </div>
         ${needApproval.map(t=>item(`
-          <div class="item-head"><span class="item-title">${esc(t.title)}</span><span class="${tagCls(t.status)}">${esc(t.status)} · ${esc(t.risk)}</span></div>
+          <div class="item-head"><span class="item-title">${esc(t.title)}</span><div class="stack">${statusBadge(t.status)}<span class="chip">${esc(t.risk)}</span></div></div>
           <p class="muted">${esc(t.instruction)}</p>
           <div class="actions">
             ${t.status==='waiting_approval'?`<button class="sm" onclick="action('${esc(t.id)}','authorize')">批准执行</button>`:''}
@@ -2078,10 +2447,13 @@ async function render(){
         `)).join('')||'<p class="muted">暂无待授权或待验收任务</p>'}
       </div>
 
-      <div class="panel">
-        <div class="card-head"><h2>待核对外部副作用台账</h2><span class="tag tag-bad">${esc(unreconciledSes.length)} 项</span></div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/状态/alert-失败.svg" alt=""><h2>待核对外部副作用台账</h2></div>
+          <span class="tag tag-bad">${esc(unreconciledSes.length)} 项</span>
+        </div>
         ${unreconciledSes.map(se=>item(`
-          <div class="item-head"><span class="item-title">${esc(se.task_title)} · ${esc(se.target_system)}</span><span class="${tagCls(se.status)}">${esc(se.status)}</span></div>
+          <div class="item-head"><span class="item-title">${esc(se.task_title)} · ${esc(se.target_system)}</span>${sideEffectStatusBadge(se.status)}</div>
           <p>${esc(se.description)}</p>
           <p class="muted">幂等键：<code>${esc(se.idempotency_key)}</code> · epoch ${esc(se.lease_epoch)}</p>
           <div class="actions">
@@ -2093,10 +2465,13 @@ async function render(){
     </div>
 
     <div class="grid-2">
-      <div class="panel">
-        <div class="card-head"><h2>跨项目知识共享审批</h2><span class="tag tag-warn">${esc(pendingShares.length)} 项</span></div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/功能/repeat-A2A协作.svg" alt=""><h2>跨项目知识共享审批</h2></div>
+          <span class="tag tag-warn">${esc(pendingShares.length)} 项</span>
+        </div>
         ${pendingShares.map(sh=>item(`
-          <div class="item-head"><span class="item-title">${esc(sh.item_kind)} 跨项目推广</span><span class="${tagCls(sh.status)}">${esc(sh.status)}</span></div>
+          <div class="item-head"><span class="item-title">${esc(itemKindLabel(sh.item_kind))} 跨项目推广</span>${knowledgeStatusBadge(sh.status)}</div>
           <p>${esc(sh.rationale)}</p>
           <p class="muted">目标项目：<code>${esc(sh.target_project_id)}</code></p>
           <div class="actions">
@@ -2106,15 +2481,18 @@ async function render(){
         `)).join('')||'<p class="muted">暂无待审批共享提案</p>'}
       </div>
 
-      <div class="panel">
-        <div class="card-head"><h2>待裁决决策与知识发布</h2><span class="tag tag-info">${esc(pendingDecisions.length+pendingKnowledge.length)} 项</span></div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/功能/book-知识库.svg" alt=""><h2>待裁决决策与知识发布</h2></div>
+          <span class="tag tag-info">${esc(pendingDecisions.length+pendingKnowledge.length)} 项</span>
+        </div>
         ${pendingDecisions.map(d=>item(`
-          <div class="item-head"><span class="item-title">${esc(d.question)}</span><span class="${tagCls(d.status)}">决策</span></div>
+          <div class="item-head"><span class="item-title">${esc(d.question)}</span>${decisionStatusBadge(d.status)}</div>
           <p>${esc(d.resolution)}</p>
           <div class="actions"><button class="sm" onclick="resolveDecision('${esc(d.id)}')">确认裁决</button> <button class="secondary sm" onclick="setPage('collaboration')">前往协作详情</button></div>
         `)).join('')}
         ${pendingKnowledge.map(k=>item(`
-          <div class="item-head"><span class="item-title">${esc(k.title)}</span><span class="tag tag-warn">待发布 ${esc(k.kind)}</span></div>
+          <div class="item-head"><span class="item-title">${esc(k.title)}</span>${knowledgeStatusBadge('proposed',itemKindLabel(k.kind)+' · ')}</div>
           <p class="muted">${esc(k.body)}</p>
           <div class="actions">${k.kind==='memory'?`<button class="sm" onclick="publish('${esc(k.id)}')">发布记忆</button>`:`<button class="sm" onclick="publishSkill('${esc(k.id)}')">发布 Skill</button>`}</div>
         `)).join('')}
@@ -2127,18 +2505,21 @@ async function render(){
   if(page==='collaboration'){
     const [ds,shs]=await Promise.all([api('/projects/'+project+'/decisions'),api('/projects/'+project+'/knowledge-shares')]);
     root.innerHTML=`
-    <div class="mascot-banner">
-      <img src="/assets/mascots/otter-thinking.png" alt="思考协作水獭">
-      <div>
-        <div class="item-title">多 Agent 决策协同与二轮协商</div>
-        <p class="muted" style="margin:2px 0 0">支持先收集独立意见、配置锁定二轮名单并开启反驳与补充，最终裁决权始终归属管理员。</p>
-      </div>
-    </div>
+    ${pageHero(
+      '/assets/icons/SVG/导航/network-协作调度.svg',
+      '多 Agent 决策协同与二轮协商',
+      '支持先收集独立意见、配置锁定二轮名单并开启反驳与补充，最终裁决权始终归属管理员。',
+      '/assets/mascots/otter-thinking.png',
+      `<span class="chip">团队决策 ${esc(ds.length)} 项</span><span class="chip">共享提案 ${esc(shs.length)} 条</span>`
+    )}
     <div class="grid-2">
-      <div class="panel">
-        <div class="card-head"><h2>团队决策与多轮协商</h2><img src="/assets/icons/SVG/功能/repeat-A2A协作.svg" width="32" height="32" alt=""></div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/功能/repeat-A2A协作.svg" alt=""><h2>团队决策与多轮协商</h2></div>
+          <span class="chip">${esc(ds.length)} 条</span>
+        </div>
         ${ds.map(d=>item(`
-          <div class="item-head"><span class="item-title">${esc(d.question)}</span><span class="${tagCls(d.status)}">${esc(d.status)}</span></div>
+          <div class="item-head"><span class="item-title">${esc(d.question)}</span>${decisionStatusBadge(d.status)}</div>
           <p>${esc(d.resolution)}</p>
           <div class="actions">
             <button class="secondary sm" onclick="showDecisionReviews('${esc(d.id)}')">查看独立意见</button>
@@ -2156,11 +2537,14 @@ async function render(){
         </form>
       </div>
 
-      <div class="panel">
-        <div class="card-head"><h2>跨项目知识推广记录</h2><span class="chip">${esc(shs.length)} 条</span></div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/功能/book-知识库.svg" alt=""><h2>跨项目知识推广记录</h2></div>
+          <span class="chip">${esc(shs.length)} 条</span>
+        </div>
         <p class="muted">提案人须同时具备源项目与目标项目成员资格；批准后在目标项目生成带来源溯源的独立克隆副本。</p>
         ${shs.map(sh=>item(`
-          <div class="item-head"><span class="item-title">${esc(sh.item_kind)} 跨项目共享</span><span class="${tagCls(sh.status)}">${esc(sh.status)}</span></div>
+          <div class="item-head"><span class="item-title">${esc(itemKindLabel(sh.item_kind))} 跨项目共享</span>${knowledgeStatusBadge(sh.status)}</div>
           <p>${esc(sh.rationale)}</p>
           <p class="muted"><code>${esc(sh.source_project_id)}</code> → <code>${esc(sh.target_project_id)}</code></p>
           <p class="muted">来源条目：<code>${esc(sh.source_item_id)}</code>${sh.promoted_item_id?` · 目标克隆 ID：<code>${esc(sh.promoted_item_id)}</code>`:''}</p>
@@ -2178,18 +2562,21 @@ async function render(){
     const filteredM=ms.filter(m=>!q||m.title.toLowerCase().includes(q)||m.content.toLowerCase().includes(q));
     const filteredS=sks.filter(s=>!q||s.name.toLowerCase().includes(q)||s.content.toLowerCase().includes(q));
     root.innerHTML=`
-    <div class="mascot-banner">
-      <img src="/assets/mascots/otter-reading.png" alt="阅读知识库水獭">
-      <div>
-        <div class="item-title">团队记忆与可复用 Skills 台账</div>
-        <p class="muted" style="margin:2px 0 0">支持记忆版本修订与归档、Skill 实战评估打分，以及经审批的跨项目安全克隆。</p>
-      </div>
-    </div>
+    ${pageHero(
+      '/assets/icons/SVG/导航/database-记忆与知识.svg',
+      '团队记忆与可复用 Skills 台账',
+      '支持记忆版本修订与归档、Skill 实战评估打分，以及经审批的跨项目安全克隆。',
+      '/assets/mascots/otter-reading.png',
+      `<span class="chip">项目记忆 ${esc(filteredM.length)} 条</span><span class="chip">Skills ${esc(filteredS.length)} 个</span>`
+    )}
     <div class="grid-2">
-      <div class="panel">
-        <div class="card-head"><h2>项目记忆与版本修订</h2><img src="/assets/icons/SVG/功能/book-知识库.svg" width="32" height="32" alt=""></div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/功能/book-知识库.svg" alt=""><h2>项目记忆与版本修订</h2></div>
+          <span class="chip">${esc(filteredM.length)} 条</span>
+        </div>
         ${filteredM.map(m=>item(`
-          <div class="item-head"><span class="item-title">${esc(m.title)}</span><span class="${tagCls(m.status)}">${esc(m.status)} · v${esc(m.version||1)}</span></div>
+          <div class="item-head"><span class="item-title">${esc(m.title)}</span>${knowledgeStatusBadge(m.status,`v${m.version||1} · `)}</div>
           <p>${esc(m.content)}</p>
           <p class="muted"><strong>出处：</strong>${esc(m.source)}</p>
           <div class="actions">
@@ -2206,10 +2593,13 @@ async function render(){
           <div class="actions"><button type="submit">提交记忆提案</button></div>
         </form>
       </div>
-      <div class="panel">
-        <div class="card-head"><h2>Skills 生命周期与结构化评估</h2><img src="/assets/icons/SVG/功能/package-应用扩展.svg" width="32" height="32" alt=""></div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/功能/package-应用扩展.svg" alt=""><h2>Skills 生命周期与结构化评估</h2></div>
+          <span class="chip">${esc(filteredS.length)} 个</span>
+        </div>
         ${filteredS.map(sk=>item(`
-          <div class="item-head"><span class="item-title">${esc(sk.name)}</span><span class="${tagCls(sk.status)}">v${esc(sk.version)} · ${esc(sk.status)}</span></div>
+          <div class="item-head"><span class="item-title">${esc(sk.name)}</span>${knowledgeStatusBadge(sk.status,`v${sk.version} · `)}</div>
           <p>${esc(sk.content)}</p>
           <p class="muted"><strong>来源：</strong>${esc(sk.source)}</p>
           <div class="actions">
@@ -2227,30 +2617,53 @@ async function render(){
   }
 
   if(page==='events'){
-    const ev=cachedEvents;
+    const evMap=new Map();
+    [...(cachedEvents||[]),...(cachedAuthEvents||[])].forEach(x=>{if(x&&x.id!=null)evMap.set(x.id,x)});
+    const ev=[...evMap.values()].sort((a,b)=>(b.id||0)-(a.id||0));
     const taskNameMap=Object.fromEntries((cachedTasks||[]).map(t=>[t.id,t.title]));
     const filteredEv=ev.filter(e=>{
       if(q&&!e.kind.toLowerCase().includes(q)&&!JSON.stringify(e.payload||'').toLowerCase().includes(q))return false;
       if(eventCategory==='task'&&!e.kind.startsWith('task.'))return false;
       if(eventCategory==='approval'&&!(e.kind.includes('side_effect')||e.kind.includes('share')||e.kind.includes('authorized')))return false;
       if(eventCategory==='knowledge'&&!(e.kind.includes('memory')||e.kind.includes('skill')||e.kind.includes('decision')))return false;
+      if(eventCategory==='auth'&&!e.kind.startsWith('owner.'))return false;
       return true;
     });
     root.innerHTML=`
-    <div class="panel">
+    ${pageHero(
+      '/assets/icons/SVG/导航/chart-监控分析.svg',
+      '不可变审计事件流',
+      '记录每步任务状态迁移、租约 epoch、外部副作用台账、账号登录 2FA 及决策协商轨迹。',
+      '/assets/mascots/otter-explorer.png',
+      `<span class="chip">审计事件总计 ${esc(ev.length)} 条</span><span class="tag tag-info">筛选命中 ${esc(filteredEv.length)} 条</span>`
+    )}
+    <div class="card">
       <div class="card-head">
-        <div><h2>不可变审计事件流</h2><p class="muted" style="margin:4px 0 0">记录每步任务状态迁移、租约 epoch、副作用声明及决策协商过程。</p></div>
-        <div class="stack">
-          <button class="ghost sm" type="button" onclick="eventCategory='all';render()">全部 (${esc(ev.length)})</button>
-          <button class="ghost sm" type="button" onclick="eventCategory='task';render()">任务事件</button>
-          <button class="ghost sm" type="button" onclick="eventCategory='approval';render()">授权与副作用</button>
-          <button class="ghost sm" type="button" onclick="eventCategory='knowledge';render()">决策与知识</button>
+        <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/导航/chart-监控分析.svg" alt=""><h2>审计时间线（仅追加不可篡改）</h2></div>
+        <div class="segmented">
+          <button type="button" class="seg-btn ${eventCategory==='all'?'active':''}" onclick="eventCategory='all';render()">全部 (${esc(ev.length)})</button>
+          <button type="button" class="seg-btn ${eventCategory==='task'?'active':''}" onclick="eventCategory='task';render()">任务</button>
+          <button type="button" class="seg-btn ${eventCategory==='approval'?'active':''}" onclick="eventCategory='approval';render()">授权与副作用</button>
+          <button type="button" class="seg-btn ${eventCategory==='knowledge'?'active':''}" onclick="eventCategory='knowledge';render()">决策与知识</button>
+          <button type="button" class="seg-btn ${eventCategory==='auth'?'active':''}" onclick="eventCategory='auth';render()">账号与 2FA</button>
         </div>
       </div>
-      ${filteredEv.slice(0,40).map(e=>{
-        const meta=formatEventItem(e,taskNameMap);
-        return item(`<div class="item-head"><div class="stack"><img src="${meta.icon}" width="26" height="26" alt=""><span class="item-title">${esc(meta.text)}</span><span class="tag tag-info">${esc(e.kind)}</span></div><span class="muted">${esc(relTime(e.created_at))} · ${esc(e.created_at)}</span></div><p class="muted">主体 ID：<code>${esc(e.subject_id)}</code></p>${e.payload?`<pre>${esc(JSON.stringify(e.payload,null,2))}</pre>`:''}`);
-      }).join('')||'<p class="muted">当前筛选下暂无事件记录</p>'}
+      <div class="timeline">
+        ${filteredEv.slice(0,50).map(e=>{
+          const meta=formatEventItem(e,taskNameMap);
+          return `<div class="timeline-row" style="flex-direction:column;align-items:stretch;gap:8px;padding:12px 10px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+              <div class="timeline-left"><img class="tl-img" src="${meta.icon}" width="32" height="32" alt=""><strong>${esc(meta.text)}</strong><span class="tag tag-info">${esc(e.kind)}</span></div>
+              <span class="tl-time">${esc(relTime(e.created_at))}</span>
+            </div>
+            <details class="payload-details">
+              <summary>查看主体与 JSON 载荷（${esc(e.created_at)}）</summary>
+              <p class="muted" style="margin:8px 0 6px">主体 ID：<code>${esc(e.subject_id)}</code></p>
+              ${e.payload?`<pre>${esc(JSON.stringify(e.payload,null,2))}</pre>`:'<p class="muted">无附加 JSON 载荷</p>'}
+            </details>
+          </div>`;
+        }).join('')||`<div class="empty-state"><img src="/assets/mascots/otter-sleep.png" alt=""><p class="muted">当前筛选下暂无事件记录</p></div>`}
+      </div>
     </div>`;
     return;
   }
@@ -2260,13 +2673,18 @@ async function render(){
     const c=b.charter;
     const statusOtter=b.project.status==='paused'?'/assets/mascots/otter-float.png':(b.project.status==='archived'?'/assets/mascots/otter-music.png':'/assets/mascots/otter-laptop.png');
     root.innerHTML=`
-    <div class="panel">
-      <div class="item-head">
-        <div class="stack">
-          <div class="otter-avatar"><img src="${statusOtter}" alt="项目状态水獭"></div>
-          <div><h2>${esc(b.project.name)} · 运行宪章与硬预算</h2><p class="muted" style="margin:4px 0 0">${esc(b.honesty_notice)}</p></div>
-        </div>
-        <span class="${tagCls(b.project.status)}">${esc(b.project.status)}</span>
+    ${pageHero(
+      '/assets/icons/SVG/导航/gear-系统设置.svg',
+      `${b.project.name} · 系统与运行宪章设置`,
+      b.honesty_notice,
+      statusOtter,
+      `${projectStatusBadge(b.project.status)}<span class="chip">并发上限 ${esc(c.running_tasks)}/${esc(c.max_concurrent_tasks)}</span><span class="chip">任务总量 ${esc(c.active_total_tasks)}/${esc(c.max_total_tasks)}</span>`
+    )}
+    ${renderSecurityCard()}
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/导航/chart-监控分析.svg" alt=""><h2>硬预算执行配额</h2></div>
+        ${projectStatusBadge(b.project.status)}
       </div>
       <div class="meter-grid">
         ${meterCard('并发运行任务硬预算',c.running_tasks,c.max_concurrent_tasks)}
@@ -2275,10 +2693,12 @@ async function render(){
     </div>
 
     <div class="grid-2">
-      <div class="panel">
-        <h2>状态切换与硬预算边界</h2>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/导航/gear-系统设置.svg" alt=""><h2>状态切换与硬预算边界</h2></div>
+        </div>
         <form onsubmit="changeProjectStatus(event)">
-          <label>运行状态（paused 不自动中止远端进程）</label>
+          <label>运行状态（暂停后不会强行中断远端进程）</label>
           <select name="status">
             <option value="active" ${b.project.status==='active'?'selected':''}>active（正常调度与领取）</option>
             <option value="paused" ${b.project.status==='paused'?'selected':''}>paused（暂停新调度与领取）</option>
@@ -2301,21 +2721,25 @@ async function render(){
       </div>
 
       <div>
-        <div class="panel">
-          <div class="card-head"><h2>无密文可携带项目导出</h2><img src="/assets/icons/SVG/操作/download-下载.svg" width="32" height="32" alt=""></div>
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/操作/download-下载.svg" alt=""><h2>无密文可携带项目导出</h2></div>
+          </div>
           <p class="muted">生成规范化项目导出 JSON 包（永久设置 <code>secrets_included: false</code>，不含任何 Token/Secret）。</p>
-          <div class="actions"><button type="button" onclick="exportProjectBundle()"><img src="/assets/icons/SVG/操作/download-下载.svg" width="20" height="20" alt="">导出项目 JSON 包</button></div>
+          <div class="actions"><button type="button" onclick="exportProjectBundle()"><img src="/assets/icons/SVG/操作/download-下载.svg" width="20" height="20" style="filter:brightness(0) invert(1)" alt="">导出项目 JSON 包</button></div>
           <div id="export-preview"></div>
         </div>
 
-        <div class="panel">
-          <div class="card-head"><h2>认证与上线部署边界</h2><img src="/assets/icons/SVG/功能/lock-安全权限.svg" width="32" height="32" alt=""></div>
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/功能/lock-安全权限.svg" alt=""><h2>认证兼容与上线部署边界</h2></div>
+          </div>
           <ul class="info-list">
-            <li><strong>当前管理员认证</strong>：内存 Bearer Token（<code>OTTERNEST_OWNER_TOKEN</code>），关闭页签即清空。</li>
-            <li><strong>正式上线前提</strong>：当前版本不含内置企业 SSO / OAuth 与多管理员 RBAC，上线必须通过 HTTPS 与企业认证网关暴露。</li>
+            <li><strong>双通道管理员认证</strong>：Web 控制台支持「账号密码 + 2FA 会话」（12 小时服务端会话令牌，可随时全部注销），同时兼容 <code>OTTERNEST_OWNER_TOKEN</code> 静态密钥供脚本与 CLI 调用。</li>
+            <li><strong>正式上线前提</strong>：多管理员精细 RBAC 与企业 SSO 建议结合前置 HTTPS 反向代理及企业认证网关部署。</li>
           </ul>
           <div class="actions">
-            <a class="menu-item" style="width:auto;background:#F4F5FA;border:1px solid #E4E6F4" href="/api/docs" target="_blank" rel="noopener">打开 OpenAPI 文档</a>
+            <a class="btn secondary sm" href="/api/docs" target="_blank" rel="noopener">打开 OpenAPI 文档</a>
           </div>
         </div>
       </div>
@@ -2359,18 +2783,25 @@ function showCommandPlan(plan){
 }
 async function previewNaturalCommand(e){e.preventDefault();await safe(async()=>{const data=form(e);const endpoint=data.mode==='model'?'/command/interpret-model':'/command/interpret';if(data.mode==='model'&&!confirm('将指令及本项目部分任务标题发送到配置的模型服务，仅用于生成待二次确认建议。继续？'))return;const plan=await api(endpoint,'POST',{project_id:project,text:data.text});showCommandPlan(plan)})}
 async function previewCommand(e){e.preventDefault();await safe(async()=>{const data=form(e);const body={task_id:data.task_id,action:data.action};if(body.action==='review_task'){body.accepted=data.accepted==='true';body.reason=data.reason||''}if(body.action==='route_task'){body.target_agent_id=data.target_agent_id||null}const plan=await api('/command/plans','POST',body);showCommandPlan(plan)})}
-function discardCommandPreview(){currentPlan=null;const el=document.getElementById('commandPreview');if(el){el.hidden=false;el.textContent='已放弃本次操作预览（未执行）。'}}
+function discardCommandPreview(){
+  currentPlan=null;
+  const el=document.getElementById('commandPreview');
+  if(el){
+    el.hidden=false;
+    el.innerHTML=`<div class="card-head"><div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/导航/clipboard-check-任务中心.svg" alt=""><h2>执行计划（待确认）</h2></div><span class="chip">已放弃</span></div><p class="muted">已放弃本次操作预览（尚未写入控制状态）。可随时在上方重新生成待确认计划。</p>`;
+  }
+}
 async function confirmCurrentPlan(){if(!currentPlan)return;await safe(async()=>{const id=currentPlan;const result=await api('/command/plans/'+id+'/confirm','POST');currentPlan=null;notice('已执行并记录：'+result.result.status);await refresh()})}
-async function showDecisionReviews(id){await safe(async()=>{const reviews=await api('/decisions/'+id+'/reviews');const el=document.getElementById('reviews-'+id);el.innerHTML='<div class="continuity-box"><h3>独立意见（仅检验引用存在性）</h3>'+(reviews.map(r=>item(`<div class="item-head"><span class="${tagCls(r.stance)}">${esc(r.stance)}</span><span class="muted">Agent: <code>${esc(r.agent_id)}</code></span></div><p>${esc(r.reasoning)}</p><p class="muted">证据引用：${esc(r.evidence.join(', ')||'未提供')}</p>`)).join('')||'<p class="muted">暂无独立意见</p>')+'</div>'})}
+async function showDecisionReviews(id){await safe(async()=>{const reviews=await api('/decisions/'+id+'/reviews');const el=document.getElementById('reviews-'+id);el.innerHTML='<div class="continuity-box"><h3>独立意见（仅检验引用存在性）</h3>'+(reviews.map(r=>item(`<div class="item-head">${stanceBadge(r.stance)}<span class="muted">Agent: <code>${esc(r.agent_id)}</code></span></div><p>${esc(r.reasoning)}</p><p class="muted">证据引用：${esc(r.evidence.join(', ')||'未提供')}</p>`)).join('')||'<p class="muted">暂无独立意见</p>')+'</div>'})}
 async function configureAutoDeliberation(id){await safe(async()=>{const ids=prompt('填写 2–8 名当前项目 Agent 的 ID，用逗号分隔。设置后不能更改，全员发表独立意见后自动进入二轮。');if(ids===null)return;const roster=ids.split(',').map(x=>x.trim()).filter(Boolean);await api('/decisions/'+id+'/deliberation/auto-policy','POST',{reviewer_ids:roster});notice('已锁定自动协商名单；二轮协商不会自动批准决策')})}
 async function openDeliberation(id){await safe(async()=>{await api('/decisions/'+id+'/deliberation/open','POST');notice('二轮协商已开启，仅第一轮参与者可发表回应');await showDeliberation(id)})}
-async function showDeliberation(id){await safe(async()=>{const data=await api('/decisions/'+id+'/deliberation');const root=document.getElementById('deliberation-'+id);if(!root)return;root.innerHTML=`<div class="continuity-box"><h3>二轮协商详情（状态：${esc(data.status)}）</h3><p class="muted">证据引用尚未独立核实，最终裁决权属于管理员。</p><pre>${esc(JSON.stringify({first_round:data.first_round,rebuttals:data.rebuttals},null,2))}</pre>${data.status==='open'?`<div class="actions"><button class="secondary sm" onclick="closeDeliberation('${esc(id)}')">关闭二轮协商</button></div>`:''}</div>`})}
+async function showDeliberation(id){await safe(async()=>{const data=await api('/decisions/'+id+'/deliberation');const root=document.getElementById('deliberation-'+id);if(!root)return;const stLabel={open:'进行中',closed:'已关闭'}[data.status]||data.status;root.innerHTML=`<div class="continuity-box"><h3>二轮协商详情（${esc(stLabel)}）</h3><p class="muted">证据引用尚未独立核实，最终裁决权属于管理员。</p><details class="payload-details"><summary>查看首轮意见与二轮交锋 JSON 详情</summary><pre>${esc(JSON.stringify({first_round:data.first_round,rebuttals:data.rebuttals},null,2))}</pre></details>${data.status==='open'?`<div class="actions"><button class="secondary sm" onclick="closeDeliberation('${esc(id)}')">关闭二轮协商</button></div>`:''}</div>`})}
 async function closeDeliberation(id){await safe(async()=>{const reason=prompt('请输入结束第二轮的实质说明（至少10字）');if(reason===null)return;await api('/decisions/'+id+'/deliberation/close','POST',{reason});notice('第二轮已关闭，仍需管理员最终裁决');await showDeliberation(id)})}
 async function resolveDecision(id){await safe(async()=>{const reviews=await api('/decisions/'+id+'/reviews');const hasDissent=reviews.some(x=>x.stance==='oppose'||x.stance==='alternative');const note=prompt(hasDissent?'存在异议，请说明处理不同意见的依据（至少10字）':'决策批准说明（存在二轮异议时至少10字）','');if(note===null)return;const response=await api('/decisions/'+id+'/resolve','POST',{owner_note:note});notice('已确认决策，记录异议数：'+response.dissent_count);await refresh()})}
 const form=e=>Object.fromEntries(new FormData(e.target).entries());
 function parseCapabilities(value){return String(value||'').split(',').map(x=>x.trim()).filter(Boolean)}
 async function schedule(){await safe(async()=>{const result=await api('/projects/'+project+'/schedule','POST',{limit:20});notice('已匹配 '+result.count+' 项任务；实际执行仍须 Agent 主动领取');await refresh()})}
-async function showRuntimes(id){await safe(async()=>{const list=await api('/agents/'+id+'/runtimes');const el=document.getElementById('runtime-'+id);el.innerHTML=`<div class="continuity-box"><h3>已登记运行实例</h3>`+(list.map(r=>item(`<div class="item-head"><strong>${esc(r.label)}</strong><span class="tag ${r.online?'tag-ok':'tag-warn'}">${r.online?'在线心跳':'离线/未知'} · ${esc(r.status)}</span></div><p class="muted">执行环境：${esc(r.environment)} · 最近上报：${esc(r.last_seen||'从未')}${r.enabled?'':' · 已禁用'}</p>`)).join('')||'<p class="muted">暂无运行实例</p>')+`<h3>新增运行实例</h3><form onsubmit="registerRuntime(event,'${esc(id)}')"><div class="grid-2"><div><label>实例标签</label><input name="label" required></div><div><label>运行环境</label><input name="environment" required></div></div><div class="actions"><button type="submit">注册实例</button></div></form></div>`})}
+async function showRuntimes(id){await safe(async()=>{const list=await api('/agents/'+id+'/runtimes');const el=document.getElementById('runtime-'+id);el.innerHTML=`<div class="continuity-box"><h3>已登记运行实例</h3>`+(list.map(r=>item(`<div class="item-head"><strong>${esc(r.label)}</strong><span class="tag ${r.online?'tag-ok':'tag-warn'}">${r.online?'在线心跳':'离线/未知'}</span></div><p class="muted">执行环境：${esc(r.environment)} · 最近上报：${esc(r.last_seen||'从未')}${r.enabled?'':' · 已禁用'}</p>`)).join('')||'<p class="muted">暂无运行实例</p>')+`<h3>新增运行实例</h3><form onsubmit="registerRuntime(event,'${esc(id)}')"><div class="grid-2"><div><label>实例标签</label><input name="label" required></div><div><label>运行环境</label><input name="environment" required></div></div><div class="actions"><button type="submit">注册实例</button></div></form></div>`})}
 async function registerRuntime(e,id){e.preventDefault();await safe(async()=>{await api('/agents/'+id+'/runtimes','POST',form(e));notice('实例已注册，后续须由该 Agent 主动上报心跳');await refresh();await showRuntimes(id)})}
 async function verifyCapabilities(id){await safe(async()=>{const record=agents.find(a=>a.id===id);if(!record)return;const input=prompt('输入已独立验证的能力（逗号分隔，不得超出声明范围）',(record.verified_capabilities||[]).join(', '));if(input===null)return;const approved=parseCapabilities(input);if(!approved.every(c=>(record.declared_capabilities||[]).includes(c))){notice('不能验证未声明的能力',true);return}await api('/agents/'+id+'/verified-capabilities','PUT',{capabilities:approved});notice('已保存能力核验记录');await refresh()})}
 async function createProject(e){e.preventDefault();await safe(async()=>{await api('/projects','POST',form(e));showNewProjectForm=false;notice('项目已创建');await refresh()})}
@@ -2386,7 +2817,7 @@ async function publish(id){await safe(async()=>{await api('/memories/'+id+'/publ
 async function approve(id){await safe(async()=>{await api('/decisions/'+id+'/approve','POST');notice('决策已批准');await refresh()})}
 async function saveCharter(e){e.preventDefault();await safe(async()=>{const body=form(e);body.max_concurrent_tasks=Number(body.max_concurrent_tasks);body.max_total_tasks=Number(body.max_total_tasks);await api('/projects/'+project+'/charter','PUT',body);notice('项目宪章与预算已保存');await refresh()})}
 async function changeProjectStatus(e){e.preventDefault();await safe(async()=>{const body=form(e);const res=await api('/projects/'+project+'/status','POST',body);notice('项目状态已更新为 '+res.status+'（当前运行中任务：'+res.in_flight_running_tasks+'）');await refresh()})}
-async function showTaskContinuity(id){await safe(async()=>{const [cps,handoff,ses]=await Promise.all([api('/tasks/'+id+'/checkpoints'),api('/tasks/'+id+'/handoff'),api('/tasks/'+id+'/side-effects')]);const root=document.getElementById('continuity-'+id);if(!root)return;const cpHtml=cps.map(cp=>item(`<div class="item-head"><span class="${tagCls(cp.verification_status)}">epoch ${esc(cp.lease_epoch)} · #${esc(cp.step_number)} · ${esc(cp.verification_status)}</span><span class="muted">Agent: <code>${esc(cp.agent_id)}</code></span></div><p>${esc(cp.summary)}</p>${cp.next_steps?`<p class="muted"><strong>下一步：</strong>${esc(cp.next_steps)}</p>`:''}<p class="muted"><strong>关联成果：</strong>${esc((cp.artifact_ids||[]).join(', ')||'无')}</p>${cp.owner_note?`<p class="muted"><strong>核验备注：</strong>${esc(cp.owner_note)}</p>`:''}<div class="actions"><button class="sm" onclick="verifyCheckpoint('${esc(cp.id)}','owner_verified','${esc(id)}')">核验通过</button> <button class="secondary sm" onclick="verifyCheckpoint('${esc(cp.id)}','rejected','${esc(id)}')">驳回检查点</button></div>`)).join('')||'<p class="muted">暂无检查点</p>';const seHtml=ses.map(se=>item(`<div class="item-head"><div><strong>${esc(se.target_system)}</strong> · <code>${esc(se.idempotency_key)}</code></div><span class="${tagCls(se.status)}">${esc(se.status)} · epoch ${esc(se.lease_epoch)} · ${se.owner_verified?'已核对':'待核对'}</span></div><p>${esc(se.description)}</p>${se.evidence_summary?`<p class="muted"><strong>执行自证：</strong>${esc(se.evidence_summary)}</p>`:''}${se.owner_note?`<p class="muted"><strong>对账备注：</strong>${esc(se.owner_note)}</p>`:''}<div class="actions"><button class="sm" onclick="reconcileSideEffect('${esc(se.id)}','verified_executed','${esc(id)}')">核验已执行</button> <button class="secondary sm" onclick="reconcileSideEffect('${esc(se.id)}','verified_not_executed','${esc(id)}')">核验未执行（允许重开）</button></div>`)).join('')||'<p class="muted">暂无登记的外部副作用</p>';root.innerHTML=`<div class="continuity-box"><div class="grid-2"><div><h3>任务检查点（Epoch 隔离）</h3>${cpHtml}</div><div><h3>外部副作用台账（不可自动回滚）</h3>${seHtml}</div></div><h3>标准交接包边界</h3><div class="callout">${esc(handoff.handoff_boundary)}</div><pre>${esc(JSON.stringify({latest_verified_checkpoint:handoff.latest_verified_checkpoint,latest_self_reported_checkpoint:handoff.latest_self_reported_checkpoint,side_effects:handoff.side_effects,artifacts:handoff.artifacts},null,2))}</pre></div>`})}
+async function showTaskContinuity(id){await safe(async()=>{const [cps,handoff,ses]=await Promise.all([api('/tasks/'+id+'/checkpoints'),api('/tasks/'+id+'/handoff'),api('/tasks/'+id+'/side-effects')]);const root=document.getElementById('continuity-'+id);if(!root)return;const cpMap={self_reported:'节点自报',owner_verified:'已核验',rejected:'已驳回'};const cpHtml=cps.map(cp=>item(`<div class="item-head"><span class="${tagCls(cp.verification_status)}">epoch ${esc(cp.lease_epoch)} · #${esc(cp.step_number)} · ${esc(cpMap[cp.verification_status]||cp.verification_status)}</span><span class="muted">Agent: <code>${esc(cp.agent_id)}</code></span></div><p>${esc(cp.summary)}</p>${cp.next_steps?`<p class="muted"><strong>下一步：</strong>${esc(cp.next_steps)}</p>`:''}<p class="muted"><strong>关联成果：</strong>${esc((cp.artifact_ids||[]).join(', ')||'无')}</p>${cp.owner_note?`<p class="muted"><strong>核验备注：</strong>${esc(cp.owner_note)}</p>`:''}<div class="actions"><button class="sm" onclick="verifyCheckpoint('${esc(cp.id)}','owner_verified','${esc(id)}')">核验通过</button> <button class="secondary sm" onclick="verifyCheckpoint('${esc(cp.id)}','rejected','${esc(id)}')">驳回检查点</button></div>`)).join('')||'<p class="muted">暂无检查点</p>';const seHtml=ses.map(se=>item(`<div class="item-head"><div><strong>${esc(se.target_system)}</strong> · <code>${esc(se.idempotency_key)}</code></div><div class="stack">${sideEffectStatusBadge(se.status)}<span class="chip">epoch ${esc(se.lease_epoch)} · ${se.owner_verified?'已核对':'待核对'}</span></div></div><p>${esc(se.description)}</p>${se.evidence_summary?`<p class="muted"><strong>执行自证：</strong>${esc(se.evidence_summary)}</p>`:''}${se.owner_note?`<p class="muted"><strong>对账备注：</strong>${esc(se.owner_note)}</p>`:''}<div class="actions"><button class="sm" onclick="reconcileSideEffect('${esc(se.id)}','verified_executed','${esc(id)}')">核验已执行</button> <button class="secondary sm" onclick="reconcileSideEffect('${esc(se.id)}','verified_not_executed','${esc(id)}')">核验未执行（允许重开）</button></div>`)).join('')||'<p class="muted">暂无登记的外部副作用</p>';root.innerHTML=`<div class="continuity-box"><div class="grid-2"><div><h3>任务检查点（Epoch 隔离）</h3>${cpHtml}</div><div><h3>外部副作用台账（不可自动回滚）</h3>${seHtml}</div></div><h3>标准交接包边界</h3><div class="callout">${esc(handoff.handoff_boundary)}</div><details class="payload-details"><summary>查看交接包原始 JSON 快照</summary><pre>${esc(JSON.stringify({latest_verified_checkpoint:handoff.latest_verified_checkpoint,latest_self_reported_checkpoint:handoff.latest_self_reported_checkpoint,side_effects:handoff.side_effects,artifacts:handoff.artifacts},null,2))}</pre></details></div>`})}
 async function verifyCheckpoint(cpId,status,taskId){await safe(async()=>{const note=prompt(status==='rejected'?'请输入驳回检查点的原因（至少5字）':'可选：输入核验备注','')??null;if(note===null)return;await api('/checkpoints/'+cpId+'/verify','POST',{status,note});notice('检查点状态已更新：'+status);await showTaskContinuity(taskId)})}
 async function revokeTaskLease(id){await safe(async()=>{const reason=prompt('请输入撤回租约并隔离旧 epoch 的原因（至少5字）');if(reason===null)return;const target=prompt('可选：输入交接目标 Agent ID（留空则不指定）','')??'';await api('/tasks/'+id+'/revoke-lease','POST',{reason,target_agent_id:target.trim()||null});notice('租约已撤回并提升 epoch；旧进程未获远端终止核实');await refresh()})}
 async function reconcileSideEffect(effectId,status,taskId){await safe(async()=>{const note=prompt(status==='verified_executed'?'请输入核对已执行的依据（至少5字）':'请输入核对未执行、允许下一轮重开的依据（至少5字）');if(note===null)return;await api('/side-effects/'+effectId+'/reconcile','POST',{status,note});notice('副作用台账已核对：'+status);await refresh();const el=document.getElementById('continuity-'+taskId);if(el)await showTaskContinuity(taskId)})}
@@ -2395,10 +2826,202 @@ async function reviseMemory(id){await safe(async()=>{const cur=(globalThis._memM
 async function archiveMemory(id){await safe(async()=>{const reason=prompt('请输入归档记忆原因（至少5字，归档后不再注入后续上下文）');if(reason===null)return;await api('/memories/'+id+'/archive','POST',{reason});notice('记忆已归档');await refresh()})}
 async function publishSkill(id){await safe(async()=>{await api('/skills/'+id+'/publish','POST',{});notice('Skill 已发布');await refresh()})}
 async function evaluateSkill(id){await safe(async()=>{const verdict=prompt('请输入评价结论（pass / fail / concern）','pass');if(verdict===null)return;const notes=prompt('请输入评价依据（至少5字）');if(notes===null)return;const taskId=prompt('可选：关联本项目的 Task ID（留空则不关联）','')??'';await api('/skills/'+id+'/evaluations','POST',{verdict:verdict.trim(),notes,task_id:taskId.trim()||null});notice('Skill 评价已记录');await showSkillEvaluations(id)})}
-async function showSkillEvaluations(id){await safe(async()=>{const rows=await api('/skills/'+id+'/evaluations');const el=document.getElementById('skill-evals-'+id);if(!el)return;el.innerHTML=`<div class="continuity-box"><h3>Skill 评价历史</h3>`+(rows.map(ev=>item(`<div class="item-head"><span class="${tagCls(ev.verdict)}">${esc(ev.verdict)}</span><span class="muted">${esc(ev.actor_kind)}: <code>${esc(ev.actor_id)}</code>${ev.task_id?` · task <code>${esc(ev.task_id)}</code>`:''}</span></div><p>${esc(ev.notes)}</p>`)).join('')||'<p class="muted">暂无评价记录</p>')+`</div>`})}
+async function showSkillEvaluations(id){await safe(async()=>{const rows=await api('/skills/'+id+'/evaluations');const el=document.getElementById('skill-evals-'+id);if(!el)return;el.innerHTML=`<div class="continuity-box"><h3>Skill 评价历史</h3>`+(rows.map(ev=>item(`<div class="item-head">${verdictBadge(ev.verdict)}<span class="muted">${esc(ev.actor_kind)}: <code>${esc(ev.actor_id)}</code>${ev.task_id?` · task <code>${esc(ev.task_id)}</code>`:''}</span></div><p>${esc(ev.notes)}</p>`)).join('')||'<p class="muted">暂无评价记录</p>')+`</div>`})}
 async function archiveSkill(id){await safe(async()=>{const reason=prompt('请输入归档 Skill 原因（至少5字，归档后仅保留审计不对外展示）');if(reason===null)return;await api('/skills/'+id+'/archive','POST',{reason});notice('Skill 已归档');await refresh()})}
 async function proposeShare(itemKind,itemId){await safe(async()=>{const hint=(projects||[]).filter(p=>p.id!==project).map(p=>`${p.name}:${p.id}`).join(', ');const targetProjectId=prompt('请输入目标 Project ID'+(hint?`（可选：${hint}）`:''));if(targetProjectId===null)return;const rationale=prompt('请输入跨项目共享理由（至少5字）');if(rationale===null)return;await api('/projects/'+project+'/knowledge-shares','POST',{target_project_id:targetProjectId.trim(),item_kind:itemKind,source_item_id:itemId,rationale});notice('已提交跨项目共享提案，等待管理员审批');await refresh()})}
 async function resolveShare(shareId,approved){await safe(async()=>{const note=prompt(approved?'请输入批准共享备注（至少5字）':'请输入拒绝共享备注（至少5字）');if(note===null)return;await api('/knowledge-shares/'+shareId+'/resolve','POST',{approved,note});notice(approved?'已批准共享并克隆到目标项目':'已拒绝共享提案');await refresh()})}
+
+function renderSecurityCard(){
+  const acc=cachedAccount||{};
+  const user=acc.user||null;
+  const configured=Boolean(acc.account_configured&&user);
+  const totpOn=Boolean(user?.totp_enabled);
+  const methodLabel=acc.auth_method==='session'?'账号会话登录（on_session）':'部署令牌直连（OTTERNEST_OWNER_TOKEN）';
+  const recList=Array.isArray(revealedRecoveryCodes)?revealedRecoveryCodes:null;
+  return `
+  <div id="securityCard" class="card">
+    <div class="card-head">
+      <div class="card-title-group">
+        <img class="card-title-icon" src="/assets/icons/SVG/功能/lock-安全权限.svg" alt="">
+        <div>
+          <h2>账号登录与双重身份验证（2FA）</h2>
+          <p class="muted" style="margin:2px 0 0">统一管理控制台登录凭据、活动会话与 TOTP 动态口令保护。</p>
+        </div>
+      </div>
+      <span class="tag ${totpOn?'tag-ok':'tag-warn'}">${totpOn?'2FA 已开启':'2FA 未开启'}</span>
+    </div>
+
+    <div class="callout" style="margin-bottom:14px">
+      <strong>当前认证方式：</strong>${esc(methodLabel)}
+      ${configured?` · 登录名 <code>${esc(user.username)}</code>（${esc(user.display_name||'管理员')}）· 活动会话 ${esc(acc.active_sessions??0)} 个`:' · 尚未设置控制台登录账号（当前仅可使用部署令牌登录）'}
+    </div>
+
+    <div class="grid-2" style="margin-bottom:0">
+      <div class="item-card" style="margin-top:0">
+        <div class="item-head">
+          <span class="item-title">${configured?'修改登录账号与密码':'初始化登录账号与密码'}</span>
+          <span class="chip">${configured?'已配置':'待配置'}</span>
+        </div>
+        <form onsubmit="updateOwnerPassword(event)">
+          <label>登录用户名</label>
+          <input name="username" value="${esc(user?.username||'owner')}" minlength="3" maxlength="64" required placeholder="例如：owner 或 admin">
+          <label>显示名称</label>
+          <input name="display_name" value="${esc(user?.display_name||'管理员')}" maxlength="120" placeholder="管理员">
+          ${configured&&acc.auth_method==='session'?`<label>当前密码</label><input name="current_password" type="password" required autocomplete="current-password" placeholder="修改密码需验证原密码">`:''}
+          <label>新密码（至少 8 位）</label>
+          <input name="new_password" type="password" minlength="8" maxlength="128" required autocomplete="new-password" placeholder="至少 8 个字符">
+          <div class="actions">
+            <button type="submit">${configured?'更新账号密码':'创建登录账号'}</button>
+            ${configured?`<button type="button" class="secondary" onclick="logoutAllSessions()">注销全部会话</button>`:''}
+          </div>
+        </form>
+      </div>
+
+      <div class="item-card" style="margin-top:0">
+        <div class="item-head">
+          <span class="item-title">双重身份验证（TOTP + 备用恢复码）</span>
+          <span class="tag ${totpOn?'tag-ok':'tag-info'}">${totpOn?`剩余恢复码 ${esc(user?.recovery_codes_remaining??0)} 组`:'RFC 6238'}</span>
+        </div>
+        ${!configured?`
+          <p class="muted">请先在左侧初始化登录账号与密码，随后即可绑定验证器（Google Authenticator / Apple 密码 / 1Password / Bitwarden 等）。</p>
+        `:(!totpOn?`
+          <p class="muted">启用后，使用「账号密码」登录时需额外输入验证器 6 位动态口令或一次性恢复码。</p>
+          ${!pendingTotpSetup?`
+            <div class="actions"><button type="button" onclick="setup2FA()">开启双重身份验证</button></div>
+          `:`
+            <div class="totp-secret-box">
+              <div>
+                <div class="muted" style="font-size:14px">手动录入密钥（Base32 / SHA-1 / 30 秒）</div>
+                <div class="totp-code-key">${esc(pendingTotpSetup.formatted_secret||pendingTotpSetup.secret)}</div>
+              </div>
+              <div class="stack">
+                <button type="button" class="secondary sm" onclick="copyText(pendingTotpSetup.secret,'已复制 2FA 密钥')">复制密钥</button>
+                <button type="button" class="ghost sm" onclick="copyText(pendingTotpSetup.otpauth_uri,'已复制 otpauth 绑定链接')">复制 URI</button>
+              </div>
+            </div>
+            <form onsubmit="enable2FA(event)">
+              <label>输入验证器生成的 6 位验证码以完成绑定</label>
+              <input name="code" inputmode="numeric" maxlength="12" required autocomplete="one-time-code" placeholder="输入 6 位数字验证码">
+              <div class="actions">
+                <button type="submit">确认绑定并启用 2FA</button>
+                <button type="button" class="secondary" onclick="pendingTotpSetup=null;safe(render)">取消绑定</button>
+              </div>
+            </form>
+          `}
+        `:`
+          <p class="muted">双重身份验证已生效。请妥善保管 8 组一次性备用恢复码，用于验证器设备丢失时应急登录。</p>
+          ${recList?`
+            <div class="callout" style="margin:10px 0">
+              <strong>新生成的备用恢复码（仅展示一次，每组仅限使用 1 次）：</strong>
+              <div class="recovery-grid">${recList.map(c=>`<div class="recovery-chip">${esc(c)}</div>`).join('')}</div>
+              <div class="actions">
+                <button type="button" class="secondary sm" onclick="copyText(revealedRecoveryCodes.join('\\n'),'已复制全部恢复码')">复制全部恢复码</button>
+                <button type="button" class="ghost sm" onclick="revealedRecoveryCodes=null;safe(render)">我已妥善保存</button>
+              </div>
+            </div>
+          `:''}
+          <form onsubmit="regenerateRecoveryCodes(event)">
+            <label>重新生成 8 组恢复码（将作废旧恢复码）</label>
+            <div class="input-row">
+              <input name="code" inputmode="numeric" maxlength="12" required placeholder="输入当前 6 位 TOTP 验证码">
+              <button type="submit" class="secondary" style="white-space:nowrap">重置恢复码</button>
+            </div>
+          </form>
+          <form onsubmit="disable2FA(event)" style="margin-top:12px">
+            <label>停用双重身份验证（须核验密码与动态码/恢复码）</label>
+            <div class="grid-2" style="margin-bottom:0">
+              <input name="current_password" type="password" required autocomplete="current-password" placeholder="当前登录密码">
+              <input name="code" maxlength="16" required placeholder="6 位动态码或恢复码">
+            </div>
+            <div class="actions"><button type="submit" class="danger sm">停用 2FA</button></div>
+          </form>
+        `)}
+      </div>
+    </div>
+  </div>`;
+}
+
+async function copyText(text,msg){
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(text);
+    }else{
+      const ta=document.createElement('textarea');
+      ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+      document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();
+    }
+    notice(msg||'已复制到剪贴板');
+  }catch(_){notice('自动复制失败，请手动复制文本',true)}
+}
+async function updateOwnerPassword(e){
+  e.preventDefault();
+  await safe(async()=>{
+    const body=form(e);
+    const payload={username:body.username,display_name:body.display_name,new_password:body.new_password};
+    if(body.current_password)payload.current_password=body.current_password;
+    await api('/auth/password','POST',payload);
+    if(cachedAccount?.auth_method==='session'){
+      await logout('登录账号与密码已更新，所有旧会话已吊销，请使用新密码重新登录。');
+      return;
+    }
+    notice('登录账号与密码已保存');
+    await refresh();
+  });
+}
+async function setup2FA(){
+  await safe(async()=>{
+    pendingTotpSetup=await api('/auth/2fa/setup','POST',{});
+    revealedRecoveryCodes=null;
+    notice('已生成 2FA 密钥，请在验证器中添加并输入 6 位动态码完成绑定');
+    await render();
+  });
+}
+async function enable2FA(e){
+  e.preventDefault();
+  await safe(async()=>{
+    const body=form(e);
+    const res=await api('/auth/2fa/enable','POST',{code:body.code});
+    if(res.session_token)token=res.session_token;
+    pendingTotpSetup=null;
+    revealedRecoveryCodes=res.recovery_codes||[];
+    notice('双重身份验证（2FA）已开启，请妥善保管下方 8 组一次性恢复码');
+    await refresh();
+  });
+}
+async function regenerateRecoveryCodes(e){
+  e.preventDefault();
+  await safe(async()=>{
+    const body=form(e);
+    const res=await api('/auth/2fa/recovery-codes','POST',{code:body.code});
+    revealedRecoveryCodes=res.recovery_codes||[];
+    notice('已重新生成 8 组恢复码，旧恢复码已全部作废');
+    await refresh();
+  });
+}
+async function disable2FA(e){
+  e.preventDefault();
+  await safe(async()=>{
+    const body=form(e);
+    if(!confirm('确认停用双重身份验证（2FA）？停用后仅凭账号密码即可登录。'))return;
+    await api('/auth/2fa/disable','POST',{current_password:body.current_password,code:body.code});
+    pendingTotpSetup=null;revealedRecoveryCodes=null;
+    notice('双重身份验证（2FA）已停用');
+    await refresh();
+  });
+}
+async function logoutAllSessions(){
+  await safe(async()=>{
+    if(!confirm('确认立即注销所有活动中的账号会话？'))return;
+    const isSess=cachedAccount?.auth_method==='session';
+    await api('/auth/logout-all','POST',{});
+    if(isSess){
+      await logout('已注销所有活动会话，请重新登录。');
+      return;
+    }
+    notice('已注销所有账号会话');
+    await refresh();
+  });
+}
 </script>
 </body>
 </html>
