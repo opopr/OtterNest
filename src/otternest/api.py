@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .db import get_session
-from .models import A2ADelegation, Agent, AgentRuntime, Artifact, Decision, DecisionReview, Event, Goal, Membership, Memory, Project, Task, TaskDependency, now
+from .models import A2ADelegation, Agent, AgentRuntime, Artifact, Decision, DecisionReview, DecisionDeliberation, DecisionRebuttal, Event, Goal, Membership, Memory, Project, Task, TaskDependency, now
 from .security import Actor, authenticate, hash_token, new_agent_token, owner_only
 from .services import Conflict, claim, dependency_ids, dependencies_completed, emit, ensure_lease, release_dependents, require_project, require_task, task_ready_status, update_dependencies, validate_goal, choose_dispatch_targets
 
@@ -596,8 +596,15 @@ def approve_decision(decision_id: str, actor: Actor = Depends(authenticate), db:
         raise HTTPException(404, "Decision not found")
     if d.status != "proposed":
         raise Conflict("Decision is not proposed")
-    if db.scalar(select(DecisionReview.id).where(DecisionReview.decision_id == d.id,
-                       DecisionReview.stance.in_(("oppose", "alternative")))):
+    state = db.get(DecisionDeliberation, d.id)
+    if state is not None and state.status != "closed":
+        raise Conflict("Second round must close before approval")
+    dissent_one = db.scalar(select(DecisionReview.id).where(DecisionReview.decision_id == d.id,
+                       DecisionReview.stance.in_(("oppose", "alternative"))))
+    dissent_two = db.scalar(select(DecisionRebuttal.id).where(
+        DecisionRebuttal.decision_id == d.id,
+        DecisionRebuttal.stance.in_(("oppose", "alternative"))))
+    if dissent_one or dissent_two:
         raise Conflict("Independent dissent requires owner resolution note; use /resolve")
     d.status = "approved"
     emit(db, actor, "decision.approved", d.id, d.project_id)

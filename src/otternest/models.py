@@ -283,3 +283,28 @@ class DecisionReview(Base):
     evidence: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
     __table_args__ = (UniqueConstraint("decision_id", "agent_id", name="uq_decision_review_agent"),)
+
+
+class DecisionDeliberation(Base):
+    """At most one explicitly opened second round for each decision."""
+    __tablename__ = "decision_deliberations"
+    decision_id: Mapped[str] = mapped_column(ForeignKey("decisions.id"), primary_key=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(24), default="open", nullable=False)
+    closing_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+class DecisionRebuttal(Base):
+    """One independent second-round rebuttal per first-round participant."""
+    __tablename__ = "decision_rebuttals"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    decision_id: Mapped[str] = mapped_column(ForeignKey("decisions.id"), nullable=False, index=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    agent_id: Mapped[str] = mapped_column(ForeignKey("agents.id"), nullable=False)
+    responds_to_review_id: Mapped[str] = mapped_column(ForeignKey("decision_reviews.id"), nullable=False)
+    stance: Mapped[str] = mapped_column(String(24), nullable=False)
+    reasoning: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+    __table_args__ = (UniqueConstraint("decision_id", "agent_id", name="uq_decision_rebuttal_agent"),)

@@ -265,3 +265,49 @@ def test_postgres_command_plans_revalidate_task_version_concurrently():
         assert len(db.scalars(select(Event).where(
             Event.subject_id == task_id, Event.kind == "task.authorized")).all()) == 1
     engine.dispose()
+
+
+@pytest.mark.skipif(not os.getenv("OTTERNEST_PG_TEST_URL"), reason="PostgreSQL required")
+def test_postgres_one_rebuttal_per_agent_under_concurrent_requests():
+    """Two transactions from the same Agent cannot both enter round two."""
+    import secrets
+    from otternest.models import Decision, DecisionDeliberation, DecisionReview, DecisionRebuttal
+    from otternest.deliberation import RebuttalDraft, submit_rebuttal
+
+    engine=create_engine(os.environ["OTTERNEST_PG_TEST_URL"], pool_pre_ping=True)
+    factory=sessionmaker(bind=engine,expire_on_commit=False)
+    with factory() as db:
+        project=Project(name="Concurrent deliberation")
+        a=Agent(name="A",platform="test",token_hash=secrets.token_hex(32))
+        b=Agent(name="B",platform="test",token_hash=secrets.token_hex(32))
+        db.add_all([project,a,b]); db.flush()
+        db.add_all([Membership(project_id=project.id,agent_id=x.id,role="reviewer") for x in (a,b)])
+        decision=Decision(project_id=project.id, question="Which?",resolution="A",rationale="Study")
+        db.add(decision);db.flush()
+        r1=DecisionReview(project_id=project.id,decision_id=decision.id,
+                          agent_id=a.id,stance="support",reasoning="Test evidence for A")
+        r2=DecisionReview(project_id=project.id,decision_id=decision.id,
+                          agent_id=b.id,stance="oppose",reasoning="Test evidence for B")
+        db.add_all([r1,r2])
+        db.add(DecisionDeliberation(decision_id=decision.id, project_id=project.id))
+        db.commit()
+        did,aid,rid=decision.id,a.id,r2.id
+    ready=Barrier(2)
+    draft=RebuttalDraft(responds_to_review_id=rid,stance="support",
+                        reasoning="Second review argues against the first evidence.")
+    def submit(_):
+        with factory() as db:
+            ready.wait(timeout=10)
+            try:
+                submit_rebuttal(did,draft,Actor("agent",aid),db)
+                return "created"
+            except Conflict:
+                db.rollback()
+                return "conflict"
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results=list(pool.map(submit,range(2)))
+    assert sorted(results)==["conflict","created"]
+    with factory() as db:
+        assert len(db.scalars(select(DecisionRebuttal).where(
+            DecisionRebuttal.decision_id==did)).all())==1
+    engine.dispose()
