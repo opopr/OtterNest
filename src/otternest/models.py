@@ -116,6 +116,45 @@ class A2AInboxMessage(Base):
     __table_args__ = (UniqueConstraint("project_id", "actor_id", "message_id", name="uq_a2a_message_origin"),)
 
 
+
+
+class A2ARemoteEndpoint(Base):
+    """Owner-approved HTTPS A2A peer, tied to a verified project Agent.
+
+    Secrets are referenced by endpoint ID and held outside the database.
+    """
+    __tablename__ = "a2a_remote_endpoints"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    agent_id: Mapped[str] = mapped_column(ForeignKey("agents.id"), nullable=False)
+    url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    remote_project_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+    __table_args__ = (UniqueConstraint("project_id", "agent_id", name="uq_a2a_remote_agent_project"),)
+
+
+class A2ADelegation(Base):
+    """Durable owner-authorized outbound request and remote-task correlation.
+
+    A lost message/send acknowledgement is *unknown*, not retryable on its own.
+    """
+    __tablename__ = "a2a_delegations"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), nullable=False, unique=True)
+    endpoint_id: Mapped[str] = mapped_column(ForeignKey("a2a_remote_endpoints.id"), nullable=False)
+    message_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    status: Mapped[str] = mapped_column(String(24), default="pending", nullable=False)
+    remote_task_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    remote_context_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    remote_state: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_error: Mapped[str] = mapped_column(String(240), default="", nullable=False)
+    next_poll_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+
 class Memory(Base):
     __tablename__ = "memories"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)

@@ -145,3 +145,75 @@ def test_postgres_a2a_duplicate_messages_create_one_task():
         assert len(db.scalars(select(A2AInboxMessage).where(A2AInboxMessage.project_id == project_id)).all()) == 1
         assert len(db.scalars(select(Task).where(Task.project_id == project_id)).all()) == 1
     engine.dispose()
+
+
+@pytest.mark.skipif(not os.getenv("OTTERNEST_PG_TEST_URL"), reason="PostgreSQL integration URL not provided")
+def test_postgres_concurrent_a2a_dispatchers_send_only_one_request(monkeypatch):
+    """For one persisted delegation, two workers must not both send message/send."""
+    import json
+    import secrets
+    from threading import Lock
+
+    import httpx
+    from otternest.models import A2ADelegation, A2ARemoteEndpoint
+    from otternest.a2a_outbound import dispatch_once, token_env_name
+
+    engine = create_engine(os.environ["OTTERNEST_PG_TEST_URL"], pool_pre_ping=True)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as db:
+        project = Project(name="Concurrent outbound A2A")
+        agent = Agent(name="Peer", platform="test", execution_mode="remote",
+                      token_hash=secrets.token_hex(32))
+        db.add_all([project, agent])
+        db.flush()
+        db.add(Membership(project_id=project.id, agent_id=agent.id, role="worker"))
+        task = Task(project_id=project.id, title="One remote send", instruction="do work",
+                    acceptance="review", target_agent_id=agent.id)
+        db.add(task)
+        db.flush()
+        endpoint = A2ARemoteEndpoint(project_id=project.id, agent_id=agent.id,
+                                     url="https://a2a-peer.example.org/a2a")
+        db.add(endpoint)
+        db.flush()
+        delegation = A2ADelegation(project_id=project.id, task_id=task.id, endpoint_id=endpoint.id,
+                                   message_id=secrets.token_hex(24))
+        db.add(delegation)
+        db.commit()
+        delegation_id, task_id, endpoint_id = delegation.id, task.id, endpoint.id
+    monkeypatch.setenv("OTTERNEST_A2A_ALLOWED_HOSTS", "a2a-peer.example.org")
+    monkeypatch.setenv(token_env_name(endpoint_id), "valid-example-external-token-123")
+    # socket is shared globally: mock ONLY the external peer's lookup.
+    # psycopg must continue to resolve localhost to the CI PostgreSQL service.
+    import socket
+    original_getaddrinfo = socket.getaddrinfo
+
+    def resolve(host, *args, **kwargs):
+        if host == "a2a-peer.example.org":
+            return [(None, None, None, None, ("93.184.215.14", 443))]
+        return original_getaddrinfo(host, *args, **kwargs)
+
+    monkeypatch.setattr("otternest.a2a_outbound.socket.getaddrinfo", resolve)
+    barrier = Barrier(2)
+    calls = []
+    guard = Lock()
+
+    def request(req):
+        obj = json.loads(req.content)
+        with guard:
+            calls.append(obj)
+        return httpx.Response(200, json={"jsonrpc": "2.0", "id": obj["id"], "result": {
+            "kind": "task", "id": "external-task-1", "status": {"state": "working"}}})
+
+    def worker(_):
+        with httpx.Client(transport=httpx.MockTransport(request), trust_env=False) as client:
+            barrier.wait(timeout=15)
+            return dispatch_once(factory, client=client)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(worker, range(2)))
+    assert len(calls) == 1
+    assert sum(r["sent"] for r in results) == 1
+    with factory() as db:
+        assert db.get(A2ADelegation, delegation_id).status == "remote"
+        assert db.get(Task, task_id).status == "running"
+    engine.dispose()

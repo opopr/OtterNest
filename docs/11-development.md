@@ -63,3 +63,10 @@ OtterNest 已进入**完整产品开发**。此文件是工程状态登记，而
 `otternest.a2a` now exposes an explicit v0.3.0 Agent Card plus `message/send`, `tasks/get`, `tasks/cancel` with Bearer-based project authorization, durable request deduplication and truthful status mapping. Configure `OTTERNEST_A2A_BASE_URL` for the real external HTTPS origin before advertising discovery. Apply Alembic revision `0006` before serving requests. Details: [docs/14-a2a-gateway.md](14-a2a-gateway.md).
 
 This is the task ingress and status layer. It does not yet provide automatic remote wake-up, streaming/push, or proven interoperability with hosted third-party Agent products.
+
+## A2A owner-approved outbound handoff
+
+The `otternest-a2a-outbound --once` CLI processes explicitly authorized outbound
+A2A work. It does not discover/launch third-party cloud agents automatically.
+See [docs/15-a2a-outbound.md](15-a2a-outbound.md) for credentials, trust model,
+network restrictions, manual reconciliation and cancellation semantics.
