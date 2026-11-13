@@ -12,8 +12,37 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install -e '.[dev]'
+      - run: python -m pip install -e '.[dev,mcp]'
       - run: pytest -q
+      - run: python -m compileall -q src
       - run: alembic upgrade head
         env:
           OTTERNEST_DATABASE_URL: sqlite+pysqlite:///./ci-migration.sqlite3
+
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: otternest
+          POSTGRES_PASSWORD: ci_password_not_for_production
+          POSTGRES_DB: otternest_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U otternest -d otternest_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      OTTERNEST_DATABASE_URL: postgresql+psycopg://otternest:ci_password_not_for_production@localhost:5432/otternest_ci
+      OTTERNEST_PG_TEST_URL: postgresql+psycopg://otternest:ci_password_not_for_production@localhost:5432/otternest_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e '.[dev]'
+      - run: alembic upgrade head
+      - run: pytest -q tests/test_postgres_concurrency.py

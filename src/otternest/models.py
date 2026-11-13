@@ -67,12 +67,23 @@ class Task(Base):
     status: Mapped[str] = mapped_column(String(24), default="ready", nullable=False)
     risk: Mapped[str] = mapped_column(String(2), default="R1", nullable=False)
     assigned_agent_id: Mapped[str | None] = mapped_column(ForeignKey("agents.id"), nullable=True)
+    target_agent_id: Mapped[str | None] = mapped_column(ForeignKey("agents.id"), nullable=True)
+    priority: Mapped[int] = mapped_column(Integer, default=50, nullable=False)
+    approval_granted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     lease_epoch: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     result_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
     __table_args__ = (Index("ix_tasks_project_status", "project_id", "status"),)
+
+
+class TaskDependency(Base):
+    """An immutable-with-respect-to-execution edge: task waits for depends_on_id."""
+    __tablename__ = "task_dependencies"
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True)
+    depends_on_id: Mapped[str] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True)
+    __table_args__ = (Index("ix_task_dependencies_predecessor", "depends_on_id"),)
 
 
 class Memory(Base):
