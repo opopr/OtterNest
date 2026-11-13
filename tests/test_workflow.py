@@ -163,3 +163,41 @@ def test_agent_cannot_read_unpublished_decision_or_register_itself(env, owner_he
     assert rec.status_code == 201
     assert not env.get(f"/api/v1/projects/{a}/decisions", headers=auth).json()
     assert env.get("/api/v1/agents", headers=auth).status_code == 403
+
+
+def test_generic_agent_polling_context_and_skills(env, owner_headers):
+    project = create_project(env, owner_headers)
+    other = create_project(env, owner_headers, "Confidential")
+    agent = create_agent(env, owner_headers)
+    enroll(env, owner_headers, project, agent["id"])
+    auth = {"Authorization": "Bearer " + agent["token"]}
+    ready = create_task(env, owner_headers, project)
+    create_task(env, owner_headers, other)
+    r3 = create_task(env, owner_headers, project, "R3")
+    available = env.get("/api/v1/agent/queue", headers=auth)
+    assert available.status_code == 200, available.text
+    assert [t["id"] for t in available.json()] == [ready["id"]]
+    assert env.get(f"/api/v1/tasks/{ready['id']}/context", headers=auth).status_code == 409
+    proposed = env.post(f"/api/v1/projects/{project}/memories", headers=auth,
+                        json={"title": "Private draft", "content": "unverified", "source": "agent"}).json()
+    published = env.post(f"/api/v1/projects/{project}/memories", headers=owner_headers,
+                         json={"title": "Approved", "content": "Use data sources", "source": "owner"}).json()
+    env.post(f"/api/v1/memories/{published['id']}/publish", headers=owner_headers)
+    claim = env.post(f"/api/v1/tasks/{ready['id']}/claim", headers=auth, json={})
+    assert claim.status_code == 200
+    context = env.get(f"/api/v1/tasks/{ready['id']}/context", headers=auth)
+    assert context.status_code == 200, context.text
+    assert context.json()["task"]["project_id"] == project
+    assert [m["id"] for m in context.json()["memories"]] == [published["id"]]
+    skill = env.post(f"/api/v1/projects/{project}/skills", headers=auth,
+                     json={"name": "review", "version": "1", "content": "# review\nCheck tests", "source": "agent"})
+    assert skill.status_code == 201, skill.text
+    assert env.get(f"/api/v1/projects/{project}/skills", headers=auth).json() == []
+    assert env.post(f"/api/v1/skills/{skill.json()['id']}/publish", headers=auth).status_code == 403
+    assert env.post(f"/api/v1/skills/{skill.json()['id']}/publish", headers=owner_headers).status_code == 200
+    assert len(env.get(f"/api/v1/projects/{project}/skills", headers=auth).json()) == 1
+    assert env.post(f"/api/v1/projects/{project}/skills", headers=auth,
+                    json={"name": "review", "version": "1", "content": "duplicate", "source": "agent"}).status_code == 409
+    # No permission to read the other project's task context or R3 unapproved work.
+    assert r3["id"] not in [t["id"] for t in env.get("/api/v1/agent/queue", headers=auth).json()]
+    assert env.get(f"/api/v1/projects/{other}/skills", headers=auth).status_code == 404
