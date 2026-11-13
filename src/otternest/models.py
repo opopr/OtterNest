@@ -148,3 +148,28 @@ class Skill(Base):
     status: Mapped[str] = mapped_column(String(24), default="proposed", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
     __table_args__ = (UniqueConstraint("project_id", "name", "version", name="uq_skill_revision"),)
+
+
+class WebhookEndpoint(Base):
+    """Owner-approved project webhook destination; signing key is derived, not stored."""
+    __tablename__ = "webhook_endpoints"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    event_prefix: Mapped[str] = mapped_column(String(100), nullable=False, default="task.")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+
+
+class WebhookDelivery(Base):
+    """One durable attempt series per event/subscription; at-least-once delivery."""
+    __tablename__ = "webhook_deliveries"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"), nullable=False, index=True)
+    endpoint_id: Mapped[str] = mapped_column(ForeignKey("webhook_endpoints.id"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(24), default="pending", nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    retry_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str] = mapped_column(String(240), default="", nullable=False)
+    __table_args__ = (UniqueConstraint("event_id", "endpoint_id", name="uq_event_endpoint"),)

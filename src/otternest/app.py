@@ -10,6 +10,7 @@ from sqlalchemy import text
 from . import models  # noqa: F401 - load ORM models for schema registry
 from .api import router
 from .extensions import router as extension_router
+from .webhooks import router as webhook_router
 from .db import get_engine
 
 app = FastAPI(
@@ -21,6 +22,7 @@ app = FastAPI(
 )
 app.include_router(router)
 app.include_router(extension_router)
+app.include_router(webhook_router)
 
 
 @app.get("/health/live")

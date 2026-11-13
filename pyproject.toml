@@ -19,6 +19,7 @@ dependencies = [
 
 [project.scripts]
 otternest-runner = "otternest.runner:main"
+otternest-webhooks = "otternest.webhooks:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "httpx>=0.27,<1"]

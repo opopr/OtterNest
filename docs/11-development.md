@@ -16,7 +16,7 @@ OtterNest 已进入**完整产品开发**。此文件是工程状态登记，而
 | 数据与记忆 | 记忆提案/发布、决策提案/批准、授权上下文包 | Context Broker、证据、修订、检索与知识推广 |
 | 权限与审批 | 单所有者、Agent 项目隔离、R3 任务门禁 | RBAC/ABAC 细粒度策略、临时能力、Secrets 管理 |
 | 成果 | 受限上传、SHA-256、元信息 | 不可变版本、审查、备份与 GC |
-| 事件 | 持久 Event + Outbox 记录、SSE 流 | 分发消费者、Webhook 重试、SSE、工作流规则 |
+| 事件 | 持久 Event + Outbox、SSE、签名 Webhook 及重试投递 | 工作流订阅规则、外部事件回调和完整恢复 |
 | MCP / A2A | 未实现 | 完整协议端点与能力协商 |
 | OpenAPI | FastAPI 自动文档 | 版本兼容、规范校验与 SDK 示例 |
 | Skills / AG-UI / A2UI / WS | Skills 版本提案/发布已实现，AG-UI/A2UI/WS 未实现 | 安全可插拔的 Skills 和 UI 事件协议 |
