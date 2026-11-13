@@ -35,4 +35,9 @@ where = ["src"]
 testpaths = ["tests"]
 
 [tool.setuptools.package-data]
-otternest = ["index.html"]
+otternest = [
+  "index.html",
+  "assets/mascots/*.png",
+  "assets/icons/SVG/*/*.svg",
+  "assets/icons/PNG/*/*.png"
+]

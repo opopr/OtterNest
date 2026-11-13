@@ -1,98 +1,2404 @@
-<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OtterNest · 小水獭窝</title>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OtterNest · 控制中心</title>
 <style>
-:root{color-scheme:dark;--bg:#101927;--panel:#192638;--border:#32445b;--text:#eaf2fa;--muted:#aabed1;--accent:#7dd6bd;--danger:#f7a1a1}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
-header{display:flex;justify-content:space-between;align-items:center;padding:18px max(24px,calc((100vw - 1120px)/2));border-bottom:1px solid var(--border);background:#142136}
-h1{margin:0;font-size:24px}.subtitle{color:var(--muted);font-size:12px}.wrap{max-width:1120px;padding:24px;margin:auto}
-button,input,select,textarea{font:inherit}button{border:0;border-radius:9px;background:var(--accent);padding:9px 15px;color:#13272b;cursor:pointer;font-weight:600}
-button.secondary{background:#344a64;color:var(--text)}button.danger{background:#743c49;color:#ffe9e9}button:disabled{opacity:.5;cursor:default}
-input,select,textarea{border:1px solid var(--border);border-radius:9px;background:#101b2a;color:var(--text);padding:10px;width:100%}textarea{resize:vertical;min-height:75px}
-small,.muted{color:var(--muted)}.layout{display:grid;grid-template-columns:260px 1fr;gap:20px}.panel{border:1px solid var(--border);border-radius:14px;background:var(--panel);padding:20px;margin-bottom:18px}
-nav button{display:block;width:100%;text-align:left;margin:8px 0;background:transparent;color:var(--text)}nav button.active{background:#315064;color:var(--accent)}
-label{display:block;margin:12px 0 5px;color:var(--muted);font-size:13px}.stack{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.stack>*{flex:1}
-.row{padding:12px 0;border-bottom:1px solid var(--border)}.row:last-child{border:0}.tag{font-size:12px;padding:3px 9px;background:#34566a;border-radius:18px;color:#b8e9d9}
-#message{min-height:26px;color:var(--accent)}#message.error{color:var(--danger)}[hidden]{display:none!important}
-code{overflow-wrap:anywhere;color:#a4e0d4}a{color:var(--accent)}h2{margin-top:0;font-size:18px}h3{font-size:15px;margin:12px 0 5px}
-@media(max-width:760px){.layout{grid-template-columns:1fr}header{padding:16px 20px}.wrap{padding:16px}.stack{display:block}.stack>*{margin-bottom:7px}}
-</style></head>
-<body><header><div><h1>🦦 OtterNest</h1><div class="subtitle">小水獭窝 · AI Team OS</div></div><span class="tag">自托管控制中心</span></header>
-<main class="wrap"><div id="login" class="panel"><h2>管理员连接</h2><p class="muted">输入管理员令牌。令牌仅保存在当前页面内存中，不写入浏览器存储。</p><div class="stack"><input id="ownerToken" type="password" autocomplete="off" placeholder="OTTERNEST_OWNER_TOKEN"><button onclick="login()">连接</button></div></div>
-<div id="dashboard" hidden><div class="layout"><aside class="panel"><h2>指挥中心</h2><div class="muted">当前项目</div><select id="projectSelect" onchange="refresh()"></select><nav id="nav"></nav><button class="secondary" onclick="logout()">退出控制台</button></aside>
-<section><div id="message" role="status"></div><div id="view"></div></section></div></div></main>
-<script>
-let token="",project="",page="overview",projects=[],agents=[],currentPlan=null;
-const api=async(path,method="GET",data)=>{const response=await fetch('/api/v1'+path,{method,headers:{'Authorization':'Bearer '+token,...(data!==undefined?{'Content-Type':'application/json'}:{})},body:data===undefined?undefined:JSON.stringify(data)});const out=await response.json();if(!response.ok)throw Error(out.detail||response.statusText);return out};
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const notice=(text,isError=false)=>{let el=document.getElementById('message');el.textContent=text;el.className=isError?'error':''};
-const safe=async(fn)=>{try{await fn()}catch(e){notice(e.message,true)}};
-async function login(){await safe(async()=>{token=document.getElementById('ownerToken').value;await api('/me');document.getElementById('ownerToken').value='';document.getElementById('login').hidden=true;document.getElementById('dashboard').hidden=false;await refresh()})}
-function logout(){token='';document.getElementById('dashboard').hidden=true;document.getElementById('login').hidden=false;document.getElementById('view').textContent=''}
-async function refresh(){await safe(async()=>{projects=await api('/projects');agents=await api('/agents');const sel=document.getElementById('projectSelect');let current=sel.value||project;sel.innerHTML='<option value="">选择项目</option>'+projects.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');project=projects.find(p=>p.id===current)?.id||projects[0]?.id||'';sel.value=project;renderNav();await render()})}
-function renderNav(){document.getElementById('nav').innerHTML=['overview:概览','commands:操作预览','tasks:任务','agents:Agent','memories:知识与决策','events:事件'].map(e=>{let [id,label]=e.split(':');return `<button class="${page===id?'active':''}" onclick="setPage('${id}')">${label}</button>`}).join('')}
-function setPage(p){page=p;renderNav();safe(render)}
-function item(html){return `<div class="row">${html}</div>`}
-async function render(){const root=document.getElementById('view');if(page==='overview'){root.innerHTML=`<div class="panel"><h2>项目总览</h2><p class="muted">当前 ${projects.length} 个项目，${agents.length} 个 Agent。所有显示内容来自中央数据库。</p><h3>新建项目</h3><form onsubmit="createProject(event)"><label>名称</label><input name="name" required maxlength="160"><label>描述</label><textarea name="description"></textarea><button>创建项目</button></form></div>`;return}
-if(page==='agents'){root.innerHTML=`<div class="panel"><h2>Agent 目录与执行环境</h2><p class="muted">声明能力不等于已验证能力；执行实例的状态由其自己上报，不能代表第三方平台提供了可验证的远程运行证据。</p>${agents.map(a=>item(`<strong>${esc(a.name)}</strong> <span class="tag">${esc(a.platform)}</span><br><small>${esc(a.execution_mode)} · ${a.enabled?'已启用':'已禁用'} · 声明：${esc((a.declared_capabilities||[]).join(', ')||'无')} · 已验证：${esc((a.verified_capabilities||[]).join(', ')||'无')}</small><p><button class="secondary" onclick="showRuntimes('${esc(a.id)}')">运行实例</button> <button class="secondary" onclick="verifyCapabilities('${esc(a.id)}')">确认能力</button></p><div id="runtime-${esc(a.id)}"></div>`)).join('')||'<p class="muted">暂无 Agent</p>'}${project?`<h3>将 Agent 加入当前项目</h3><form onsubmit="addMember(event)"><label>Agent</label><select name="agent_id">${agents.filter(a=>a.enabled).map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('')}</select><label>项目角色</label><select name="role"><option>worker</option><option>manager</option><option>reviewer</option><option>advisor</option></select><button>分配项目权限</button></form>`:''}<h3>注册 Agent</h3><form onsubmit="createAgent(event)"><label>名称</label><input name="name" required><label>平台</label><input name="platform" required><label>声明能力（小写标识，逗号分隔）</label><input name="capabilities" placeholder="python, browser"><label>运行方式</label><select name="execution_mode"><option value="manual">人工接入</option><option value="polling">主动轮询</option><option value="remote">远程调用</option></select><button>注册</button></form><p class="muted">新令牌仅在注册后展示一次，请妥善保存。当前不自动检测平台是否支持实际接单。</p><pre id="newToken"></pre></div>`;return}
-if(!project){root.innerHTML='<div class="panel"><h2>尚无项目</h2><button onclick="setPage(\'overview\')">先创建一个项目</button></div>';return}
-if(page==='commands'){
-const tasks=await api('/projects/'+project+'/tasks');
-const members=await api('/projects/'+project+'/members');
-root.innerHTML=`<div class="panel"><h2>受控指挥 · 操作预览</h2><p class="muted">支持列出的中文句式与结构化表单，不具备自由自然语言推理。两种方式都只生成待确认预览；系统在确认时核对版本、权限及风险。预览在 10 分钟后过期。可选外部模型建议需服务器显式开启且会外发指令与项目任务标题。</p>
-<h3>受限中文指令（不会自动执行）</h3>
-<p class="muted">支持：批准任务「标题」、取消任务「标题」、验收通过任务「标题」、验收驳回任务「标题」原因：理由、指派任务「标题」给「Agent名称」。同名使用 UUID。未匹配指令会拒绝；不调用大模型。</p>
-<form onsubmit="previewNaturalCommand(event)"><label>操作指令</label><textarea name="text" required minlength="4" maxlength="3500" placeholder="请批准任务「修复登录问题」。"></textarea><label>解析方式</label><select name="mode"><option value="template">本地严格中文模板（不外传）</option><option value="model">外部模型建议（需服务器显式开启，发送指令和任务标题）</option></select><button>解析并生成预览</button></form>
-<h3>结构化操作</h3><form onsubmit="previewCommand(event)"><label>任务</label><select name="task_id" required>${tasks.map(t=>`<option value="${esc(t.id)}">${esc(t.title)} · ${esc(t.status)} · v${esc(t.version)}</option>`).join('')}</select>
-<label>操作</label><select name="action" onchange="toggleCommandFields(this.form)"><option value="authorize_task">批准高风险任务</option><option value="review_task">验收任务</option><option value="route_task">设置执行 Agent</option><option value="cancel_task">取消任务</option></select>
-<div data-field="review" hidden><label>验收结果</label><select name="accepted"><option value="true">通过</option><option value="false">要求修改</option></select><label>验收说明（拒绝时必填）</label><textarea name="reason" maxlength="3000"></textarea></div>
-<div data-field="route" hidden><label>执行 Agent</label><select name="target_agent_id"><option value="">不指定</option>${members.filter(m=>m.enabled&&['worker','manager','reviewer'].includes(m.role)).map(m=>`<option value="${esc(m.agent_id)}">${esc(m.agent_name)}</option>`).join('')}</select></div>
-<button>生成待确认预览</button></form><div id="commandPreview" aria-live="polite"></div></div>`;
-return;
+:root{
+  --bg:#F5F6FC;
+  --sidebar:#F1F0FA;
+  --sidebar-border:#E6E7F5;
+  --card:#FFFFFF;
+  --card-soft:#F8F9FE;
+  --border:#ECEEF8;
+  --border-strong:#D8DCF0;
+  --text:#1E2235;
+  --text-soft:#4B526E;
+  --muted:#6E7491;
+  --accent:#5955E9;
+  --accent-deep:#4338CA;
+  --accent-soft:#E4E2FB;
+  --ok:#13B96A;
+  --ok-soft:#E7F8EE;
+  --warn:#E79B15;
+  --warn-soft:#FEF3DF;
+  --danger:#ED525D;
+  --danger-soft:#FDECEC;
+  --blue:#287EF4;
+  --purple:#8B5CF6;
+  --shadow:0 8px 28px rgba(95,106,165,.06);
+  --shadow-sm:0 3px 12px rgba(95,106,165,.05);
+  --radius:18px;
+  --radius-sm:12px;
+  --font:"PingFang SC","Microsoft YaHei UI","Segoe UI",Inter,-apple-system,BlinkMacSystemFont,sans-serif;
+  --mono:"Cascadia Code","JetBrains Mono","Fira Code",Consolas,monospace;
 }
-if(page==='tasks'){
-const graph=await api('/projects/'+project+'/task-graph'), tasks=graph.tasks, edges=graph.dependencies;
-const members=await api('/projects/'+project+'/members');
-const nameById=Object.fromEntries(tasks.map(t=>[t.id,t.title]));
-const eligible=members.filter(m=>m.enabled&&['worker','manager','reviewer'].includes(m.role));
-root.innerHTML=`<div class="panel"><h2>项目任务与依赖</h2><p><button class="secondary" onclick="schedule()">按已验证能力调度在线 Agent</button></p><p class="muted">任务只有在前置任务通过验收后才可领取；调度只标记接单候选者，不会直接启动远程进程。</p>
-${tasks.map(t=>{let deps=edges.filter(d=>d.task_id===t.id).map(d=>nameById[d.depends_on_id]||d.depends_on_id);
-return item(`<strong>${esc(t.title)}</strong> <span class="tag">${esc(t.status)} · ${esc(t.risk)} · P${esc(t.priority)}</span><p class="muted">${esc(t.acceptance)}</p><small>需求能力：${esc((t.required_capabilities||[]).join(', ')||'无')}<br>${deps.length?'前置：'+deps.map(esc).join('、'):'无前置任务'} · 指派：${esc(eligible.find(m=>m.agent_id===t.target_agent_id)?.agent_name||'未指定')}</small>
-${['ready','waiting_dependencies','waiting_approval'].includes(t.status)?`<p class="stack"><select id="target-${esc(t.id)}"><option value="">不指定 Agent</option>${eligible.map(m=>`<option value="${esc(m.agent_id)}" ${m.agent_id===t.target_agent_id?'selected':''}>${esc(m.agent_name)} (${esc(m.role)})</option>`).join('')}</select><button class="secondary" onclick="targetTask('${esc(t.id)}')">设定执行者</button></p>`:''}
-${t.status==='waiting_approval'?`<p><button onclick="action('${esc(t.id)}','authorize')">授权</button></p>`:''}
-${t.status==='submitted'?`<p><button onclick="review('${esc(t.id)}',true)">验收通过</button> <button class="secondary" onclick="review('${esc(t.id)}',false)">要求修改</button></p>`:''}`)}).join('')||'<p class="muted">暂无任务</p>'}
-<h3>创建任务</h3><form onsubmit="createTask(event)"><label>标题</label><input name="title" required maxlength="240"><label>执行说明</label><textarea name="instruction" required></textarea><label>验收标准</label><textarea name="acceptance" required></textarea>
-<label>优先级（0–100）</label><input name="priority" type="number" value="50" min="0" max="100" required><label>任务所需已验证能力（小写标识，逗号分隔）</label><input name="required_capabilities" placeholder="python, testing"><label>前置任务（可多选）</label>
-<select name="dependencies" multiple size="${Math.max(2,Math.min(6,tasks.length))}">${tasks.map(t=>`<option value="${esc(t.id)}">${esc(t.title)} · ${esc(t.status)}</option>`).join('')}</select><small>按 Ctrl 或 Cmd 多选；没有前置任务可以留空。</small>
-<label>风险</label><select name="risk"><option>R0</option><option selected>R1</option><option>R2</option><option>R3</option></select><button>创建</button></form></div>`;return}
-if(page==='memories'){let [ms,ds]=await Promise.all([api('/projects/'+project+'/memories'),api('/projects/'+project+'/decisions')]);root.innerHTML=`<div class="panel"><h2>项目记忆</h2>${ms.map(m=>item(`<strong>${esc(m.title)}</strong> <span class="tag">${esc(m.status)}</span><p>${esc(m.content)}</p>${m.status==='proposed'?`<button onclick="publish('${esc(m.id)}')">发布</button>`:''}`)).join('')||'<p class="muted">暂无记忆</p>'}<form onsubmit="createMemory(event)"><h3>提出知识记录</h3><label>标题</label><input name="title" required><label>内容</label><textarea name="content" required></textarea><label>出处</label><input name="source" required><button>提交提案</button></form></div><div class="panel"><h2>决策</h2>${ds.map(d=>item(`<strong>${esc(d.question)}</strong><p>${esc(d.resolution)}</p><span class="tag">${esc(d.status)}</span><p><button class="secondary" onclick="showDecisionReviews('${esc(d.id)}')">查看独立意见</button> ${d.status==='proposed'?`<button onclick="resolveDecision('${esc(d.id)}')">确认决策</button> <button class="secondary" onclick="configureAutoDeliberation('${esc(d.id)}')">设置自动协商名单</button> <button class="secondary" onclick="openDeliberation('${esc(d.id)}')">开启二轮</button> <button class="secondary" onclick="showDeliberation('${esc(d.id)}')">查看二轮</button>`:''}</p><div id="reviews-${esc(d.id)}"></div><div id="deliberation-${esc(d.id)}"></div>`)).join('')||'<p class="muted">暂无决策</p>'}<form onsubmit="createDecision(event)"><h3>提出决策</h3><label>问题</label><textarea name="question" required></textarea><label>结论</label><textarea name="resolution" required></textarea><label>依据</label><textarea name="rationale" required></textarea><button>提交提案</button></form></div>`;return}
-if(page==='events'){let ev=await api('/projects/'+project+'/events');root.innerHTML=`<div class="panel"><h2>项目事件时间线</h2>${ev.map(e=>item(`<strong>${esc(e.kind)}</strong><br><small>${esc(e.subject_id)} · ${esc(e.created_at)}</small>`)).join('')||'<p class="muted">暂无事件</p>'}</div>`}}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{min-height:100%}
+body{
+  margin:0;
+  font-family:var(--font);
+  font-size:16px;
+  line-height:1.6;
+  color:var(--text);
+  background:var(--bg);
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent-deep);text-decoration:none}
+a:hover{text-decoration:underline}
+code,pre{font-family:var(--mono);font-size:14px}
+code{
+  background:#F2F3FA;
+  border:1px solid #E4E6F4;
+  border-radius:7px;
+  padding:2px 7px;
+  color:#3D3B8E;
+}
+pre{
+  background:#F8F9FE;
+  border:1px solid var(--border-strong);
+  border-radius:14px;
+  padding:14px 16px;
+  color:var(--text);
+  overflow:auto;
+  line-height:1.55;
+  margin:10px 0 0;
+}
+h1,h2,h3{margin:0;line-height:1.3;color:var(--text)}
+h1{font-size:26px;font-weight:700}
+h2{font-size:19px;font-weight:700}
+h3{font-size:17px;font-weight:600;margin:16px 0 10px}
+p{margin:6px 0 10px}
+.muted{color:var(--muted);font-size:15px}
+
+/* Login shell */
+.login-shell{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:32px 24px;
+  background:
+    radial-gradient(circle at 12% 15%,rgba(147,139,255,.16),transparent 42%),
+    radial-gradient(circle at 88% 85%,rgba(103,205,172,.14),transparent 38%),
+    var(--bg);
+}
+.login-grid{
+  width:100%;
+  max-width:1060px;
+  display:grid;
+  grid-template-columns:1.08fr .92fr;
+  gap:24px;
+  align-items:stretch;
+}
+.panel{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:22px 24px;
+  box-shadow:var(--shadow);
+  margin-bottom:20px;
+}
+.login-brand{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom:14px;
+}
+.login-brand-left{display:flex;align-items:center;gap:14px}
+.login-brand-title{font-size:24px;font-weight:700;color:var(--text)}
+.login-mascot{width:84px;height:84px;object-fit:contain;flex-shrink:0}
+.info-list{margin:14px 0 0;padding-left:20px}
+.info-list li{margin-bottom:12px;color:var(--text-soft);font-size:15px}
+
+/* Dashboard Shell */
+.app-shell{
+  display:grid;
+  grid-template-columns:252px minmax(0,1fr);
+  min-height:100vh;
+}
+.sidebar{
+  background:var(--sidebar);
+  border-right:1px solid var(--sidebar-border);
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  position:sticky;
+  top:0;
+  height:100vh;
+  overflow:hidden;
+  padding:20px 14px 0;
+}
+.sidebar-top{position:relative;z-index:2;display:flex;flex-direction:column;min-height:0;flex:1}
+.brand-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:2px 8px 16px;
+}
+.brand-avatar{
+  width:44px;
+  height:44px;
+  border-radius:50%;
+  background:#E2DDFC;
+  display:grid;
+  place-items:center;
+  flex-shrink:0;
+  overflow:hidden;
+  box-shadow:0 4px 12px rgba(89,85,233,.15);
+}
+.brand-avatar img{width:38px;height:38px;object-fit:contain}
+.brand-name{
+  font-size:21px;
+  font-weight:700;
+  letter-spacing:-.02em;
+  color:var(--text);
+  line-height:1.15;
+}
+.brand-sub{
+  font-size:14px;
+  color:var(--muted);
+  margin-top:2px;
+}
+nav{
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  overflow-y:auto;
+  padding-right:2px;
+}
+.nav-btn{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:9px 12px;
+  border:none;
+  border-radius:14px;
+  background:transparent;
+  color:#4B526E;
+  font-family:var(--font);
+  font-size:15px;
+  font-weight:500;
+  cursor:pointer;
+  transition:background .15s ease,color .15s ease;
+  text-align:left;
+}
+.nav-btn:hover{background:rgba(227,225,251,.6);color:var(--text);box-shadow:none}
+.nav-btn.active{
+  background:var(--accent-soft);
+  color:#342FA8;
+  font-weight:600;
+  box-shadow:none;
+}
+.nav-main{display:flex;align-items:center;gap:11px;min-width:0}
+.nav-icon-img{width:26px;height:26px;flex-shrink:0;display:block}
+.nav-badge{
+  min-width:24px;
+  height:24px;
+  padding:0 8px;
+  border-radius:999px;
+  background:#CFC7FA;
+  color:#4332A8;
+  font-size:14px;
+  font-weight:700;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+.sidebar-art{
+  position:relative;
+  margin:6px -14px 0;
+  height:144px;
+  flex-shrink:0;
+  pointer-events:none;
+  user-select:none;
+  overflow:hidden;
+}
+.sidebar-wave{
+  position:absolute;
+  inset:auto 0 0 0;
+  width:100%;
+  height:92px;
+  display:block;
+}
+.sidebar-otter{
+  position:relative;
+  z-index:2;
+  width:128px;
+  height:128px;
+  margin-left:14px;
+  margin-top:8px;
+  object-fit:contain;
+  filter:drop-shadow(0 6px 14px rgba(80,74,155,.14));
+}
+
+/* Main workspace */
+.main-area{
+  min-width:0;
+  padding:22px 30px 42px;
+  max-width:1380px;
+  width:100%;
+  margin:0 auto;
+}
+.topbar{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  flex-wrap:wrap;
+  margin-bottom:22px;
+}
+.topbar-left{display:flex;flex-direction:column;gap:4px;min-width:0}
+.topbar-title-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.page-title-icon{width:34px;height:34px;flex-shrink:0}
+.topbar-sub{font-size:15px;color:var(--muted)}
+.project-pill-wrap{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:3px 12px 3px 10px;
+  box-shadow:var(--shadow-sm);
+}
+.project-pill-wrap select{
+  border:none;
+  background:transparent;
+  font-family:var(--font);
+  font-size:15px;
+  font-weight:600;
+  color:var(--text);
+  padding:4px 4px 4px 0;
+  margin:0;
+  width:auto;
+  min-width:150px;
+  max-width:280px;
+  outline:none;
+  cursor:pointer;
+}
+.topbar-right{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.search-box{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:6px 10px 6px 12px;
+  min-width:300px;
+  box-shadow:var(--shadow-sm);
+  transition:border-color .15s ease,box-shadow .15s ease;
+}
+.search-box:focus-within{
+  border-color:#A8A4F5;
+  box-shadow:0 0 0 3px rgba(89,85,233,.12);
+}
+.search-box input{
+  border:none;
+  background:transparent;
+  margin:0;
+  padding:4px 0;
+  font-size:15px;
+  color:var(--text);
+  outline:none;
+  width:100%;
+  box-shadow:none;
+}
+.search-box input::placeholder{color:#8E94AE}
+.kbd-chip{
+  background:#F4F5FA;
+  border:1px solid #E3E5F2;
+  border-radius:8px;
+  padding:2px 8px;
+  font-size:14px;
+  font-weight:600;
+  color:var(--muted);
+  white-space:nowrap;
+}
+.icon-btn{
+  position:relative;
+  width:44px;
+  height:44px;
+  border-radius:14px;
+  border:1px solid var(--border);
+  background:var(--card);
+  color:var(--text-soft);
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  padding:0;
+  box-shadow:var(--shadow-sm);
+}
+.icon-btn:hover{background:#FAF9FF;border-color:var(--border-strong);box-shadow:var(--shadow-sm)}
+.bell-dot{
+  position:absolute;
+  top:8px;
+  right:9px;
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:#5955E9;
+  border:2px solid #FFFFFF;
+}
+.user-menu-wrap{position:relative}
+.avatar-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:4px 12px 4px 5px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:var(--card);
+  color:var(--text);
+  font-family:var(--font);
+  font-size:15px;
+  font-weight:600;
+  cursor:pointer;
+  box-shadow:var(--shadow-sm);
+}
+.avatar-btn:hover{border-color:var(--border-strong);background:#FAF9FF;box-shadow:var(--shadow-sm)}
+.avatar-circle{
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  background:#E9E6FD;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+}
+.avatar-circle img{width:28px;height:28px;object-fit:contain}
+.user-popover{
+  position:absolute;
+  top:52px;
+  right:0;
+  min-width:240px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:10px;
+  box-shadow:0 16px 36px rgba(64,74,125,.14);
+  z-index:40;
+}
+.user-popover-head{
+  padding:8px 10px 10px;
+  border-bottom:1px solid var(--border);
+  margin-bottom:6px;
+  font-size:14px;
+  color:var(--muted);
+}
+.menu-item{
+  width:100%;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:9px 12px;
+  border:none;
+  border-radius:10px;
+  background:transparent;
+  color:var(--text);
+  font-family:var(--font);
+  font-size:15px;
+  font-weight:500;
+  cursor:pointer;
+  text-align:left;
+  text-decoration:none;
+  box-shadow:none;
+}
+.menu-item:hover{background:#F3F2FC;text-decoration:none;box-shadow:none}
+.menu-item.danger-text{color:#B91C1C}
+
+#message{
+  margin-bottom:16px;
+  padding:12px 16px;
+  border-radius:14px;
+  background:#EAFAF1;
+  border:1px solid #BCE8CE;
+  color:#146C3B;
+  font-size:15px;
+  font-weight:500;
+}
+#message:empty{display:none}
+#message.error{background:#FEF1F1;border-color:#FACACA;color:#B91C1C}
+
+/* Overview KPI cards */
+.kpi-row{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:18px;
+  margin-bottom:22px;
+}
+.kpi-tile{
+  position:relative;
+  overflow:hidden;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:18px 20px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  box-shadow:var(--shadow);
+  cursor:pointer;
+  transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;
+}
+.kpi-tile:hover{
+  transform:translateY(-2px);
+  border-color:#D6D9F0;
+  box-shadow:0 12px 30px rgba(95,106,165,.1);
+}
+.kpi-tile::after{
+  content:"";
+  position:absolute;
+  right:-18px;
+  bottom:-24px;
+  width:130px;
+  height:76px;
+  border-radius:60% 40% 0 0;
+  opacity:.58;
+  pointer-events:none;
+}
+.kpi-tile.tone-blue::after{background:radial-gradient(circle at 60% 60%,#DDE9FF 0%,rgba(221,233,255,0) 75%)}
+.kpi-tile.tone-mint::after{background:radial-gradient(circle at 60% 60%,#DCF7E8 0%,rgba(220,247,232,0) 75%)}
+.kpi-tile.tone-lavender::after{background:radial-gradient(circle at 60% 60%,#EAE6FD 0%,rgba(234,230,253,0) 75%)}
+.kpi-tile.tone-amber::after{background:radial-gradient(circle at 60% 60%,#FDEED9 0%,rgba(253,238,217,0) 75%)}
+.kpi-icon-img{width:48px;height:48px;flex-shrink:0;position:relative;z-index:1}
+.kpi-meta{position:relative;z-index:1;min-width:0}
+.kpi-label{font-size:15px;font-weight:500;color:var(--text-soft);margin-bottom:3px}
+.kpi-value{font-size:30px;font-weight:700;line-height:1.15;color:var(--text);letter-spacing:-.02em}
+.kpi-total{font-size:20px;font-weight:600;color:var(--muted);margin-left:3px}
+
+.mid-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:22px;
+  margin-bottom:22px;
+}
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:22px 24px;
+  box-shadow:var(--shadow);
+}
+.card-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:16px;
+  flex-wrap:wrap;
+}
+.card-link{
+  border:none;
+  background:transparent;
+  color:var(--accent);
+  font-family:var(--font);
+  font-size:15px;
+  font-weight:600;
+  cursor:pointer;
+  padding:4px 8px;
+  border-radius:8px;
+  box-shadow:none;
+}
+.card-link:hover{background:#F2F1FD;box-shadow:none}
+
+/* Donut chart */
+.donut-wrap{
+  display:flex;
+  align-items:center;
+  justify-content:space-around;
+  gap:22px;
+  flex-wrap:wrap;
+  padding:6px 4px;
+}
+.donut-svg{width:176px;height:176px;flex-shrink:0}
+.legend-table{
+  flex:1;
+  min-width:205px;
+  display:flex;
+  flex-direction:column;
+  gap:13px;
+}
+.legend-row{
+  display:grid;
+  grid-template-columns:14px 1fr auto auto;
+  align-items:center;
+  gap:12px;
+  font-size:15px;
+}
+.legend-dot{width:12px;height:12px;border-radius:4px;display:inline-block}
+.legend-name{color:var(--text-soft);font-weight:500}
+.legend-num{font-weight:700;color:var(--text);min-width:28px;text-align:right}
+.legend-pct{color:var(--muted);min-width:44px;text-align:right;font-size:14px}
+
+/* Agent Status list + Mascot Avatars */
+.agent-rows{display:flex;flex-direction:column;gap:14px}
+.agent-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding:6px 4px;
+}
+.agent-row-left{display:flex;align-items:center;gap:14px;min-width:0}
+.otter-avatar{
+  width:46px;
+  height:46px;
+  border-radius:14px;
+  background:#F4F2FE;
+  border:1px solid #E5E1FB;
+  display:grid;
+  place-items:center;
+  flex-shrink:0;
+  overflow:hidden;
+}
+.otter-avatar img{width:42px;height:42px;object-fit:contain}
+.otter-avatar-sm{
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  background:#F2F0FD;
+  border:1px solid #E3DFFB;
+  display:inline-grid;
+  place-items:center;
+  overflow:hidden;
+  flex-shrink:0;
+}
+.otter-avatar-sm img{width:24px;height:24px;object-fit:contain}
+.agent-name-main{font-size:16px;font-weight:600;color:var(--text);line-height:1.25}
+.agent-status-line{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:14px;
+  color:var(--muted);
+  margin-top:2px;
+}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.dot-on{background:#13B96A}
+.dot-off{background:#9AA1B9}
+.cap-pills{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.cap-pill{
+  background:#F4F5FA;
+  border:1px solid #EAEBF5;
+  color:#4A516D;
+  font-size:14px;
+  font-weight:500;
+  padding:4px 12px;
+  border-radius:10px;
+  white-space:nowrap;
+}
+
+/* Recent timeline */
+.timeline{display:flex;flex-direction:column}
+.timeline-row{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:11px 0;
+}
+.timeline-row:not(:last-child)::before{
+  content:"";
+  position:absolute;
+  left:17px;
+  top:46px;
+  bottom:-10px;
+  width:2px;
+  background:#EAECF5;
+}
+.timeline-left{display:flex;align-items:center;gap:14px;min-width:0}
+.tl-img{width:36px;height:36px;position:relative;z-index:1;flex-shrink:0}
+.tl-text{font-size:16px;font-weight:500;color:var(--text)}
+.tl-time{font-size:14px;color:var(--muted);white-space:nowrap}
+
+/* Mockup 2: Projects & Tasks Page */
+.subtabs-bar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  flex-wrap:wrap;
+  margin-bottom:18px;
+  border-bottom:1px solid var(--border);
+  padding-bottom:10px;
+}
+.subtabs{display:flex;align-items:center;gap:20px}
+.subtab-btn{
+  border:none;
+  background:transparent;
+  color:var(--muted);
+  font-family:var(--font);
+  font-size:16px;
+  font-weight:600;
+  padding:6px 2px 10px;
+  border-bottom:3px solid transparent;
+  border-radius:0;
+  cursor:pointer;
+  box-shadow:none;
+}
+.subtab-btn.active{color:var(--accent);border-bottom-color:var(--accent);box-shadow:none}
+.subtab-btn:hover{color:var(--text);box-shadow:none}
+
+.proj-cards-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(265px,1fr));
+  gap:16px;
+  margin-bottom:24px;
+}
+.proj-card{
+  background:var(--card);
+  border:1.5px solid var(--border);
+  border-radius:18px;
+  padding:18px 20px;
+  box-shadow:var(--shadow);
+  cursor:pointer;
+  transition:border-color .15s ease,transform .15s ease,box-shadow .15s ease;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  gap:12px;
+}
+.proj-card:hover{transform:translateY(-2px);border-color:#C7C5F8}
+.proj-card.selected{border-color:var(--accent);box-shadow:0 10px 26px rgba(89,85,233,.12)}
+.proj-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.proj-card-title{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;color:var(--text)}
+.proj-card-desc{font-size:14px;color:var(--muted);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.prog-row{display:flex;align-items:center;gap:10px}
+.prog-track{flex:1;height:8px;background:#EAEBF5;border-radius:999px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,#7B77F5,#5955E9);border-radius:999px}
+.prog-fill.mint{background:linear-gradient(90deg,#34D399,#13B96A)}
+.prog-pct{font-size:14px;font-weight:600;color:var(--text-soft);min-width:38px;text-align:right}
+.proj-card-foot{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding-top:10px;
+  border-top:1px solid var(--border);
+  font-size:14px;
+  color:var(--muted);
+}
+
+/* Task Table & Filter Bar */
+.toolbar-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:14px;
+}
+.filter-bar{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-bottom:16px;
+}
+.filter-select{
+  width:auto;
+  min-width:140px;
+  padding:8px 12px;
+  font-size:14px;
+  border-radius:12px;
+}
+.segmented{
+  display:inline-flex;
+  background:#F2F3FA;
+  border:1px solid var(--border-strong);
+  border-radius:12px;
+  padding:3px;
+}
+.seg-btn{
+  border:none;
+  background:transparent;
+  color:var(--muted);
+  font-family:var(--font);
+  font-size:14px;
+  font-weight:600;
+  padding:6px 12px;
+  border-radius:9px;
+  cursor:pointer;
+  box-shadow:none;
+}
+.seg-btn.active{background:#FFFFFF;color:var(--accent);box-shadow:0 2px 6px rgba(89,85,233,.12)}
+
+.task-table-wrap{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:18px;
+  box-shadow:var(--shadow);
+  overflow-x:auto;
+}
+table.task-table{
+  width:100%;
+  border-collapse:collapse;
+  min-width:860px;
+}
+.task-table th{
+  text-align:left;
+  font-size:14px;
+  font-weight:600;
+  color:var(--muted);
+  padding:14px 16px;
+  background:#FAFBFD;
+  border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+.task-table td{
+  padding:14px 16px;
+  border-bottom:1px solid var(--border);
+  font-size:15px;
+  color:var(--text);
+  vertical-align:middle;
+}
+.task-table tr.task-row:hover td{background:#FAF9FF}
+.task-table tr.drawer-row td{background:#F8F9FE;padding:18px 20px}
+.kanban-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:16px;
+  align-items:start;
+}
+.kanban-col{
+  background:#F8F9FE;
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:14px;
+}
+.kanban-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:12px;
+  font-size:15px;
+  font-weight:700;
+}
+.kanban-card{
+  background:#FFFFFF;
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:14px;
+  margin-bottom:10px;
+  box-shadow:var(--shadow-sm);
+}
+
+/* Shared cards, forms, buttons, tags */
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start}
+.item-card{
+  background:#FAFBFD;
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:18px 20px;
+  margin-top:14px;
+}
+.item-card:first-child{margin-top:6px}
+.item-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:8px;
+}
+.item-title{font-size:17px;font-weight:700;color:var(--text)}
+.stack{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.stack-grow>*{flex:1;min-width:190px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+
+.mascot-banner{
+  display:flex;
+  align-items:center;
+  gap:16px;
+  background:linear-gradient(135deg,#F5F3FE,#FFFFFF);
+  border:1px solid #E5E1FB;
+  border-radius:18px;
+  padding:14px 20px;
+  margin-bottom:20px;
+}
+.mascot-banner img{width:64px;height:64px;object-fit:contain;flex-shrink:0}
+.empty-state{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  padding:32px 20px;
+  gap:10px;
+}
+.empty-state img{width:112px;height:112px;object-fit:contain}
+
+label{display:block;font-size:15px;font-weight:600;color:var(--text-soft);margin:14px 0 6px}
+input,textarea,select{
+  width:100%;
+  background:#FFFFFF;
+  color:var(--text);
+  border:1px solid var(--border-strong);
+  border-radius:12px;
+  padding:10px 14px;
+  font-family:var(--font);
+  font-size:15px;
+  transition:border-color .15s ease,box-shadow .15s ease;
+}
+input:focus,textarea:focus,select:focus{
+  outline:none;
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(89,85,233,.12);
+}
+textarea{min-height:88px;resize:vertical}
+.input-row{display:flex;gap:10px;align-items:center}
+
+button,.btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  background:linear-gradient(135deg,#6E68F5,#5955E9);
+  color:#FFFFFF;
+  border:1px solid transparent;
+  border-radius:12px;
+  padding:9px 16px;
+  font-family:var(--font);
+  font-size:15px;
+  font-weight:600;
+  cursor:pointer;
+  transition:transform .08s ease,box-shadow .15s ease;
+}
+button:hover{box-shadow:0 6px 18px rgba(89,85,233,.24)}
+button:active{transform:translateY(1px)}
+button.secondary{
+  background:#FFFFFF;
+  color:var(--text-soft);
+  border-color:var(--border-strong);
+  box-shadow:none;
+}
+button.secondary:hover{background:#F5F4FD;color:var(--text);box-shadow:none}
+button.ghost{
+  background:#F4F5FB;
+  color:var(--text-soft);
+  border-color:transparent;
+  box-shadow:none;
+}
+button.ghost:hover{background:#ECEBFA;color:var(--text);box-shadow:none}
+button.danger{
+  background:#FEF1F1;
+  color:#B91C1C;
+  border-color:#FACACA;
+  box-shadow:none;
+}
+button.danger:hover{background:#FDE2E2;box-shadow:none}
+button.sm{padding:6px 12px;font-size:14px;border-radius:10px}
+
+.tag,.chip{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:14px;
+  font-weight:600;
+  padding:4px 11px;
+  border-radius:999px;
+  background:#F2F3FA;
+  border:1px solid #E4E6F4;
+  color:var(--text-soft);
+  white-space:nowrap;
+}
+.tag-ok,.tag-active,.tag-published,.tag-completed,.tag-owner_verified,.tag-verified_executed,.tag-approved,.tag-pass{
+  background:var(--ok-soft);border-color:#B7EBD0;color:#15803D;
+}
+.tag-info,.tag-running,.tag-ready,.tag-support,.tag-submitted{
+  background:#EBF1FE;border-color:#C7D9FC;color:#1D4ED8;
+}
+.tag-warn,.tag-waiting_approval,.tag-waiting_dependencies,.tag-proposed,.tag-self_reported,.tag-unknown,.tag-paused,.tag-concern,.tag-alternative,.tag-open{
+  background:var(--warn-soft);border-color:#FBD79C;color:#B45309;
+}
+.tag-bad,.tag-blocked,.tag-cancelled,.tag-archived,.tag-rejected,.tag-oppose,.tag-fail,.tag-closed{
+  background:var(--danger-soft);border-color:#FACACA;color:#B91C1C;
+}
+
+.callout{
+  padding:13px 16px;
+  border-radius:14px;
+  background:#F4F3FE;
+  border:1px solid #E1DFFA;
+  color:#3E3A7A;
+  font-size:15px;
+}
+.meter-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:14px 0}
+.meter-card{
+  background:#FAFBFD;
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:16px 18px;
+}
+.meter-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;font-size:15px}
+.meter-track{height:12px;background:#E9ECF7;border-radius:999px;overflow:hidden}
+.meter-fill{height:100%;background:linear-gradient(90deg,#6E68F5,#287EF4);border-radius:999px;transition:width .25s ease}
+.meter-fill.warn{background:linear-gradient(90deg,#E79B15,#FBBF24)}
+.meter-fill.danger{background:linear-gradient(90deg,#ED525D,#F87171)}
+.continuity-box{
+  margin-top:12px;
+  padding-top:12px;
+  border-top:1px dashed var(--border-strong);
+}
+
+/* Mockup 3: AI Command Center */
+.cmd-layout{
+  display:grid;
+  grid-template-columns:minmax(0,1.55fr) minmax(300px,.88fr);
+  gap:22px;
+  align-items:start;
+}
+.cmd-hero{
+  position:relative;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  background:linear-gradient(135deg,#ECEAFB 0%,#F5F7FE 65%,#EAE5FD 100%);
+  border:1px solid #E1DFFA;
+  border-radius:20px;
+  padding:20px 24px;
+  margin-bottom:20px;
+  box-shadow:var(--shadow);
+}
+.cmd-hero-left{position:relative;z-index:2;max-width:520px}
+.cmd-hero-title{display:flex;align-items:center;gap:12px;font-size:23px;font-weight:700;color:var(--text)}
+.cmd-hero-mascot{position:relative;z-index:2;width:118px;height:102px;object-fit:contain;flex-shrink:0}
+.cmd-hero-wave{position:absolute;right:0;bottom:0;width:240px;height:82px;opacity:.75;pointer-events:none}
+.preset-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.preset-chip{
+  border:1px solid #DFDCFA;
+  background:#F6F5FE;
+  color:#4338CA;
+  font-family:var(--font);
+  font-size:14px;
+  font-weight:500;
+  padding:5px 12px;
+  border-radius:999px;
+  cursor:pointer;
+  box-shadow:none;
+}
+.preset-chip:hover{background:#EAE7FD;box-shadow:none}
+.composer-foot{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-top:14px;
+  padding-top:12px;
+  border-top:1px solid var(--border);
+}
+.cmd-step{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding:13px 16px;
+  border-radius:14px;
+  background:#FAFBFD;
+  border:1px solid var(--border);
+  margin-top:10px;
+}
+.cmd-step-left{display:flex;align-items:center;gap:14px;min-width:0}
+.step-num{
+  width:30px;
+  height:30px;
+  border-radius:50%;
+  background:#E8E5FC;
+  color:#4338CA;
+  font-size:15px;
+  font-weight:700;
+  display:grid;
+  place-items:center;
+  flex-shrink:0;
+}
+.alert-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px 14px;
+  border-radius:14px;
+  background:#FAFBFD;
+  border:1px solid var(--border);
+  margin-top:10px;
+  cursor:pointer;
+  transition:border-color .15s ease,background .15s ease;
+}
+.alert-row:hover{background:#F5F3FE;border-color:#D8D4FA}
+.cap-stat-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:11px 14px;
+  border-radius:14px;
+  background:#FAFBFD;
+  border:1px solid var(--border);
+  margin-top:10px;
+  font-size:15px;
+}
+
+@media (max-width:1180px){
+  .kpi-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kanban-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mid-grid,.grid-2,.meter-grid,.login-grid,.cmd-layout{grid-template-columns:1fr}
+}
+@media (max-width:860px){
+  .app-shell{grid-template-columns:1fr}
+  .sidebar{position:static;height:auto;border-right:none;border-bottom:1px solid var(--sidebar-border)}
+  .sidebar-art{display:none}
+  nav{flex-direction:row;flex-wrap:wrap;padding-bottom:12px}
+  .nav-btn{width:auto}
+  .main-area{padding:18px 16px 32px}
+  .search-box{min-width:200px;flex:1}
+  .kanban-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div id="login" class="login-shell">
+  <div class="login-grid">
+    <section class="panel">
+      <div class="login-brand">
+        <div class="login-brand-left">
+          <div class="brand-avatar" aria-hidden="true">
+            <img src="/assets/icons/SVG/装饰/水獭头像.svg" width="38" height="38" alt="OtterNest 图标">
+          </div>
+          <div>
+            <div class="login-brand-title">OtterNest · 控制台登录</div>
+            <div class="muted">AI Team OS · 多 Agent 任务治理与本地权威状态</div>
+          </div>
+        </div>
+        <img class="login-mascot" src="/assets/mascots/otter-wave.png" alt="欢迎水獭">
+      </div>
+      <p class="muted">输入启动服务端时配置的管理员令牌，令牌仅保存在当前浏览器页面内存中。</p>
+      <form onsubmit="event.preventDefault();login();">
+        <label for="ownerToken">管理员访问令牌（OTTERNEST_OWNER_TOKEN）</label>
+        <div class="input-row">
+          <input id="ownerToken" type="password" autocomplete="off" placeholder="请输入管理员 Bearer 令牌" required>
+          <button type="button" class="secondary" onclick="toggleTokenVisibility(this)">显示</button>
+        </div>
+        <div class="actions">
+          <button type="submit">连接控制台</button>
+          <a class="menu-item" style="width:auto;background:#F4F5FA;border:1px solid #E4E6F4" href="/api/docs" target="_blank" rel="noopener">OpenAPI 文档</a>
+        </div>
+      </form>
+      <div id="loginNotice" class="callout" style="margin-top:18px">
+        所有任务租约、预算、检查点、外部副作用对账及跨项目共享均以中央数据库为准。
+      </div>
+    </section>
+
+    <aside class="panel">
+      <div class="card-head" style="margin-bottom:8px">
+        <h2>认证与上线部署边界</h2>
+        <img src="/assets/icons/SVG/功能/lock-安全权限.svg" width="34" height="34" alt="安全边界">
+      </div>
+      <ul class="info-list">
+        <li><strong>管理员会话（当前）</strong>：通过环境变量 <code>OTTERNEST_OWNER_TOKEN</code> 恒定时间校验，关闭页签即失效。</li>
+        <li><strong>Agent 独立凭据</strong>：注册时生成一次性 <code>on_agent_*</code> 令牌，数据库只保存 <code>SHA-256</code> 哈希，并按角色与 <code>lease_epoch</code> 隔离。</li>
+        <li><strong>生产上线前提</strong>：当前版本尚未内置企业 SSO / OAuth 与多管理员 RBAC；生产部署必须置于 HTTPS 与企业统一身份认证网关之后。</li>
+      </ul>
+    </aside>
+  </div>
+</div>
+
+<div id="dashboard" class="app-shell" hidden>
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="brand-row">
+        <div class="brand-avatar" aria-hidden="true">
+          <img src="/assets/icons/SVG/装饰/水獭头像.svg" width="38" height="38" alt="OtterNest 徽标">
+        </div>
+        <div>
+          <div class="brand-name">OtterNest</div>
+          <div class="brand-sub">AI 团队协作控制平面</div>
+        </div>
+      </div>
+      <nav id="nav" aria-label="主导航"></nav>
+    </div>
+
+    <div class="sidebar-art" aria-hidden="true">
+      <img class="sidebar-otter" src="/assets/mascots/otter-laptop.png" alt="">
+      <svg class="sidebar-wave" viewBox="0 0 252 92" fill="none" preserveAspectRatio="none">
+        <path d="M0 32 Q65 10 132 28 T252 24 L252 92 L0 92 Z" fill="#E3E0FA" opacity=".78"/>
+        <path d="M0 52 Q78 34 155 54 T252 48 L252 92 L0 92 Z" fill="#D5D0F7" opacity=".88"/>
+      </svg>
+    </div>
+  </aside>
+
+  <main class="main-area">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-title-row">
+          <img id="pageIcon" class="page-title-icon" src="/assets/icons/SVG/导航/home-概览.svg" alt="">
+          <h1 id="pageTitle">首页仪表盘</h1>
+          <div class="project-pill-wrap">
+            <span class="dot dot-on" aria-hidden="true"></span>
+            <select id="projectSelect" aria-label="选择当前工作项目" onchange="onProjectSwitch()"></select>
+          </div>
+        </div>
+        <div id="pageSub" class="topbar-sub">总览团队项目进度、在线 Agent 与实时审计动态</div>
+      </div>
+
+      <div class="topbar-right">
+        <div class="search-box">
+          <img src="/assets/icons/SVG/功能/search-全局搜索.svg" width="22" height="22" alt="搜索">
+          <input id="globalSearch" type="search" placeholder="搜索项目、任务或 Agent..." aria-label="全局搜索" oninput="onSearchInput(this.value)">
+          <span class="kbd-chip">⌘K</span>
+        </div>
+
+        <button id="bellBtn" class="icon-btn" type="button" title="待审批事项" aria-label="查看待审批事项" onclick="setPage('approvals')">
+          <img src="/assets/icons/SVG/操作/bell-通知.svg" width="26" height="26" alt="通知">
+          <span id="bellDot" class="bell-dot" hidden></span>
+        </button>
+
+        <div class="user-menu-wrap">
+          <button id="userMenuBtn" class="avatar-btn" type="button" aria-haspopup="true" aria-expanded="false" onclick="toggleUserMenu()">
+            <span class="avatar-circle" aria-hidden="true">
+              <img src="/assets/icons/SVG/装饰/水獭头像.svg" width="28" height="28" alt="管理员">
+            </span>
+            <span>管理员</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6"/>
+            </svg>
+          </button>
+          <div id="userMenu" class="user-popover" hidden>
+            <div class="user-popover-head">管理员会话 · 本地权威状态</div>
+            <button class="menu-item" type="button" onclick="toggleUserMenu();refresh()">
+              <img src="/assets/icons/SVG/操作/refresh-刷新.svg" width="20" height="20" alt="">刷新实时数据
+            </button>
+            <a class="menu-item" href="/api/docs" target="_blank" rel="noopener" onclick="toggleUserMenu()">
+              <img src="/assets/icons/SVG/操作/file-文件.svg" width="20" height="20" alt="">OpenAPI 接口文档
+            </a>
+            <button class="menu-item" type="button" onclick="toggleUserMenu();setPage('settings')">
+              <img src="/assets/icons/SVG/功能/lock-安全权限.svg" width="20" height="20" alt="">连接与安全边界
+            </button>
+            <button class="menu-item danger-text" type="button" onclick="toggleUserMenu();logout()">退出控制台</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div id="message" role="status" aria-live="polite"></div>
+    <div id="view"></div>
+  </main>
+</div>
+
+<script>
+let token="",project="",page="overview",projects=[],agents=[],currentPlan=null,searchQuery="";
+let taskFilter="all",taskViewMode="list",projectSubTab="projects",expandedTaskId="",showNewProjectForm=false,showNewTaskForm=false;
+let eventCategory="all";
+let cachedBriefing=null,cachedShares=[],cachedTasks=[],cachedEvents=[],cachedMembers=[],runtimesMap={},projectStatsMap={};
+
+const NAV_DEFS=[
+  ['overview','首页仪表盘','/assets/icons/SVG/导航/home-概览.svg','总览项目任务分布、Agent 在线心跳与最近动态'],
+  ['projects','项目与任务','/assets/icons/SVG/导航/folder-项目管理.svg','管理项目、任务图谱、租约核验与执行进度'],
+  ['commands','AI 指挥中心','/assets/icons/SVG/导航/sparkle-智能指挥中心.svg','受限中文意图解析与 10 分钟二次确认执行预览'],
+  ['agents','Agent 管理','/assets/icons/SVG/导航/bot-Agent管理.svg','管理可执行节点、运行实例心跳及已独立核验能力'],
+  ['approvals','操作审批','/assets/icons/SVG/导航/shield-check-审批管理.svg','集中审批高风险任务、外部副作用核对与跨项目共享提案'],
+  ['collaboration','协作与决策','/assets/icons/SVG/导航/network-协作调度.svg','发起团队决策、独立意见审查与二轮协同协商'],
+  ['memories','记忆与知识','/assets/icons/SVG/导航/database-记忆与知识.svg','管理项目记忆修订、Skill 评估记录与跨项目知识发布'],
+  ['events','事件与审计','/assets/icons/SVG/导航/chart-监控分析.svg','查看不可变项目审计事件流与详细变更载荷'],
+  ['settings','系统设置','/assets/icons/SVG/导航/gear-系统设置.svg','配置项目宪章硬预算、运行状态控制与无密文可携带导出']
+];
+
+const CAP_LABELS={design:'设计',docs:'文档',coding:'开发',dev:'开发',testing:'测试',research:'调研',analysis:'分析'};
+function capLabel(c){return CAP_LABELS[c]||c}
+
+function agentMascot(agent){
+  const txt=((agent?.name||'')+' '+(agent?.platform||'')+' '+((agent?.declared_capabilities||[]).join(' '))).toLowerCase();
+  if(txt.includes('codex')||txt.includes('coding')||txt.includes('dev'))return '/assets/mascots/otter-coding.png';
+  if(txt.includes('gemini')||txt.includes('research')||txt.includes('analysis'))return '/assets/mascots/otter-explorer.png';
+  if(txt.includes('muse')||txt.includes('design')||txt.includes('ui'))return '/assets/mascots/otter-idea.png';
+  if(txt.includes('review')||txt.includes('test'))return '/assets/mascots/otter-checklist.png';
+  return '/assets/mascots/otter-laptop.png';
+}
+
+const api=async(path,method="GET",data)=>{
+  const response=await fetch('/api/v1'+path,{
+    method,
+    headers:{'Authorization':'Bearer '+token,...(data!==undefined?{'Content-Type':'application/json'}:{})},
+    body:data===undefined?undefined:JSON.stringify(data)
+  });
+  const out=await response.json();
+  if(!response.ok)throw Error(out.detail||response.statusText);
+  return out;
+};
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const notice=(text,isError=false)=>{const el=document.getElementById('message');if(!el)return;el.textContent=text;el.className=isError?'error':''};
+const safe=async(fn)=>{try{await fn()}catch(e){notice(e.message,true)}};
+function tagCls(v){return 'tag tag-'+String(v||'').replace(/[^a-zA-Z0-9_-]/g,'')}
+function toggleTokenVisibility(btn){const inp=document.getElementById('ownerToken');const show=inp.type==='password';inp.type=show?'text':'password';btn.textContent=show?'隐藏':'显示'}
+
+document.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){
+    const inp=document.getElementById('globalSearch');
+    if(inp&&!document.getElementById('dashboard').hidden){e.preventDefault();inp.focus();inp.select()}
+  }
+});
+document.addEventListener('click',e=>{
+  const wrap=document.querySelector('.user-menu-wrap');
+  const menu=document.getElementById('userMenu');
+  if(wrap&&menu&&!menu.hidden&&!wrap.contains(e.target)){
+    menu.hidden=true;
+    document.getElementById('userMenuBtn')?.setAttribute('aria-expanded','false');
+  }
+});
+function toggleUserMenu(){
+  const menu=document.getElementById('userMenu');
+  if(!menu)return;
+  menu.hidden=!menu.hidden;
+  document.getElementById('userMenuBtn')?.setAttribute('aria-expanded',String(!menu.hidden));
+}
+
+async function login(){
+  await safe(async()=>{
+    token=document.getElementById('ownerToken').value;
+    await api('/me');
+    document.getElementById('ownerToken').value='';
+    document.getElementById('login').hidden=true;
+    document.getElementById('dashboard').hidden=false;
+    notice('');
+    await refresh();
+  });
+}
+function logout(){
+  token='';
+  cachedBriefing=null;cachedShares=[];cachedTasks=[];cachedEvents=[];cachedMembers=[];runtimesMap={};projectStatsMap={};
+  document.getElementById('dashboard').hidden=true;
+  document.getElementById('login').hidden=false;
+  document.getElementById('view').textContent='';
+  notice('');
+}
+
+function pendingApprovalsCount(){
+  const pa=cachedBriefing?.pending_owner_actions||{};
+  const sharesCount=(cachedShares||[]).filter(s=>s.status==='proposed').length;
+  return (pa.tasks_waiting_approval||0)+(pa.tasks_submitted_for_review||0)+(pa.tasks_blocked||0)+(pa.tasks_lease_expired_unverified||0)+(pa.side_effects_unreconciled||0)+(pa.decisions_proposed||0)+(pa.memories_proposed||0)+(pa.skills_proposed||0)+sharesCount;
+}
+
+function renderNav(){
+  const badgeNum=pendingApprovalsCount();
+  const bellDot=document.getElementById('bellDot');
+  if(bellDot)bellDot.hidden=badgeNum<=0;
+  const def=NAV_DEFS.find(([id])=>id===page)||NAV_DEFS[0];
+  document.getElementById('pageTitle').textContent=def[1];
+  document.getElementById('pageIcon').src=def[2];
+  document.getElementById('pageSub').textContent=def[3];
+  document.getElementById('nav').innerHTML=NAV_DEFS.map(([id,label,iconSrc])=>`
+    <button class="nav-btn ${page===id?'active':''}" onclick="setPage('${id}')">
+      <span class="nav-main"><img class="nav-icon-img" src="${iconSrc}" width="26" height="26" alt=""><span>${esc(label)}</span></span>
+      ${id==='approvals'&&badgeNum>0?`<span class="nav-badge">${esc(badgeNum)}</span>`:''}
+    </button>`).join('');
+}
+
+function onProjectSwitch(){
+  project=document.getElementById('projectSelect').value;
+  safe(refresh);
+}
+function onSearchInput(v){
+  searchQuery=String(v||'').trim().toLowerCase();
+  if(['projects','agents','memories','collaboration','approvals','events'].includes(page))safe(render);
+  else if(searchQuery){page='projects';projectSubTab='tasks';renderNav();safe(render)}
+}
+
+async function refresh(){
+  await safe(async()=>{
+    projects=await api('/projects');
+    agents=await api('/agents');
+    const sel=document.getElementById('projectSelect');
+    const current=project||sel.value;
+    sel.innerHTML='<option value="">选择项目</option>'+projects.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+    project=projects.find(p=>p.id===current)?.id||projects[0]?.id||'';
+    sel.value=project;
+    const rtPairs=await Promise.all(agents.map(a=>api('/agents/'+a.id+'/runtimes').then(list=>[a.id,list]).catch(()=>[a.id,[]])));
+    runtimesMap=Object.fromEntries(rtPairs);
+    const statPairs=await Promise.all(projects.map(async p=>{
+      try{
+        const [br,mb]=await Promise.all([api('/projects/'+p.id+'/briefing'),api('/projects/'+p.id+'/members')]);
+        return [p.id,{briefing:br,members:mb}];
+      }catch(_){return [p.id,{briefing:null,members:[]}]}
+    }));
+    projectStatsMap=Object.fromEntries(statPairs);
+    if(project){
+      const [br,sh,tk,ev,mb]=await Promise.all([
+        api('/projects/'+project+'/briefing'),
+        api('/projects/'+project+'/knowledge-shares'),
+        api('/projects/'+project+'/tasks'),
+        api('/projects/'+project+'/events'),
+        api('/projects/'+project+'/members')
+      ]);
+      cachedBriefing=br;cachedShares=sh;cachedTasks=tk;cachedEvents=[...ev].reverse();cachedMembers=mb;
+    }else{
+      cachedBriefing=null;cachedShares=[];cachedTasks=[];cachedEvents=[];cachedMembers=[];
+    }
+    renderNav();
+    await render();
+  });
+}
+
+function setPage(p){page=p;notice('');renderNav();safe(render)}
+function item(html){return `<div class="item-card">${html}</div>`}
+function meterCard(title,used,max){
+  const pct=max>0?Math.min(100,Math.round((used/max)*100)):0;
+  const cls=pct>=100?'danger':(pct>=75?'warn':'');
+  return `<div class="meter-card"><div class="meter-head"><strong>${esc(title)}</strong><span class="tag ${cls?'tag-'+cls:'tag-ok'}">${esc(used)} / ${esc(max)}（${pct}%）</span></div><div class="meter-track"><div class="meter-fill ${cls}" style="width:${pct}%"></div></div></div>`;
+}
+
+function relTime(iso){
+  if(!iso)return '刚刚';
+  const ts=Date.parse(String(iso).endsWith('Z')||String(iso).includes('+')?iso:iso+'Z');
+  if(!Number.isFinite(ts))return String(iso).slice(0,16).replace('T',' ');
+  const diffMin=Math.max(0,Math.floor((Date.now()-ts)/60000));
+  if(diffMin<1)return '刚刚';
+  if(diffMin<60)return `${diffMin} 分钟前`;
+  const diffHr=Math.floor(diffMin/60);
+  if(diffHr<24)return `${diffHr} 小时前`;
+  const diffDay=Math.floor(diffHr/24);
+  return `${diffDay} 天前`;
+}
+
+function formatEventItem(e,taskNameById){
+  const k=e.kind||'';
+  const p=e.payload||{};
+  const taskName=p.title||taskNameById[e.subject_id]||'';
+  if(k.includes('completed')||k.includes('accepted'))return{icon:'/assets/icons/SVG/状态/check-已完成.svg',text:taskName?`任务「${taskName}」已完成`:'任务已验收完成'};
+  if(k.includes('review')||k.includes('deliberation')||k.includes('opinion'))return{icon:'/assets/icons/SVG/功能/repeat-A2A协作.svg',text:p.stance?`收到新的 Agent 意见（${p.stance}）`:'收到新的 Agent 独立意见'};
+  if(k.includes('command')||k.includes('plan'))return{icon:'/assets/icons/SVG/功能/sparkle-智能规划.svg',text:p.action?`创建了新的操作计划（${p.action}）`:'创建了新的操作计划'};
+  if(k.includes('side_effect'))return{icon:'/assets/icons/SVG/状态/alert-失败.svg',text:p.target_system?`外部副作用待核对（${p.target_system}）`:'登记了外部副作用记录'};
+  if(k.includes('checkpoint'))return{icon:'/assets/icons/SVG/状态/clock-进行中.svg',text:'任务检查点已更新'};
+  if(k.includes('lease')||k.includes('claim'))return{icon:'/assets/icons/SVG/状态/clock-进行中.svg',text:taskName?`任务「${taskName}」已更新执行租约`:'任务执行租约已变更'};
+  if(k==='skill.evaluated')return{icon:'/assets/icons/SVG/状态/check-已完成.svg',text:p.verdict?`Skill 已完成效果评价（${p.verdict}）`:'新增一条 Skill 评价记录'};
+  if(k==='skill.published')return{icon:'/assets/icons/SVG/功能/sparkle-智能规划.svg',text:'已发布新的可复用 Skill'};
+  if(k==='memory.revised'||k==='memory.published')return{icon:'/assets/icons/SVG/功能/book-知识库.svg',text:'项目知识记忆已更新并提升版本'};
+  if(k.includes('task'))return{icon:'/assets/icons/SVG/功能/play-执行调度.svg',text:taskName?`任务「${taskName}」状态更新（${k}）`:`任务事件：${k}`};
+  if(k.includes('decision'))return{icon:'/assets/icons/SVG/导航/network-协作调度.svg',text:`决策协同更新（${k}）`};
+  if(k.includes('share'))return{icon:'/assets/icons/SVG/状态/check-已完成.svg',text:'提交了跨项目知识共享审批提案'};
+  return{icon:'/assets/icons/SVG/功能/book-知识库.svg',text:taskName?`${k} · ${taskName}`:`审计事件 · ${k}`};
+}
+
+function buildDonutSvg(segments,total){
+  const cx=90,cy=90,r=64,circ=2*Math.PI*r;
+  let offset=0;
+  const arcs=total>0?segments.filter(s=>s.value>0).map(s=>{
+    const dash=(s.value/total)*circ;
+    const el=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${s.color}" stroke-width="26" stroke-dasharray="${dash.toFixed(2)} ${(circ-dash).toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"/>`;
+    offset+=dash;
+    return el;
+  }).join(''):'';
+  return `<svg class="donut-svg" viewBox="0 0 180 180" role="img" aria-label="任务进展分布">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#E7E9F5" stroke-width="26"/>
+    ${arcs}
+    <text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="30" font-weight="700" fill="#1E2235">${esc(total)}</text>
+    <text x="${cx}" y="${cy+22}" text-anchor="middle" font-size="14" font-weight="500" fill="#6E7491">总任务</text>
+  </svg>`;
+}
+
+function isAgentOnline(agentId){
+  return (runtimesMap[agentId]||[]).some(r=>r.enabled&&r.online);
+}
+
+function priorityBadge(p){
+  if(p>=75)return '<span class="tag tag-bad">高</span>';
+  if(p>=45)return '<span class="tag tag-warn">中</span>';
+  return '<span class="tag tag-ok">低</span>';
+}
+
+function statusBadge(s){
+  const labels={
+    running:'进行中',submitted:'待审核',ready:'待执行',waiting_approval:'待审批',
+    waiting_dependencies:'待依赖',blocked:'已阻塞',completed:'已完成',cancelled:'已取消'
+  };
+  return `<span class="${tagCls(s)}">${esc(labels[s]||s)}</span>`;
+}
+
+function taskProgressPct(t){
+  if(t.status==='completed')return 100;
+  if(t.status==='submitted')return 90;
+  if(t.status==='running')return 55;
+  if(t.status==='blocked')return 30;
+  return 0;
+}
+
+async function render(){
+  const root=document.getElementById('view');
+  const q=searchQuery;
+
+  if(page==='overview'){
+    const b=cachedBriefing;
+    const tc=b?b.task_counts:{};
+    const inProg=(tc.running_lease_active||0)+(tc.running_lease_expired_unverified||0);
+    const completed=tc.completed||0;
+    const blocked=tc.blocked||0;
+    const pending=(tc.ready||0)+(tc.waiting_dependencies||0)+(tc.waiting_approval||0)+(tc.submitted||0);
+    const totalTasks=inProg+completed+pending+blocked;
+    const activeProjectsCount=projects.filter(p=>p.status==='active').length;
+    const onlineAgentsCount=agents.filter(a=>isAgentOnline(a.id)).length;
+    const totalAgentsCount=agents.length;
+
+    const segments=[
+      {label:'进行中',value:inProg,color:'#287EF4'},
+      {label:'已完成',value:completed,color:'#13B96A'},
+      {label:'待处理',value:pending,color:'#D8DCEB'},
+      {label:'已阻塞',value:blocked,color:'#8B5CF6'}
+    ];
+    const pctOf=v=>totalTasks>0?Math.round((v/totalTasks)*100):0;
+    const taskNameMap=Object.fromEntries((cachedTasks||[]).map(t=>[t.id,t.title]));
+    const recentEv=(project?cachedEvents:[]).slice(0,5);
+
+    root.innerHTML=`
+    <section class="kpi-row">
+      <div class="kpi-tile tone-blue" onclick="projectSubTab='tasks';taskFilter='active';setPage('projects')">
+        <img class="kpi-icon-img" src="/assets/icons/SVG/状态/clock-进行中.svg" alt="">
+        <div class="kpi-meta"><div class="kpi-label">进行中任务</div><div class="kpi-value">${esc(inProg)}</div></div>
+      </div>
+      <div class="kpi-tile tone-mint" onclick="projectSubTab='tasks';taskFilter='done';setPage('projects')">
+        <img class="kpi-icon-img" src="/assets/icons/SVG/状态/check-已完成.svg" alt="">
+        <div class="kpi-meta"><div class="kpi-label">已完成任务</div><div class="kpi-value">${esc(completed)}</div></div>
+      </div>
+      <div class="kpi-tile tone-lavender" onclick="projectSubTab='projects';setPage('projects')">
+        <img class="kpi-icon-img" src="/assets/icons/SVG/功能/boxes-资源管理.svg" alt="">
+        <div class="kpi-meta"><div class="kpi-label">活跃项目</div><div class="kpi-value">${esc(activeProjectsCount)}</div></div>
+      </div>
+      <div class="kpi-tile tone-amber" onclick="setPage('agents')">
+        <img class="kpi-icon-img" src="/assets/icons/SVG/导航/bot-Agent管理.svg" alt="">
+        <div class="kpi-meta"><div class="kpi-label">在线 Agent</div><div class="kpi-value">${esc(onlineAgentsCount)}<span class="kpi-total">/ ${esc(totalAgentsCount)}</span></div></div>
+      </div>
+    </section>
+
+    <section class="mid-grid">
+      <div class="card">
+        <div class="card-head">
+          <h2>任务进展</h2>
+          ${b?`<span class="${tagCls(b.project.status)}">${esc(b.project.name)}</span>`:''}
+        </div>
+        <div class="donut-wrap">
+          ${buildDonutSvg(segments,totalTasks)}
+          <div class="legend-table">
+            ${segments.map(s=>`
+              <div class="legend-row">
+                <span class="legend-dot" style="background:${s.color}"></span>
+                <span class="legend-name">${esc(s.label)}</span>
+                <span class="legend-num">${esc(s.value)}</span>
+                <span class="legend-pct">${pctOf(s.value)}%</span>
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Agent 状态</h2>
+          <button class="card-link" type="button" onclick="setPage('agents')">查看全部 →</button>
+        </div>
+        <div class="agent-rows">
+          ${agents.slice(0,4).map(a=>{
+            const online=isAgentOnline(a.id);
+            const caps=(a.verified_capabilities&&a.verified_capabilities.length?a.verified_capabilities:(a.declared_capabilities||[])).slice(0,3);
+            return `<div class="agent-row">
+              <div class="agent-row-left">
+                <div class="otter-avatar"><img src="${agentMascot(a)}" alt="${esc(a.name)}"></div>
+                <div>
+                  <div class="agent-name-main">${esc(a.name)}</div>
+                  <div class="agent-status-line"><span class="dot ${online?'dot-on':'dot-off'}"></span>${online?'在线':'未上报'}</div>
+                </div>
+              </div>
+              <div class="cap-pills">${caps.length?caps.map(c=>`<span class="cap-pill">${esc(capLabel(c))}</span>`).join(''):'<span class="cap-pill">通用</span>'}</div>
+            </div>`;
+          }).join('')||`<div class="empty-state"><img src="/assets/mascots/otter-sleep.png" alt="等待注册"><p class="muted">暂无已注册 Agent</p></div>`}
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>最近动态</h2>
+        <button class="card-link" type="button" onclick="setPage('events')">完整审计日志 →</button>
+      </div>
+      <div class="timeline">
+        ${recentEv.map(e=>{
+          const meta=formatEventItem(e,taskNameMap);
+          return `<div class="timeline-row">
+            <div class="timeline-left">
+              <img class="tl-img" src="${meta.icon}" width="36" height="36" alt="">
+              <span class="tl-text">${esc(meta.text)}</span>
+            </div>
+            <span class="tl-time">${esc(relTime(e.created_at))}</span>
+          </div>`;
+        }).join('')||'<p class="muted">当前项目暂无动态事件记录</p>'}
+      </div>
+    </section>
+
+    ${!project?`<div class="panel" style="margin-top:20px"><h2>新建第一个工作项目</h2><form onsubmit="createProject(event)"><label>项目名称</label><input name="name" required maxlength="160" placeholder="例如：OtterNest 核心系统"><label>项目描述</label><textarea name="description"></textarea><div class="actions"><button type="submit">创建项目</button></div></form></div>`:''}`;
+    return;
+  }
+
+  if(page==='projects'){
+    const projCardsHtml=projects.filter(p=>!q||p.name.toLowerCase().includes(q)||(p.description||'').toLowerCase().includes(q)).map(p=>{
+      const st=projectStatsMap[p.id]||{};
+      const tc=st.briefing?.task_counts||{};
+      const done=(tc.completed||0);
+      const total=(tc.ready||0)+(tc.waiting_dependencies||0)+(tc.waiting_approval||0)+(tc.running_lease_active||0)+(tc.running_lease_expired_unverified||0)+(tc.submitted||0)+(tc.blocked||0)+done;
+      const pct=total>0?Math.round((done/total)*100):0;
+      const mCount=(st.members||[]).length;
+      const stTag=p.status==='active'?(total>0?'进行中':'未开始'):(p.status==='paused'?'已暂停':'已归档');
+      return `<div class="proj-card ${p.id===project?'selected':''}" onclick="project='${esc(p.id)}';document.getElementById('projectSelect').value=project;refresh()">
+        <div>
+          <div class="proj-card-head">
+            <div class="proj-card-title"><img src="/assets/icons/SVG/导航/folder-项目管理.svg" width="28" height="28" alt=""><span>${esc(p.name)}</span></div>
+            <span class="${tagCls(p.status)}">${esc(stTag)}</span>
+          </div>
+          <div class="proj-card-desc">${esc(p.description||'暂无项目描述')}</div>
+        </div>
+        <div>
+          <div class="prog-row">
+            <div class="prog-track"><div class="prog-fill ${pct>=50?'mint':''}" style="width:${pct}%"></div></div>
+            <span class="prog-pct">${pct}%</span>
+          </div>
+          <div class="proj-card-foot">
+            <span>☑ ${esc(total)} 个任务</span>
+            <span>👥 ${esc(mCount)} 个成员</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    let tasksSectionHtml='';
+    if(project){
+      const graph=await api('/projects/'+project+'/task-graph');
+      const tasks=graph.tasks,edges=graph.dependencies;
+      const nameById=Object.fromEntries(tasks.map(t=>[t.id,t.title]));
+      const curProjName=projects.find(p=>p.id===project)?.name||'当前项目';
+      const eligible=cachedMembers.filter(m=>m.enabled&&['worker','manager','reviewer'].includes(m.role));
+      const prioFilter=window._prioFilter||'all';
+      const assigneeFilter=window._assigneeFilter||'all';
+      const filtered=tasks.filter(t=>{
+        if(q&&!t.title.toLowerCase().includes(q)&&!(t.instruction||'').toLowerCase().includes(q))return false;
+        if(taskFilter==='active'&&!['running','submitted'].includes(t.status))return false;
+        if(taskFilter==='attention'&&!['waiting_approval','waiting_dependencies','blocked','ready'].includes(t.status))return false;
+        if(taskFilter==='done'&&!['completed','cancelled'].includes(t.status))return false;
+        if(prioFilter==='high'&&t.priority<70)return false;
+        if(prioFilter==='mid'&&(t.priority<40||t.priority>=70))return false;
+        if(prioFilter==='low'&&t.priority>=40)return false;
+        if(assigneeFilter!=='all'){
+          const ownerId=t.assigned_agent_id||t.target_agent_id||'';
+          if(assigneeFilter==='unassigned'&&ownerId)return false;
+          if(assigneeFilter!=='unassigned'&&ownerId!==assigneeFilter)return false;
+        }
+        return true;
+      });
+
+      const taskDrawer=(t)=>{
+        const deps=edges.filter(d=>d.task_id===t.id).map(d=>nameById[d.depends_on_id]||d.depends_on_id);
+        return `
+        <div class="stack" style="margin-bottom:8px">
+          <span class="chip">风险：${esc(t.risk)}</span>
+          <span class="chip">epoch ${esc(t.lease_epoch)} · v${esc(t.version)}</span>
+          ${(t.required_capabilities||[]).map(c=>`<span class="chip">需能力：${esc(capLabel(c))}</span>`).join('')}
+          ${deps.length?`<span class="chip">前置依赖：${deps.map(esc).join('、')}</span>`:'<span class="chip">无前置依赖</span>'}
+        </div>
+        <p>${esc(t.instruction)}</p>
+        <p class="muted"><strong>验收标准：</strong>${esc(t.acceptance)}</p>
+        ${['ready','waiting_dependencies','waiting_approval'].includes(t.status)?`
+        <div class="stack stack-grow" style="margin-top:10px">
+          <select id="target-${esc(t.id)}"><option value="">不指定 Agent</option>${eligible.map(m=>`<option value="${esc(m.agent_id)}" ${m.agent_id===t.target_agent_id?'selected':''}>${esc(m.agent_name)}（${esc(m.role)}）</option>`).join('')}</select>
+          <button class="secondary sm" style="flex:0 0 auto" onclick="targetTask('${esc(t.id)}')">保存指派</button>
+        </div>`:''}
+        <div class="actions">
+          ${t.status==='waiting_approval'?`<button class="sm" onclick="action('${esc(t.id)}','authorize')">授权批准</button>`:''}
+          ${t.status==='running'?`<button class="danger sm" onclick="revokeTaskLease('${esc(t.id)}')">撤回租约并交接</button>`:''}
+          ${t.status==='blocked'?`<button class="sm" onclick="action('${esc(t.id)}','unblock')">解除阻塞（需先核对副作用）</button>`:''}
+          ${t.status==='submitted'?`<button class="sm" onclick="review('${esc(t.id)}',true)">验收通过</button> <button class="secondary sm" onclick="review('${esc(t.id)}',false)">要求修改</button>`:''}
+          <button class="secondary sm" onclick="showTaskContinuity('${esc(t.id)}')">加载检查点、外部副作用与交接包</button>
+        </div>
+        <div id="continuity-${esc(t.id)}"></div>`;
+      };
+
+      let listBody='';
+      if(taskViewMode==='kanban'){
+        const cols=[
+          {title:'待执行 / 待审批',items:filtered.filter(t=>['ready','waiting_dependencies','waiting_approval'].includes(t.status))},
+          {title:'进行中 (租约)',items:filtered.filter(t=>t.status==='running')},
+          {title:'待审核 / 已阻塞',items:filtered.filter(t=>['submitted','blocked'].includes(t.status))},
+          {title:'已完成 / 已取消',items:filtered.filter(t=>['completed','cancelled'].includes(t.status))}
+        ];
+        listBody=`<div class="kanban-grid">${cols.map(c=>`
+          <div class="kanban-col">
+            <div class="kanban-head"><span>${esc(c.title)}</span><span class="chip">${esc(c.items.length)}</span></div>
+            ${c.items.map(t=>{
+              const ag=agents.find(a=>a.id===(t.assigned_agent_id||t.target_agent_id));
+              return `<div class="kanban-card">
+                <div class="item-head" style="margin-bottom:6px"><strong>${esc(t.title)}</strong>${priorityBadge(t.priority)}</div>
+                <div class="stack" style="margin-bottom:8px">${statusBadge(t.status)}<span class="chip">${ag?esc(ag.name):'未指派'}</span></div>
+                <button class="secondary sm" onclick="toggleTaskDrawer('${esc(t.id)}')">操作 / 详情</button>
+                ${expandedTaskId===t.id?taskDrawer(t):''}
+              </div>`;
+            }).join('')||'<p class="muted">暂无任务</p>'}
+          </div>`).join('')}</div>`;
+      }else{
+        listBody=filtered.length?`
+        <div class="task-table-wrap">
+          <table class="task-table">
+            <thead>
+              <tr><th>任务名称</th><th>所属项目</th><th>负责人</th><th>优先级</th><th>状态</th><th>进度</th><th>操作</th></tr>
+            </thead>
+            <tbody>
+              ${filtered.map(t=>{
+                const ag=agents.find(a=>a.id===(t.assigned_agent_id||t.target_agent_id));
+                const pct=taskProgressPct(t);
+                const isOpen=expandedTaskId===t.id;
+                return `<tr class="task-row">
+                  <td><strong>${esc(t.title)}</strong></td>
+                  <td><span class="chip" style="white-space:nowrap">${esc(curProjName)}</span></td>
+                  <td>${ag?`<span class="stack" style="gap:8px;flex-wrap:nowrap"><span class="otter-avatar-sm"><img src="${agentMascot(ag)}" alt=""></span><span style="white-space:nowrap">${esc(ag.name)}</span></span>`:'<span class="muted" style="white-space:nowrap">待认领</span>'}</td>
+                  <td>${priorityBadge(t.priority)}</td>
+                  <td>${statusBadge(t.status)}</td>
+                  <td><div class="prog-row" style="min-width:120px"><div class="prog-track"><div class="prog-fill ${pct===100?'mint':''}" style="width:${pct}%"></div></div><span class="prog-pct">${pct}%</span></div></td>
+                  <td><button class="secondary sm" style="white-space:nowrap" type="button" onclick="toggleTaskDrawer('${esc(t.id)}')">${isOpen?'收起':'详情与操作'}</button></td>
+                </tr>
+                ${isOpen?`<tr class="drawer-row"><td colspan="7">${taskDrawer(t)}</td></tr>`:''}`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>`:`<div class="card empty-state"><img src="/assets/mascots/otter-sleep.png" alt="暂无任务"><h2>当前筛选下暂无任务</h2><p class="muted">可切换顶部状态过滤条件或点击右上角「+ 新建任务」。</p></div>`;
+      }
+
+      tasksSectionHtml=`
+      <div class="toolbar-row">
+        <div class="stack">
+          <h2 style="font-size:21px">任务列表</h2>
+          <span class="chip">共 ${esc(filtered.length)} / ${esc(tasks.length)} 条</span>
+        </div>
+        <div class="stack">
+          <button class="secondary sm" type="button" onclick="schedule()">
+            <img src="/assets/icons/SVG/功能/play-执行调度.svg" width="18" height="18" alt="">能力调度
+          </button>
+          <div class="segmented">
+            <button type="button" class="seg-btn ${taskViewMode==='list'?'active':''}" onclick="taskViewMode='list';render()">列表视图</button>
+            <button type="button" class="seg-btn ${taskViewMode==='kanban'?'active':''}" onclick="taskViewMode='kanban';render()">看板视图</button>
+          </div>
+          <button type="button" class="sm" onclick="showNewTaskForm=!showNewTaskForm;render()">+ 新建任务</button>
+        </div>
+      </div>
+
+      ${showNewTaskForm?`
+      <div class="panel">
+        <div class="card-head"><h2>创建新任务</h2><button class="secondary sm" type="button" onclick="showNewTaskForm=false;render()">关闭</button></div>
+        <form onsubmit="createTask(event)">
+          <div class="grid-2">
+            <div><label>任务标题</label><input name="title" required maxlength="240" placeholder="清晰描述要完成的目标"></div>
+            <div><label>风险等级</label><select name="risk"><option value="R0">R0（只读/低风险）</option><option value="R1" selected>R1（常规写入）</option><option value="R2">R2（重要外部动作）</option><option value="R3">R3（高危，需先授权）</option></select></div>
+          </div>
+          <div class="grid-2">
+            <div><label>优先级（0–100）</label><input name="priority" type="number" value="50" min="0" max="100" required></div>
+            <div><label>所需已验证能力（英文小写，逗号分隔）</label><input name="required_capabilities" placeholder="coding, testing"></div>
+          </div>
+          <label>执行说明</label><textarea name="instruction" required></textarea>
+          <label>验收标准</label><textarea name="acceptance" required></textarea>
+          <label>前置依赖任务（可选，按 Ctrl/Cmd 多选）</label>
+          <select name="dependencies" multiple size="${Math.max(2,Math.min(6,tasks.length))}">${tasks.map(t=>`<option value="${esc(t.id)}">${esc(t.title)} · ${esc(t.status)}</option>`).join('')}</select>
+          <div class="actions"><button type="submit">创建任务</button></div>
+        </form>
+      </div>`:''}
+
+      <div class="filter-bar">
+        <select class="filter-select" aria-label="按任务状态筛选" onchange="taskFilter=this.value;render()">
+          <option value="all" ${taskFilter==='all'?'selected':''}>任务状态：全部状态</option>
+          <option value="active" ${taskFilter==='active'?'selected':''}>运行中 / 待审核</option>
+          <option value="attention" ${taskFilter==='attention'?'selected':''}>待执行 / 阻塞 / 待审批</option>
+          <option value="done" ${taskFilter==='done'?'selected':''}>已完成 / 已取消</option>
+        </select>
+        <select class="filter-select" aria-label="按优先级筛选" onchange="window._prioFilter=this.value;render()">
+          <option value="all" ${prioFilter==='all'?'selected':''}>优先级：全部</option>
+          <option value="high" ${prioFilter==='high'?'selected':''}>高（>=70）</option>
+          <option value="mid" ${prioFilter==='mid'?'selected':''}>中（40–69）</option>
+          <option value="low" ${prioFilter==='low'?'selected':''}>低（<40）</option>
+        </select>
+        <select class="filter-select" aria-label="按负责人筛选" onchange="window._assigneeFilter=this.value;render()">
+          <option value="all" ${assigneeFilter==='all'?'selected':''}>负责人：全部</option>
+          <option value="unassigned" ${assigneeFilter==='unassigned'?'selected':''}>未指派</option>
+          ${eligible.map(m=>`<option value="${esc(m.agent_id)}" ${assigneeFilter===m.agent_id?'selected':''}>${esc(m.agent_name)}</option>`).join('')}
+        </select>
+      </div>
+      ${listBody}`;
+    }
+
+    root.innerHTML=`
+    <div class="subtabs-bar">
+      <div class="subtabs">
+        <button type="button" class="subtab-btn ${projectSubTab==='projects'?'active':''}" onclick="projectSubTab='projects';render()">项目管理</button>
+        <button type="button" class="subtab-btn ${projectSubTab==='tasks'?'active':''}" onclick="projectSubTab='tasks';render()">任务管理</button>
+      </div>
+      <div class="stack">
+        <button type="button" class="secondary sm" onclick="setPage('settings')">宪章与导出 →</button>
+        <button type="button" class="sm" onclick="showNewProjectForm=!showNewProjectForm;render()">+ 新建项目</button>
+      </div>
+    </div>
+
+    ${showNewProjectForm?`
+    <div class="panel">
+      <div class="card-head"><h2>新建工作项目</h2><button class="secondary sm" type="button" onclick="showNewProjectForm=false;render()">关闭</button></div>
+      <form onsubmit="createProject(event)">
+        <label>项目名称</label><input name="name" required maxlength="160" placeholder="例如：核心引擎迁移项目">
+        <label>项目描述</label><textarea name="description" placeholder="描述项目目标与边界"></textarea>
+        <div class="actions"><button type="submit">创建项目</button></div>
+      </form>
+    </div>`:''}
+
+    ${projectSubTab==='projects'?`<div class="proj-cards-grid">${projCardsHtml}</div>`:''}
+    ${tasksSectionHtml}`;
+    return;
+  }
+
+  if(page==='agents'){
+    const filteredAgents=agents.filter(a=>!q||a.name.toLowerCase().includes(q)||(a.platform||'').toLowerCase().includes(q));
+    root.innerHTML=`
+    <div class="panel">
+      <div class="card-head">
+        <div>
+          <h2>Agent 目录与执行环境</h2>
+          <p class="muted" style="margin:4px 0 0">声明能力不等于已验证能力；运行实例状态由节点主动心跳上报。</p>
+        </div>
+        <span class="tag tag-info">共 ${esc(filteredAgents.length)} 个 Agent</span>
+      </div>
+      ${filteredAgents.map(a=>{
+        const online=isAgentOnline(a.id);
+        return item(`
+        <div class="item-head">
+          <div class="stack">
+            <div class="otter-avatar"><img src="${agentMascot(a)}" alt="${esc(a.name)}"></div>
+            <div>
+              <div class="stack">
+                <span class="item-title">${esc(a.name)}</span>
+                <span class="chip">${esc(a.platform)}</span>
+                <span class="chip">${esc(a.execution_mode)}</span>
+                <span class="tag ${online?'tag-ok':'tag-warn'}">
+                  <img src="/assets/icons/SVG/状态/${online?'check-在线':'ban-离线'}.svg" width="16" height="16" alt="">
+                  ${online?'在线心跳':'未上报心跳'}
+                </span>
+              </div>
+              <div class="muted" style="margin-top:4px">ID：<code>${esc(a.id)}</code></div>
+            </div>
+          </div>
+          <span class="tag ${a.enabled?'tag-ok':'tag-bad'}">${a.enabled?'已启用':'已禁用'}</span>
+        </div>
+        <div><span class="muted">声明能力：</span>${(a.declared_capabilities||[]).length?(a.declared_capabilities||[]).map(c=>`<span class="chip">${esc(capLabel(c))} (${esc(c)})</span>`).join(' '):'<span class="muted">无</span>'}</div>
+        <div style="margin-top:8px"><span class="muted">已验证能力：</span>${(a.verified_capabilities||[]).length?(a.verified_capabilities||[]).map(c=>`<span class="tag tag-ok">${esc(capLabel(c))}</span>`).join(' '):'<span class="muted">尚未验证</span>'}</div>
+        <div class="actions">
+          <button class="secondary sm" onclick="showRuntimes('${esc(a.id)}')"><img src="/assets/icons/SVG/功能/server-运行实例.svg" width="18" height="18" alt="">查看与注册运行实例</button>
+          <button class="secondary sm" onclick="verifyCapabilities('${esc(a.id)}')">核验能力</button>
+        </div>
+        <div id="runtime-${esc(a.id)}"></div>`);
+      }).join('')||`<div class="empty-state"><img src="/assets/mascots/otter-sleep.png" alt=""><p class="muted">暂无已注册 Agent</p></div>`}
+    </div>
+    <div class="grid-2">
+      ${project?`
+      <div class="panel">
+        <h2>将 Agent 加入当前项目</h2>
+        <form onsubmit="addMember(event)">
+          <label>选择 Agent</label>
+          <select name="agent_id">${agents.filter(a=>a.enabled).map(a=>`<option value="${esc(a.id)}">${esc(a.name)}（${esc(a.platform)}）</option>`).join('')}</select>
+          <label>项目角色</label>
+          <select name="role"><option value="worker">worker（执行者）</option><option value="manager">manager（项目协调者）</option><option value="reviewer">reviewer（独立评审者）</option><option value="advisor">advisor（顾问）</option></select>
+          <div class="actions"><button type="submit">分配项目权限</button></div>
+        </form>
+      </div>`:''}
+      <div class="panel">
+        <h2>注册新 Agent</h2>
+        <form onsubmit="createAgent(event)">
+          <label>名称</label><input name="name" required placeholder="例如：codex-runner">
+          <label>平台标识</label><input name="platform" required placeholder="例如：codex / gemini / muse">
+          <label>声明能力（小写英文标识，逗号分隔）</label><input name="capabilities" placeholder="design, docs, coding, testing">
+          <label>接入方式</label>
+          <select name="execution_mode"><option value="manual">manual（人工接入）</option><option value="polling">polling（主动轮询）</option><option value="remote">remote（远端 A2A/Webhook）</option></select>
+          <div class="actions"><button type="submit">注册 Agent</button></div>
+        </form>
+        <p class="muted" style="margin-top:12px">Agent 令牌仅在注册时明文显示一次，服务端只保存 SHA-256 哈希。</p>
+        <pre id="newToken" hidden></pre>
+      </div>
+    </div>`;
+    return;
+  }
+
+  if(!project){
+    root.innerHTML='<div class="panel"><h2>尚未选择项目</h2><p class="muted">请先在「项目与任务」页创建或选择一个工作项目。</p><div class="actions"><button onclick="setPage(\'projects\')">前往项目与任务</button></div></div>';
+    return;
+  }
+
+  if(page==='commands'){
+    const [tasks,members]=await Promise.all([api('/projects/'+project+'/tasks'),api('/projects/'+project+'/members')]);
+    const cmdMode=window._cmdMode||'nl';
+    const curProjName=projects.find(p=>p.id===project)?.name||'当前项目';
+    const r3Task=tasks.find(t=>t.status==='waiting_approval');
+    const subTask=tasks.find(t=>t.status==='submitted');
+    const readyTask=tasks.find(t=>t.status==='ready');
+    const sampleAgent=members.find(m=>m.enabled&&['worker','manager','reviewer'].includes(m.role));
+    const presets=[];
+    if(r3Task)presets.push(`请批准任务「${r3Task.title}」。`);
+    if(subTask)presets.push(`请验收通过任务「${subTask.title}」。`);
+    if(readyTask&&sampleAgent)presets.push(`请指派任务「${readyTask.title}」给「${sampleAgent.agent_name}」。`);
+    window._cmdPresets=presets;
+    const placeholderText=presets[0]||'请批准任务「任务标题」。';
+
+    const taskNameMap=Object.fromEntries(tasks.map(t=>[t.id,t.title]));
+    const recentEv=(cachedEvents||[]).slice(0,4);
+    const pa=cachedBriefing?.pending_owner_actions||{};
+    const pendingShareCnt=(cachedShares||[]).filter(s=>s.status==='proposed').length;
+    const alertItems=[];
+    if(pa.tasks_waiting_approval)alertItems.push({title:'高风险任务等待批准',sub:`${pa.tasks_waiting_approval} 项待管理员授权`,icon:'/assets/icons/SVG/功能/lock-安全权限.svg'});
+    if(pa.side_effects_unreconciled)alertItems.push({title:'外部副作用状态待核对',sub:`${pa.side_effects_unreconciled} 项 unknown 记录阻断重跑`,icon:'/assets/icons/SVG/状态/alert-失败.svg'});
+    if(pa.decisions_proposed||pendingShareCnt)alertItems.push({title:'决策或跨项目共享待审批',sub:`决策 ${pa.decisions_proposed||0} · 共享 ${pendingShareCnt}`,icon:'/assets/icons/SVG/导航/shield-check-审批管理.svg'});
+
+    const capGroups=[
+      {label:'设计与文档',keys:['design','docs'],icon:'/assets/icons/SVG/功能/book-知识库.svg'},
+      {label:'开发与测试',keys:['coding','dev','testing'],icon:'/assets/icons/SVG/功能/sparkle-智能规划.svg'},
+      {label:'调研与分析',keys:['research','analysis'],icon:'/assets/icons/SVG/功能/search-全局搜索.svg'}
+    ];
+
+    root.innerHTML=`
+    <div class="cmd-layout">
+      <div class="cmd-main">
+        <div class="cmd-hero">
+          <div class="cmd-hero-left">
+            <div class="cmd-hero-title">
+              <img src="/assets/icons/SVG/导航/sparkle-智能指挥中心.svg" width="38" height="38" alt="">
+              <span>AI 指挥中心</span>
+            </div>
+            <p class="muted" style="margin:6px 0 0">用受限中文模板或结构化指令编排项目执行计划；每笔操作强制生成 <strong>10 分钟有效待确认预览</strong>。</p>
+          </div>
+          <img class="cmd-hero-mascot" src="/assets/mascots/otter-float.png" alt="水獭指挥中心">
+          <img class="cmd-hero-wave" src="/assets/icons/SVG/装饰/水波装饰.svg" alt="" aria-hidden="true">
+        </div>
+
+        <div class="panel">
+          <div class="card-head">
+            <div class="stack">
+              <img src="/assets/icons/SVG/功能/paper-plane-AI指挥.svg" width="30" height="30" alt="">
+              <h2>给 AI 团队下达指令</h2>
+            </div>
+            <div class="segmented">
+              <button type="button" class="seg-btn ${cmdMode==='nl'?'active':''}" onclick="window._cmdMode='nl';render()">自然语言模板</button>
+              <button type="button" class="seg-btn ${cmdMode==='struct'?'active':''}" onclick="window._cmdMode='struct';render()">结构化精准指令</button>
+            </div>
+          </div>
+
+          ${cmdMode==='nl'?`
+          <form onsubmit="previewNaturalCommand(event)">
+            <textarea id="nlCmdText" name="text" required minlength="4" maxlength="3500" placeholder="${esc(placeholderText)}"></textarea>
+            ${presets.length?`<div class="preset-row"><span class="muted">快速填入：</span>${presets.map((p,i)=>`<button type="button" class="preset-chip" onclick="document.getElementById('nlCmdText').value=window._cmdPresets[${i}]">${esc(p)}</button>`).join('')}</div>`:''}
+            <div class="composer-foot">
+              <div class="stack">
+                <span class="chip">关联项目：${esc(curProjName)}</span>
+                <select name="mode" style="width:auto;min-width:220px;padding:7px 12px;font-size:14px">
+                  <option value="template">本地严格中文模板（不外传）</option>
+                  <option value="model">外部模型建议（须服务端启用）</option>
+                </select>
+              </div>
+              <button type="submit"><img src="/assets/icons/SVG/功能/paper-plane-AI指挥.svg" width="18" height="18" style="filter:brightness(0) invert(1)" alt="">生成待确认计划</button>
+            </div>
+          </form>`:`
+          <form onsubmit="previewCommand(event)">
+            <div class="grid-2">
+              <div>
+                <label>目标任务</label>
+                <select name="task_id" required>${tasks.map(t=>`<option value="${esc(t.id)}">${esc(t.title)} · ${esc(t.status)} · v${esc(t.version)}</option>`).join('')}</select>
+              </div>
+              <div>
+                <label>管理动作</label>
+                <select name="action" onchange="toggleCommandFields(this.form)">
+                  <option value="authorize_task">批准高风险任务</option>
+                  <option value="review_task">验收任务</option>
+                  <option value="route_task">设置指定执行 Agent</option>
+                  <option value="cancel_task">取消任务</option>
+                </select>
+              </div>
+            </div>
+            <div data-field="review" hidden>
+              <label>验收决定</label><select name="accepted"><option value="true">通过</option><option value="false">要求修改</option></select>
+              <label>验收说明（拒绝时必填）</label><textarea name="reason" maxlength="3000"></textarea>
+            </div>
+            <div data-field="route" hidden>
+              <label>指定执行 Agent</label>
+              <select name="target_agent_id"><option value="">不指定（由成员池领取）</option>${members.filter(m=>m.enabled&&['worker','manager','reviewer'].includes(m.role)).map(m=>`<option value="${esc(m.agent_id)}">${esc(m.agent_name)}</option>`).join('')}</select>
+            </div>
+            <div class="composer-foot">
+              <span class="chip">关联项目：${esc(curProjName)}</span>
+              <button type="submit">生成待确认预览</button>
+            </div>
+          </form>`}
+        </div>
+
+        <div id="commandPreview" class="panel" aria-live="polite">
+          <div class="card-head">
+            <div class="stack"><img src="/assets/icons/SVG/导航/clipboard-check-任务中心.svg" width="30" height="30" alt=""><h2>执行计划（待确认）</h2></div>
+            <span class="tag tag-info">两段式安全门禁</span>
+          </div>
+          <p class="muted">在上方输入指令或选择结构化操作后，此处将显示待确认的执行计划详情。确认提交前不会修改数据库状态。</p>
+          <div class="cmd-step">
+            <div class="cmd-step-left"><span class="step-num">1</span><div><strong>任务锁定与乐观锁版本号（expected_version）</strong><div class="muted">预览生成时冻结任务状态快照，若中途变更自动作废</div></div></div>
+            <span class="chip">步骤 1</span>
+          </div>
+          <div class="cmd-step">
+            <div class="cmd-step-left"><span class="step-num">2</span><div><strong>权限与风险等级复核（R0–R3）</strong><div class="muted">确认按钮仅在 10 分钟有效期内可供管理员主动触发</div></div></div>
+            <span class="chip">步骤 2</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="card-head">
+            <div class="stack"><img src="/assets/icons/SVG/导航/bot-Agent管理.svg" width="30" height="30" alt=""><h2>Agent 实时状态</h2></div>
+            <button class="card-link" type="button" onclick="setPage('agents')">前往全部 Agent →</button>
+          </div>
+          <div class="agent-rows">
+            ${agents.slice(0,4).map(a=>{
+              const online=isAgentOnline(a.id);
+              const caps=(a.verified_capabilities&&a.verified_capabilities.length?a.verified_capabilities:(a.declared_capabilities||[])).slice(0,3);
+              return `<div class="agent-row">
+                <div class="agent-row-left">
+                  <div class="otter-avatar"><img src="${agentMascot(a)}" alt="${esc(a.name)}"></div>
+                  <div>
+                    <div class="agent-name-main">${esc(a.name)} <span class="chip">${esc(a.platform)}</span></div>
+                    <div class="agent-status-line"><span class="dot ${online?'dot-on':'dot-off'}"></span>${online?'在线心跳':'未上报'}</div>
+                  </div>
+                </div>
+                <div class="cap-pills">${caps.map(c=>`<span class="cap-pill">${esc(capLabel(c))}</span>`).join('')||'<span class="cap-pill">通用</span>'}</div>
+              </div>`;
+            }).join('')||'<p class="muted">暂无已注册 Agent</p>'}
+          </div>
+        </div>
+      </div>
+
+      <aside class="cmd-rail">
+        <div class="panel">
+          <div class="card-head">
+            <div class="stack"><img src="/assets/icons/SVG/操作/bell-通知.svg" width="28" height="28" alt=""><h2>审批提醒</h2></div>
+            <span class="nav-badge">${esc(pendingApprovalsCount())}</span>
+          </div>
+          ${alertItems.map(al=>`
+            <div class="alert-row" onclick="setPage('approvals')">
+              <div class="stack"><img src="${al.icon}" width="32" height="32" alt=""><div><strong>${esc(al.title)}</strong><div class="muted" style="font-size:14px">${esc(al.sub)}</div></div></div>
+              <span class="muted">→</span>
+            </div>`).join('')||`<div class="empty-state" style="padding:18px 8px"><img src="/assets/mascots/otter-celebrate.png" style="width:80px;height:80px" alt=""><p class="muted">暂无待审批提醒</p></div>`}
+        </div>
+
+        <div class="panel">
+          <div class="card-head">
+            <h2>最近活动</h2>
+            <button class="card-link" type="button" onclick="setPage('events')">查看全部 →</button>
+          </div>
+          <div class="timeline">
+            ${recentEv.map(e=>{
+              const meta=formatEventItem(e,taskNameMap);
+              return `<div class="timeline-row">
+                <div class="timeline-left"><img class="tl-img" src="${meta.icon}" width="32" height="32" alt=""><span style="font-size:15px">${esc(meta.text)}</span></div>
+                <span class="tl-time">${esc(relTime(e.created_at))}</span>
+              </div>`;
+            }).join('')||'<p class="muted">暂无最新活动</p>'}
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="card-head"><h2>Agent 能力概览</h2><span class="chip">${esc(agents.length)} 节点</span></div>
+          ${capGroups.map(g=>{
+            const count=agents.filter(a=>(a.verified_capabilities||a.declared_capabilities||[]).some(c=>g.keys.includes(c))).length;
+            return `<div class="cap-stat-row">
+              <span class="stack"><img src="${g.icon}" width="26" height="26" alt=""><strong>${esc(g.label)}</strong></span>
+              <span class="muted">${esc(count)} 个 Agent</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </aside>
+    </div>`;
+    return;
+  }
+
+  if(page==='approvals'){
+    const [tasks,ds,shs,ms,sks]=await Promise.all([
+      api('/projects/'+project+'/tasks'),
+      api('/projects/'+project+'/decisions'),
+      api('/projects/'+project+'/knowledge-shares'),
+      api('/projects/'+project+'/memories'),
+      api('/projects/'+project+'/skills')
+    ]);
+    const needApproval=tasks.filter(t=>['waiting_approval','submitted','blocked'].includes(t.status));
+    const seByTask=await Promise.all(tasks.map(t=>api('/tasks/'+t.id+'/side-effects').then(rows=>rows.filter(r=>!r.owner_verified||r.status==='unknown').map(r=>({...r,task_title:t.title,task_id:t.id}))).catch(()=>[])));
+    const unreconciledSes=seByTask.flat();
+    const pendingShares=shs.filter(s=>s.status==='proposed');
+    const pendingDecisions=ds.filter(d=>d.status==='proposed');
+    const pendingKnowledge=[...ms.filter(m=>m.status==='proposed').map(m=>({kind:'memory',id:m.id,title:m.title,body:m.content})),...sks.filter(s=>s.status==='proposed').map(s=>({kind:'skill',id:s.id,title:s.name,body:s.content}))];
+    const totalPending=needApproval.length+unreconciledSes.length+pendingShares.length+pendingDecisions.length+pendingKnowledge.length;
+
+    if(totalPending===0){
+      root.innerHTML=`<div class="card empty-state"><img src="/assets/mascots/otter-celebrate.png" alt="已清空待审批"><h2>所有待审批事项已处理完毕</h2><p class="muted">当前项目不存在待授权高风险任务、未核对外部副作用或待审批共享提案。</p></div>`;
+      return;
+    }
+
+    root.innerHTML=`
+    <div class="mascot-banner">
+      <img src="/assets/mascots/otter-checklist.png" alt="审批清单水獭">
+      <div>
+        <div class="item-title">待审批中心 · 当前共 ${esc(totalPending)} 项需管理员复核</div>
+        <p class="muted" style="margin:2px 0 0">覆盖高风险任务授权、成果验收、unknown 外部副作用核对及跨项目知识共享审批。</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="card-head"><h2>任务授权、验收与阻塞</h2><span class="tag tag-warn">${esc(needApproval.length)} 项</span></div>
+        ${needApproval.map(t=>item(`
+          <div class="item-head"><span class="item-title">${esc(t.title)}</span><span class="${tagCls(t.status)}">${esc(t.status)} · ${esc(t.risk)}</span></div>
+          <p class="muted">${esc(t.instruction)}</p>
+          <div class="actions">
+            ${t.status==='waiting_approval'?`<button class="sm" onclick="action('${esc(t.id)}','authorize')">批准执行</button>`:''}
+            ${t.status==='submitted'?`<button class="sm" onclick="review('${esc(t.id)}',true)">验收通过</button> <button class="secondary sm" onclick="review('${esc(t.id)}',false)">要求修改</button>`:''}
+            ${t.status==='blocked'?`<button class="sm" onclick="action('${esc(t.id)}','unblock')">解除阻塞</button>`:''}
+          </div>
+        `)).join('')||'<p class="muted">暂无待授权或待验收任务</p>'}
+      </div>
+
+      <div class="panel">
+        <div class="card-head"><h2>待核对外部副作用台账</h2><span class="tag tag-bad">${esc(unreconciledSes.length)} 项</span></div>
+        ${unreconciledSes.map(se=>item(`
+          <div class="item-head"><span class="item-title">${esc(se.task_title)} · ${esc(se.target_system)}</span><span class="${tagCls(se.status)}">${esc(se.status)}</span></div>
+          <p>${esc(se.description)}</p>
+          <p class="muted">幂等键：<code>${esc(se.idempotency_key)}</code> · epoch ${esc(se.lease_epoch)}</p>
+          <div class="actions">
+            <button class="sm" onclick="reconcileSideEffect('${esc(se.id)}','verified_executed','${esc(se.task_id)}')">核验已执行</button>
+            <button class="secondary sm" onclick="reconcileSideEffect('${esc(se.id)}','verified_not_executed','${esc(se.task_id)}')">核验未执行（允许重开）</button>
+          </div>
+        `)).join('')||'<p class="muted">暂无未核对外部副作用</p>'}
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="card-head"><h2>跨项目知识共享审批</h2><span class="tag tag-warn">${esc(pendingShares.length)} 项</span></div>
+        ${pendingShares.map(sh=>item(`
+          <div class="item-head"><span class="item-title">${esc(sh.item_kind)} 跨项目推广</span><span class="${tagCls(sh.status)}">${esc(sh.status)}</span></div>
+          <p>${esc(sh.rationale)}</p>
+          <p class="muted">目标项目：<code>${esc(sh.target_project_id)}</code></p>
+          <div class="actions">
+            <button class="sm" onclick="resolveShare('${esc(sh.id)}',true)">批准共享</button>
+            <button class="secondary sm" onclick="resolveShare('${esc(sh.id)}',false)">拒绝共享</button>
+          </div>
+        `)).join('')||'<p class="muted">暂无待审批共享提案</p>'}
+      </div>
+
+      <div class="panel">
+        <div class="card-head"><h2>待裁决决策与知识发布</h2><span class="tag tag-info">${esc(pendingDecisions.length+pendingKnowledge.length)} 项</span></div>
+        ${pendingDecisions.map(d=>item(`
+          <div class="item-head"><span class="item-title">${esc(d.question)}</span><span class="${tagCls(d.status)}">决策</span></div>
+          <p>${esc(d.resolution)}</p>
+          <div class="actions"><button class="sm" onclick="resolveDecision('${esc(d.id)}')">确认裁决</button> <button class="secondary sm" onclick="setPage('collaboration')">前往协作详情</button></div>
+        `)).join('')}
+        ${pendingKnowledge.map(k=>item(`
+          <div class="item-head"><span class="item-title">${esc(k.title)}</span><span class="tag tag-warn">待发布 ${esc(k.kind)}</span></div>
+          <p class="muted">${esc(k.body)}</p>
+          <div class="actions">${k.kind==='memory'?`<button class="sm" onclick="publish('${esc(k.id)}')">发布记忆</button>`:`<button class="sm" onclick="publishSkill('${esc(k.id)}')">发布 Skill</button>`}</div>
+        `)).join('')}
+        ${!pendingDecisions.length&&!pendingKnowledge.length?'<p class="muted">暂无待审批决策或待发布知识</p>':''}
+      </div>
+    </div>`;
+    return;
+  }
+
+  if(page==='collaboration'){
+    const [ds,shs]=await Promise.all([api('/projects/'+project+'/decisions'),api('/projects/'+project+'/knowledge-shares')]);
+    root.innerHTML=`
+    <div class="mascot-banner">
+      <img src="/assets/mascots/otter-thinking.png" alt="思考协作水獭">
+      <div>
+        <div class="item-title">多 Agent 决策协同与二轮协商</div>
+        <p class="muted" style="margin:2px 0 0">支持先收集独立意见、配置锁定二轮名单并开启反驳与补充，最终裁决权始终归属管理员。</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="card-head"><h2>团队决策与多轮协商</h2><img src="/assets/icons/SVG/功能/repeat-A2A协作.svg" width="32" height="32" alt=""></div>
+        ${ds.map(d=>item(`
+          <div class="item-head"><span class="item-title">${esc(d.question)}</span><span class="${tagCls(d.status)}">${esc(d.status)}</span></div>
+          <p>${esc(d.resolution)}</p>
+          <div class="actions">
+            <button class="secondary sm" onclick="showDecisionReviews('${esc(d.id)}')">查看独立意见</button>
+            ${d.status==='proposed'?`<button class="sm" onclick="resolveDecision('${esc(d.id)}')">确认裁决</button> <button class="secondary sm" onclick="configureAutoDeliberation('${esc(d.id)}')">设置自动协商名单</button> <button class="secondary sm" onclick="openDeliberation('${esc(d.id)}')">开启二轮</button> <button class="secondary sm" onclick="showDeliberation('${esc(d.id)}')">查看二轮</button>`:''}
+          </div>
+          <div id="reviews-${esc(d.id)}"></div>
+          <div id="deliberation-${esc(d.id)}"></div>
+        `)).join('')||'<p class="muted">暂无团队决策</p>'}
+        <h3>提出新决策</h3>
+        <form onsubmit="createDecision(event)">
+          <label>决策问题</label><textarea name="question" required></textarea>
+          <label>建议结论</label><textarea name="resolution" required></textarea>
+          <label>依据理由</label><textarea name="rationale" required></textarea>
+          <div class="actions"><button type="submit">提交决策提案</button></div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="card-head"><h2>跨项目知识推广记录</h2><span class="chip">${esc(shs.length)} 条</span></div>
+        <p class="muted">提案人须同时具备源项目与目标项目成员资格；批准后在目标项目生成带来源溯源的独立克隆副本。</p>
+        ${shs.map(sh=>item(`
+          <div class="item-head"><span class="item-title">${esc(sh.item_kind)} 跨项目共享</span><span class="${tagCls(sh.status)}">${esc(sh.status)}</span></div>
+          <p>${esc(sh.rationale)}</p>
+          <p class="muted"><code>${esc(sh.source_project_id)}</code> → <code>${esc(sh.target_project_id)}</code></p>
+          <p class="muted">来源条目：<code>${esc(sh.source_item_id)}</code>${sh.promoted_item_id?` · 目标克隆 ID：<code>${esc(sh.promoted_item_id)}</code>`:''}</p>
+          ${sh.owner_note?`<p class="muted"><strong>审批备注：</strong>${esc(sh.owner_note)}</p>`:''}
+          ${sh.status==='proposed'?`<div class="actions"><button class="sm" onclick="resolveShare('${esc(sh.id)}',true)">批准共享</button> <button class="secondary sm" onclick="resolveShare('${esc(sh.id)}',false)">拒绝共享</button></div>`:''}
+        `)).join('')||'<p class="muted">暂无跨项目共享提案</p>'}
+      </div>
+    </div>`;
+    return;
+  }
+
+  if(page==='memories'){
+    const [ms,sks]=await Promise.all([api('/projects/'+project+'/memories'),api('/projects/'+project+'/skills')]);
+    globalThis._memMap=Object.fromEntries(ms.map(m=>[m.id,m]));
+    const filteredM=ms.filter(m=>!q||m.title.toLowerCase().includes(q)||m.content.toLowerCase().includes(q));
+    const filteredS=sks.filter(s=>!q||s.name.toLowerCase().includes(q)||s.content.toLowerCase().includes(q));
+    root.innerHTML=`
+    <div class="mascot-banner">
+      <img src="/assets/mascots/otter-reading.png" alt="阅读知识库水獭">
+      <div>
+        <div class="item-title">团队记忆与可复用 Skills 台账</div>
+        <p class="muted" style="margin:2px 0 0">支持记忆版本修订与归档、Skill 实战评估打分，以及经审批的跨项目安全克隆。</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="card-head"><h2>项目记忆与版本修订</h2><img src="/assets/icons/SVG/功能/book-知识库.svg" width="32" height="32" alt=""></div>
+        ${filteredM.map(m=>item(`
+          <div class="item-head"><span class="item-title">${esc(m.title)}</span><span class="${tagCls(m.status)}">${esc(m.status)} · v${esc(m.version||1)}</span></div>
+          <p>${esc(m.content)}</p>
+          <p class="muted"><strong>出处：</strong>${esc(m.source)}</p>
+          <div class="actions">
+            ${m.status==='proposed'?`<button class="sm" onclick="publish('${esc(m.id)}')">发布</button>`:''}
+            ${m.status!=='archived'?`<button class="secondary sm" onclick="reviseMemory('${esc(m.id)}')">修订</button> <button class="secondary sm" onclick="archiveMemory('${esc(m.id)}')">归档</button>`:''}
+            ${m.status==='published'?`<button class="secondary sm" onclick="proposeShare('memory','${esc(m.id)}')">跨项目共享</button>`:''}
+          </div>
+        `)).join('')||'<p class="muted">暂无项目记忆</p>'}
+        <h3>提出新知识记录</h3>
+        <form onsubmit="createMemory(event)">
+          <label>标题</label><input name="title" required>
+          <label>内容</label><textarea name="content" required></textarea>
+          <label>出处来源</label><input name="source" required>
+          <div class="actions"><button type="submit">提交记忆提案</button></div>
+        </form>
+      </div>
+      <div class="panel">
+        <div class="card-head"><h2>Skills 生命周期与结构化评估</h2><img src="/assets/icons/SVG/功能/package-应用扩展.svg" width="32" height="32" alt=""></div>
+        ${filteredS.map(sk=>item(`
+          <div class="item-head"><span class="item-title">${esc(sk.name)}</span><span class="${tagCls(sk.status)}">v${esc(sk.version)} · ${esc(sk.status)}</span></div>
+          <p>${esc(sk.content)}</p>
+          <p class="muted"><strong>来源：</strong>${esc(sk.source)}</p>
+          <div class="actions">
+            ${sk.status==='proposed'?`<button class="sm" onclick="publishSkill('${esc(sk.id)}')">发布 Skill</button>`:''}
+            <button class="secondary sm" onclick="evaluateSkill('${esc(sk.id)}')">新增评价</button>
+            <button class="secondary sm" onclick="showSkillEvaluations('${esc(sk.id)}')">查看评价记录</button>
+            ${sk.status!=='archived'?`<button class="secondary sm" onclick="archiveSkill('${esc(sk.id)}')">归档</button>`:''}
+            ${sk.status==='published'?`<button class="secondary sm" onclick="proposeShare('skill','${esc(sk.id)}')">跨项目共享</button>`:''}
+          </div>
+          <div id="skill-evals-${esc(sk.id)}"></div>
+        `)).join('')||'<p class="muted">暂无 Skill 记录</p>'}
+      </div>
+    </div>`;
+    return;
+  }
+
+  if(page==='events'){
+    const ev=cachedEvents;
+    const taskNameMap=Object.fromEntries((cachedTasks||[]).map(t=>[t.id,t.title]));
+    const filteredEv=ev.filter(e=>{
+      if(q&&!e.kind.toLowerCase().includes(q)&&!JSON.stringify(e.payload||'').toLowerCase().includes(q))return false;
+      if(eventCategory==='task'&&!e.kind.startsWith('task.'))return false;
+      if(eventCategory==='approval'&&!(e.kind.includes('side_effect')||e.kind.includes('share')||e.kind.includes('authorized')))return false;
+      if(eventCategory==='knowledge'&&!(e.kind.includes('memory')||e.kind.includes('skill')||e.kind.includes('decision')))return false;
+      return true;
+    });
+    root.innerHTML=`
+    <div class="panel">
+      <div class="card-head">
+        <div><h2>不可变审计事件流</h2><p class="muted" style="margin:4px 0 0">记录每步任务状态迁移、租约 epoch、副作用声明及决策协商过程。</p></div>
+        <div class="stack">
+          <button class="ghost sm" type="button" onclick="eventCategory='all';render()">全部 (${esc(ev.length)})</button>
+          <button class="ghost sm" type="button" onclick="eventCategory='task';render()">任务事件</button>
+          <button class="ghost sm" type="button" onclick="eventCategory='approval';render()">授权与副作用</button>
+          <button class="ghost sm" type="button" onclick="eventCategory='knowledge';render()">决策与知识</button>
+        </div>
+      </div>
+      ${filteredEv.slice(0,40).map(e=>{
+        const meta=formatEventItem(e,taskNameMap);
+        return item(`<div class="item-head"><div class="stack"><img src="${meta.icon}" width="26" height="26" alt=""><span class="item-title">${esc(meta.text)}</span><span class="tag tag-info">${esc(e.kind)}</span></div><span class="muted">${esc(relTime(e.created_at))} · ${esc(e.created_at)}</span></div><p class="muted">主体 ID：<code>${esc(e.subject_id)}</code></p>${e.payload?`<pre>${esc(JSON.stringify(e.payload,null,2))}</pre>`:''}`);
+      }).join('')||'<p class="muted">当前筛选下暂无事件记录</p>'}
+    </div>`;
+    return;
+  }
+
+  if(page==='settings'){
+    const b=cachedBriefing||await api('/projects/'+project+'/briefing');
+    const c=b.charter;
+    const statusOtter=b.project.status==='paused'?'/assets/mascots/otter-float.png':(b.project.status==='archived'?'/assets/mascots/otter-music.png':'/assets/mascots/otter-laptop.png');
+    root.innerHTML=`
+    <div class="panel">
+      <div class="item-head">
+        <div class="stack">
+          <div class="otter-avatar"><img src="${statusOtter}" alt="项目状态水獭"></div>
+          <div><h2>${esc(b.project.name)} · 运行宪章与硬预算</h2><p class="muted" style="margin:4px 0 0">${esc(b.honesty_notice)}</p></div>
+        </div>
+        <span class="${tagCls(b.project.status)}">${esc(b.project.status)}</span>
+      </div>
+      <div class="meter-grid">
+        ${meterCard('并发运行任务硬预算',c.running_tasks,c.max_concurrent_tasks)}
+        ${meterCard('非取消任务总量硬预算',c.active_total_tasks,c.max_total_tasks)}
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h2>状态切换与硬预算边界</h2>
+        <form onsubmit="changeProjectStatus(event)">
+          <label>运行状态（paused 不自动中止远端进程）</label>
+          <select name="status">
+            <option value="active" ${b.project.status==='active'?'selected':''}>active（正常调度与领取）</option>
+            <option value="paused" ${b.project.status==='paused'?'selected':''}>paused（暂停新调度与领取）</option>
+            <option value="archived" ${b.project.status==='archived'?'selected':''}>archived（归档只读）</option>
+          </select>
+          <label>变更原因（至少 5 字）</label>
+          <input name="reason" required minlength="5" placeholder="说明暂停、恢复或归档原因">
+          <div class="actions"><button class="secondary" type="submit">更新项目状态</button></div>
+        </form>
+        <h3>项目宪章与预算</h3>
+        <form onsubmit="saveCharter(event)">
+          <div class="grid-2">
+            <div><label>并发运行上限（1–50）</label><input name="max_concurrent_tasks" type="number" min="1" max="50" value="${esc(c.max_concurrent_tasks)}" required></div>
+            <div><label>任务总量上限（1–2000）</label><input name="max_total_tasks" type="number" min="1" max="2000" value="${esc(c.max_total_tasks)}" required></div>
+          </div>
+          <label>范围边界</label><textarea name="scope_boundary">${esc(c.scope_boundary)}</textarea>
+          <label>停止条件</label><textarea name="stop_conditions">${esc(c.stop_conditions)}</textarea>
+          <div class="actions"><button type="submit">保存宪章与预算</button></div>
+        </form>
+      </div>
+
+      <div>
+        <div class="panel">
+          <div class="card-head"><h2>无密文可携带项目导出</h2><img src="/assets/icons/SVG/操作/download-下载.svg" width="32" height="32" alt=""></div>
+          <p class="muted">生成规范化项目导出 JSON 包（永久设置 <code>secrets_included: false</code>，不含任何 Token/Secret）。</p>
+          <div class="actions"><button type="button" onclick="exportProjectBundle()"><img src="/assets/icons/SVG/操作/download-下载.svg" width="20" height="20" alt="">导出项目 JSON 包</button></div>
+          <div id="export-preview"></div>
+        </div>
+
+        <div class="panel">
+          <div class="card-head"><h2>认证与上线部署边界</h2><img src="/assets/icons/SVG/功能/lock-安全权限.svg" width="32" height="32" alt=""></div>
+          <ul class="info-list">
+            <li><strong>当前管理员认证</strong>：内存 Bearer Token（<code>OTTERNEST_OWNER_TOKEN</code>），关闭页签即清空。</li>
+            <li><strong>正式上线前提</strong>：当前版本不含内置企业 SSO / OAuth 与多管理员 RBAC，上线必须通过 HTTPS 与企业认证网关暴露。</li>
+          </ul>
+          <div class="actions">
+            <a class="menu-item" style="width:auto;background:#F4F5FA;border:1px solid #E4E6F4" href="/api/docs" target="_blank" rel="noopener">打开 OpenAPI 文档</a>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+}
+
+function toggleTaskDrawer(id){expandedTaskId=expandedTaskId===id?'':id;safe(render)}
 function toggleCommandFields(f){f.querySelector('[data-field="review"]').hidden=f.action.value!=='review_task';f.querySelector('[data-field="route"]').hidden=f.action.value!=='route_task'}
-function showCommandPlan(plan){currentPlan=plan.id;const dest=document.getElementById('commandPreview');dest.innerHTML=`<h3>等待确认</h3><p>任务：${esc(plan.task_title)}（${esc(plan.task_status)}）</p><p>操作：${esc(plan.action)} · 风险：${esc(plan.task_risk)} · 版本：${esc(plan.expected_version)}</p><p>参数：<code>${esc(JSON.stringify(plan.parameters))}</code></p><small>截至 ${esc(plan.expires_at)} 有效。状态改变后必须重新预览。</small><p><button class="danger" onclick="confirmCurrentPlan()">确认执行此操作</button> <button class="secondary" onclick="discardCommandPreview()">放弃</button></p>`;notice('已生成预览，未执行');}
-async function previewNaturalCommand(e){e.preventDefault();await safe(async()=>{const data=form(e);const endpoint=data.mode==='model'?'/command/interpret-model':'/command/interpret';if(data.mode==='model'&&!confirm('将指令及本项目部分任务标题发送到你配置的模型服务，仅用于生成需再次确认的建议。继续？'))return;const plan=await api(endpoint,'POST',{project_id:project,text:data.text});showCommandPlan(plan)})}
+function showCommandPlan(plan){
+  currentPlan=plan.id;
+  const dest=document.getElementById('commandPreview');
+  const taskRec=(cachedTasks||[]).find(t=>t.id===plan.task_id)||{};
+  const taskTitle=plan.task_title||taskRec.title||plan.task_id;
+  const taskStatus=plan.task_status||taskRec.status||'';
+  const taskRisk=plan.task_risk||taskRec.risk||'R1';
+  const actionLabels={authorize_task:'批准高风险任务',review_task:'验收任务结果',route_task:'指派指定执行 Agent',cancel_task:'取消任务'};
+  dest.hidden=false;
+  dest.innerHTML=`
+  <div class="card-head">
+    <div class="stack"><img src="/assets/icons/SVG/导航/clipboard-check-任务中心.svg" width="30" height="30" alt=""><h2>执行计划（待确认）</h2></div>
+    <span class="tag tag-warn">有效期至 ${esc(relTime(plan.expires_at))} · 待确认</span>
+  </div>
+  <p class="muted">已根据你的指令生成待确认操作计划；提交确认后将再次锁定校对状态。</p>
+  <div class="cmd-step">
+    <div class="cmd-step-left"><span class="step-num">1</span><div><strong>目标任务：${esc(taskTitle)}</strong><div class="muted">乐观锁版本号 v${esc(plan.expected_version)}</div></div></div>
+    ${taskStatus?statusBadge(taskStatus):''}
+  </div>
+  <div class="cmd-step">
+    <div class="cmd-step-left"><span class="step-num">2</span><div><strong>执行动作：${esc(actionLabels[plan.action]||plan.action)}</strong><div class="muted">参数：<code>${esc(JSON.stringify(plan.parameters))}</code></div></div></div>
+    <span class="${tagCls(taskRisk)}">${esc(taskRisk)}</span>
+  </div>
+  <div class="composer-foot">
+    <span class="muted">任务状态若中途改变须重新解析生成预览。</span>
+    <div class="stack">
+      <button type="button" class="secondary" onclick="discardCommandPreview()">暂不执行</button>
+      <button type="button" class="danger" onclick="confirmCurrentPlan()">确认并执行</button>
+    </div>
+  </div>`;
+  notice('已生成待确认操作预览（尚未写入控制状态）');
+}
+async function previewNaturalCommand(e){e.preventDefault();await safe(async()=>{const data=form(e);const endpoint=data.mode==='model'?'/command/interpret-model':'/command/interpret';if(data.mode==='model'&&!confirm('将指令及本项目部分任务标题发送到配置的模型服务，仅用于生成待二次确认建议。继续？'))return;const plan=await api(endpoint,'POST',{project_id:project,text:data.text});showCommandPlan(plan)})}
 async function previewCommand(e){e.preventDefault();await safe(async()=>{const data=form(e);const body={task_id:data.task_id,action:data.action};if(body.action==='review_task'){body.accepted=data.accepted==='true';body.reason=data.reason||''}if(body.action==='route_task'){body.target_agent_id=data.target_agent_id||null}const plan=await api('/command/plans','POST',body);showCommandPlan(plan)})}
-function discardCommandPreview(){currentPlan=null;const el=document.getElementById('commandPreview');if(el)el.textContent='已放弃本次预览（不执行）。'}
-async function confirmCurrentPlan(){if(!currentPlan)return;await safe(async()=>{const id=currentPlan;const result=await api('/command/plans/'+id+'/confirm','POST');currentPlan=null;notice('已执行并记录：'+result.result.status);await render()})}
-async function showDecisionReviews(id){await safe(async()=>{const reviews=await api('/decisions/'+id+'/reviews');const el=document.getElementById('reviews-'+id);el.innerHTML='<strong>独立意见（仅检查内部引用是否存在，未核验论点真实性）</strong>'+ (reviews.map(r=>item(`<span class="tag">${esc(r.stance)}</span> <small>${esc(r.agent_id)}</small><p>${esc(r.reasoning)}</p><small>证据来源：${esc(r.evidence.join(', ')||'未提供')}</small>`)).join('')||'<p class="muted">暂无独立意见</p>');})}
-async function configureAutoDeliberation(id){await safe(async()=>{const ids=prompt('填写 2–8 名当前项目 Agent 的 ID，用逗号分隔。设置后不能更改，所有人完成独立意见后才自动推进轮次。');if(ids===null)return;const roster=ids.split(',').map(x=>x.trim()).filter(Boolean);await api('/decisions/'+id+'/deliberation/auto-policy','POST',{reviewer_ids:roster});notice('已锁定协商名单；协商不会自动批准决策')})}
-async function openDeliberation(id){await safe(async()=>{await api('/decisions/'+id+'/deliberation/open','POST');notice('二轮协商已开启，仅第一轮参与者可以回应');await showDeliberation(id)})}
-async function showDeliberation(id){await safe(async()=>{const data=await api('/decisions/'+id+'/deliberation');const root=document.getElementById('deliberation-'+id);if(!root)return;root.textContent='二轮协商：'+data.status+'，证据引用尚未独立核实';const pre=document.createElement('pre');pre.textContent=JSON.stringify({first_round:data.first_round,rebuttals:data.rebuttals},null,2);pre.style.whiteSpace='pre-wrap';root.appendChild(pre);if(data.status==='open'){const button=document.createElement('button');button.className='secondary';button.textContent='关闭二轮协商';button.onclick=()=>closeDeliberation(id);root.appendChild(button)}})}
-async function closeDeliberation(id){await safe(async()=>{const reason=prompt('请输入结束第二轮的实质说明（至少10字）');if(reason===null)return;await api('/decisions/'+id+'/deliberation/close','POST',{reason});notice('第二轮已关闭，仍需管理员裁决');await showDeliberation(id)})}
-async function resolveDecision(id){await safe(async()=>{const reviews=await api('/decisions/'+id+'/reviews');const hasDissent=reviews.some(x=>x.stance==='oppose'||x.stance==='alternative');const note=prompt(hasDissent?'存在异议，请说明你如何处理不同意见（至少10字）':'决策批准说明（第二轮存在异议时至少10字）','');if(note===null)return;const response=await api('/decisions/'+id+'/resolve','POST',{owner_note:note});notice('已确认决策，记录异议数：'+response.dissent_count);await render()})}
+function discardCommandPreview(){currentPlan=null;const el=document.getElementById('commandPreview');if(el){el.hidden=false;el.textContent='已放弃本次操作预览（未执行）。'}}
+async function confirmCurrentPlan(){if(!currentPlan)return;await safe(async()=>{const id=currentPlan;const result=await api('/command/plans/'+id+'/confirm','POST');currentPlan=null;notice('已执行并记录：'+result.result.status);await refresh()})}
+async function showDecisionReviews(id){await safe(async()=>{const reviews=await api('/decisions/'+id+'/reviews');const el=document.getElementById('reviews-'+id);el.innerHTML='<div class="continuity-box"><h3>独立意见（仅检验引用存在性）</h3>'+(reviews.map(r=>item(`<div class="item-head"><span class="${tagCls(r.stance)}">${esc(r.stance)}</span><span class="muted">Agent: <code>${esc(r.agent_id)}</code></span></div><p>${esc(r.reasoning)}</p><p class="muted">证据引用：${esc(r.evidence.join(', ')||'未提供')}</p>`)).join('')||'<p class="muted">暂无独立意见</p>')+'</div>'})}
+async function configureAutoDeliberation(id){await safe(async()=>{const ids=prompt('填写 2–8 名当前项目 Agent 的 ID，用逗号分隔。设置后不能更改，全员发表独立意见后自动进入二轮。');if(ids===null)return;const roster=ids.split(',').map(x=>x.trim()).filter(Boolean);await api('/decisions/'+id+'/deliberation/auto-policy','POST',{reviewer_ids:roster});notice('已锁定自动协商名单；二轮协商不会自动批准决策')})}
+async function openDeliberation(id){await safe(async()=>{await api('/decisions/'+id+'/deliberation/open','POST');notice('二轮协商已开启，仅第一轮参与者可发表回应');await showDeliberation(id)})}
+async function showDeliberation(id){await safe(async()=>{const data=await api('/decisions/'+id+'/deliberation');const root=document.getElementById('deliberation-'+id);if(!root)return;root.innerHTML=`<div class="continuity-box"><h3>二轮协商详情（状态：${esc(data.status)}）</h3><p class="muted">证据引用尚未独立核实，最终裁决权属于管理员。</p><pre>${esc(JSON.stringify({first_round:data.first_round,rebuttals:data.rebuttals},null,2))}</pre>${data.status==='open'?`<div class="actions"><button class="secondary sm" onclick="closeDeliberation('${esc(id)}')">关闭二轮协商</button></div>`:''}</div>`})}
+async function closeDeliberation(id){await safe(async()=>{const reason=prompt('请输入结束第二轮的实质说明（至少10字）');if(reason===null)return;await api('/decisions/'+id+'/deliberation/close','POST',{reason});notice('第二轮已关闭，仍需管理员最终裁决');await showDeliberation(id)})}
+async function resolveDecision(id){await safe(async()=>{const reviews=await api('/decisions/'+id+'/reviews');const hasDissent=reviews.some(x=>x.stance==='oppose'||x.stance==='alternative');const note=prompt(hasDissent?'存在异议，请说明处理不同意见的依据（至少10字）':'决策批准说明（存在二轮异议时至少10字）','');if(note===null)return;const response=await api('/decisions/'+id+'/resolve','POST',{owner_note:note});notice('已确认决策，记录异议数：'+response.dissent_count);await refresh()})}
 const form=e=>Object.fromEntries(new FormData(e.target).entries());
 function parseCapabilities(value){return String(value||'').split(',').map(x=>x.trim()).filter(Boolean)}
-async function schedule(){await safe(async()=>{const result=await api('/projects/'+project+'/schedule','POST',{limit:20});notice('已匹配 '+result.count+' 项任务；实际执行须由 Agent 领取');await render()})}
-async function showRuntimes(id){await safe(async()=>{const list=await api('/agents/'+id+'/runtimes');const el=document.getElementById('runtime-'+id);el.innerHTML=list.map(r=>item(`<small>${esc(r.label)} · ${esc(r.environment)} · ${esc(r.status)} · 最近上报：${esc(r.last_seen||'从未')} · ${r.online?'在线上报':'离线/未知'} ${r.enabled?'':'· 已禁用'}</small>`)).join('')+`<form onsubmit="registerRuntime(event,'${esc(id)}')"><label>运行实例名称</label><input name="label" required><label>执行环境</label><input name="environment" required><button>注册实例</button></form>`;})}
-async function registerRuntime(e,id){e.preventDefault();await safe(async()=>{await api('/agents/'+id+'/runtimes','POST',form(e));notice('实例已注册，须由该 Agent 主动上报心跳');await showRuntimes(id)})}
-async function verifyCapabilities(id){await safe(async()=>{const record=agents.find(a=>a.id===id);if(!record)return;const input=prompt('输入已独立验证的能力（逗号分隔，不得超出声明范围）',(record.verified_capabilities||[]).join(', '));if(input===null)return;const approved=parseCapabilities(input);if(!approved.every(c=>(record.declared_capabilities||[]).includes(c))){notice('不能验证未声明的能力',true);return}await api('/agents/'+id+'/verified-capabilities','PUT',{capabilities:approved});notice('已记录能力核验，请确保已在真实环境完成验证');await refresh()})}
-async function createProject(e){e.preventDefault();await safe(async()=>{await api('/projects','POST',form(e));notice('项目已创建');await refresh()})}
-async function createAgent(e){e.preventDefault();await safe(async()=>{const body=form(e);body.capabilities=parseCapabilities(body.capabilities);const a=await api('/agents','POST',body);await refresh();document.getElementById('newToken').textContent='仅显示一次：'+a.token;notice('Agent 已注册，请分配项目成员权限后使用')})}
-async function addMember(e){e.preventDefault();await safe(async()=>{await api('/projects/'+project+'/members','POST',form(e));notice('已分配项目角色');await render()})}
-async function createTask(e){e.preventDefault();await safe(async()=>{const body=form(e);body.priority=Number(body.priority);body.required_capabilities=parseCapabilities(body.required_capabilities);body.dependency_ids=[...new FormData(e.target).getAll('dependencies')];delete body.dependencies;await api('/projects/'+project+'/tasks','POST',body);notice('任务已创建');await render()})}
-async function targetTask(id){await safe(async()=>{const target=document.getElementById('target-'+id).value;await api('/tasks/'+id+'/target','PUT',{agent_id:target||null});notice('执行者指向已保存；远程进程需自行领取');await render()})}
-async function createMemory(e){e.preventDefault();await safe(async()=>{await api('/projects/'+project+'/memories','POST',form(e));notice('记忆提案已创建');await render()})}
-async function createDecision(e){e.preventDefault();await safe(async()=>{await api('/projects/'+project+'/decisions','POST',form(e));notice('决策提案已创建');await render()})}
-async function action(id,verb){await safe(async()=>{if(!confirm('确认执行此管理操作？'))return;await api('/tasks/'+id+'/'+verb,'POST');notice('操作已记录');await render()})}
-async function review(id,accepted){await safe(async()=>{if(!confirm('确认验收决定？'))return;await api('/tasks/'+id+'/review','POST',{accepted,reason:''});notice('验收决定已记录');await render()})}
-async function publish(id){await safe(async()=>{await api('/memories/'+id+'/publish','POST');notice('记忆已发布');await render()})}
-async function approve(id){await safe(async()=>{await api('/decisions/'+id+'/approve','POST');notice('决策已批准');await render()})}
-</script></body></html>
+async function schedule(){await safe(async()=>{const result=await api('/projects/'+project+'/schedule','POST',{limit:20});notice('已匹配 '+result.count+' 项任务；实际执行仍须 Agent 主动领取');await refresh()})}
+async function showRuntimes(id){await safe(async()=>{const list=await api('/agents/'+id+'/runtimes');const el=document.getElementById('runtime-'+id);el.innerHTML=`<div class="continuity-box"><h3>已登记运行实例</h3>`+(list.map(r=>item(`<div class="item-head"><strong>${esc(r.label)}</strong><span class="tag ${r.online?'tag-ok':'tag-warn'}">${r.online?'在线心跳':'离线/未知'} · ${esc(r.status)}</span></div><p class="muted">执行环境：${esc(r.environment)} · 最近上报：${esc(r.last_seen||'从未')}${r.enabled?'':' · 已禁用'}</p>`)).join('')||'<p class="muted">暂无运行实例</p>')+`<h3>新增运行实例</h3><form onsubmit="registerRuntime(event,'${esc(id)}')"><div class="grid-2"><div><label>实例标签</label><input name="label" required></div><div><label>运行环境</label><input name="environment" required></div></div><div class="actions"><button type="submit">注册实例</button></div></form></div>`})}
+async function registerRuntime(e,id){e.preventDefault();await safe(async()=>{await api('/agents/'+id+'/runtimes','POST',form(e));notice('实例已注册，后续须由该 Agent 主动上报心跳');await refresh();await showRuntimes(id)})}
+async function verifyCapabilities(id){await safe(async()=>{const record=agents.find(a=>a.id===id);if(!record)return;const input=prompt('输入已独立验证的能力（逗号分隔，不得超出声明范围）',(record.verified_capabilities||[]).join(', '));if(input===null)return;const approved=parseCapabilities(input);if(!approved.every(c=>(record.declared_capabilities||[]).includes(c))){notice('不能验证未声明的能力',true);return}await api('/agents/'+id+'/verified-capabilities','PUT',{capabilities:approved});notice('已保存能力核验记录');await refresh()})}
+async function createProject(e){e.preventDefault();await safe(async()=>{await api('/projects','POST',form(e));showNewProjectForm=false;notice('项目已创建');await refresh()})}
+async function createAgent(e){e.preventDefault();await safe(async()=>{const body=form(e);body.capabilities=parseCapabilities(body.capabilities);const a=await api('/agents','POST',body);await refresh();const pre=document.getElementById('newToken');pre.hidden=false;pre.textContent='一次性 Agent 令牌（请立即妥善保存）：'+a.token;notice('Agent 已注册，请为其分配项目角色')})}
+async function addMember(e){e.preventDefault();await safe(async()=>{await api('/projects/'+project+'/members','POST',form(e));notice('已分配项目角色');await refresh()})}
+async function createTask(e){e.preventDefault();await safe(async()=>{const body=form(e);body.priority=Number(body.priority);body.required_capabilities=parseCapabilities(body.required_capabilities);body.dependency_ids=[...new FormData(e.target).getAll('dependencies')];delete body.dependencies;await api('/projects/'+project+'/tasks','POST',body);showNewTaskForm=false;notice('任务已创建');await refresh()})}
+async function targetTask(id){await safe(async()=>{const target=document.getElementById('target-'+id).value;await api('/tasks/'+id+'/target','PUT',{agent_id:target||null});notice('执行者指向已保存；远程节点需自行领取');await refresh()})}
+async function createMemory(e){e.preventDefault();await safe(async()=>{await api('/projects/'+project+'/memories','POST',form(e));notice('记忆提案已提交');await refresh()})}
+async function createDecision(e){e.preventDefault();await safe(async()=>{await api('/projects/'+project+'/decisions','POST',form(e));notice('决策提案已提交');await refresh()})}
+async function action(id,verb){await safe(async()=>{if(!confirm('确认执行此管理操作？'))return;await api('/tasks/'+id+'/'+verb,'POST');notice('操作已记录');await refresh()})}
+async function review(id,accepted){await safe(async()=>{if(!confirm('确认验收决定？'))return;await api('/tasks/'+id+'/review','POST',{accepted,reason:''});notice('验收决定已记录');await refresh()})}
+async function publish(id){await safe(async()=>{await api('/memories/'+id+'/publish','POST');notice('记忆已发布');await refresh()})}
+async function approve(id){await safe(async()=>{await api('/decisions/'+id+'/approve','POST');notice('决策已批准');await refresh()})}
+async function saveCharter(e){e.preventDefault();await safe(async()=>{const body=form(e);body.max_concurrent_tasks=Number(body.max_concurrent_tasks);body.max_total_tasks=Number(body.max_total_tasks);await api('/projects/'+project+'/charter','PUT',body);notice('项目宪章与预算已保存');await refresh()})}
+async function changeProjectStatus(e){e.preventDefault();await safe(async()=>{const body=form(e);const res=await api('/projects/'+project+'/status','POST',body);notice('项目状态已更新为 '+res.status+'（当前运行中任务：'+res.in_flight_running_tasks+'）');await refresh()})}
+async function showTaskContinuity(id){await safe(async()=>{const [cps,handoff,ses]=await Promise.all([api('/tasks/'+id+'/checkpoints'),api('/tasks/'+id+'/handoff'),api('/tasks/'+id+'/side-effects')]);const root=document.getElementById('continuity-'+id);if(!root)return;const cpHtml=cps.map(cp=>item(`<div class="item-head"><span class="${tagCls(cp.verification_status)}">epoch ${esc(cp.lease_epoch)} · #${esc(cp.step_number)} · ${esc(cp.verification_status)}</span><span class="muted">Agent: <code>${esc(cp.agent_id)}</code></span></div><p>${esc(cp.summary)}</p>${cp.next_steps?`<p class="muted"><strong>下一步：</strong>${esc(cp.next_steps)}</p>`:''}<p class="muted"><strong>关联成果：</strong>${esc((cp.artifact_ids||[]).join(', ')||'无')}</p>${cp.owner_note?`<p class="muted"><strong>核验备注：</strong>${esc(cp.owner_note)}</p>`:''}<div class="actions"><button class="sm" onclick="verifyCheckpoint('${esc(cp.id)}','owner_verified','${esc(id)}')">核验通过</button> <button class="secondary sm" onclick="verifyCheckpoint('${esc(cp.id)}','rejected','${esc(id)}')">驳回检查点</button></div>`)).join('')||'<p class="muted">暂无检查点</p>';const seHtml=ses.map(se=>item(`<div class="item-head"><div><strong>${esc(se.target_system)}</strong> · <code>${esc(se.idempotency_key)}</code></div><span class="${tagCls(se.status)}">${esc(se.status)} · epoch ${esc(se.lease_epoch)} · ${se.owner_verified?'已核对':'待核对'}</span></div><p>${esc(se.description)}</p>${se.evidence_summary?`<p class="muted"><strong>执行自证：</strong>${esc(se.evidence_summary)}</p>`:''}${se.owner_note?`<p class="muted"><strong>对账备注：</strong>${esc(se.owner_note)}</p>`:''}<div class="actions"><button class="sm" onclick="reconcileSideEffect('${esc(se.id)}','verified_executed','${esc(id)}')">核验已执行</button> <button class="secondary sm" onclick="reconcileSideEffect('${esc(se.id)}','verified_not_executed','${esc(id)}')">核验未执行（允许重开）</button></div>`)).join('')||'<p class="muted">暂无登记的外部副作用</p>';root.innerHTML=`<div class="continuity-box"><div class="grid-2"><div><h3>任务检查点（Epoch 隔离）</h3>${cpHtml}</div><div><h3>外部副作用台账（不可自动回滚）</h3>${seHtml}</div></div><h3>标准交接包边界</h3><div class="callout">${esc(handoff.handoff_boundary)}</div><pre>${esc(JSON.stringify({latest_verified_checkpoint:handoff.latest_verified_checkpoint,latest_self_reported_checkpoint:handoff.latest_self_reported_checkpoint,side_effects:handoff.side_effects,artifacts:handoff.artifacts},null,2))}</pre></div>`})}
+async function verifyCheckpoint(cpId,status,taskId){await safe(async()=>{const note=prompt(status==='rejected'?'请输入驳回检查点的原因（至少5字）':'可选：输入核验备注','')??null;if(note===null)return;await api('/checkpoints/'+cpId+'/verify','POST',{status,note});notice('检查点状态已更新：'+status);await showTaskContinuity(taskId)})}
+async function revokeTaskLease(id){await safe(async()=>{const reason=prompt('请输入撤回租约并隔离旧 epoch 的原因（至少5字）');if(reason===null)return;const target=prompt('可选：输入交接目标 Agent ID（留空则不指定）','')??'';await api('/tasks/'+id+'/revoke-lease','POST',{reason,target_agent_id:target.trim()||null});notice('租约已撤回并提升 epoch；旧进程未获远端终止核实');await refresh()})}
+async function reconcileSideEffect(effectId,status,taskId){await safe(async()=>{const note=prompt(status==='verified_executed'?'请输入核对已执行的依据（至少5字）':'请输入核对未执行、允许下一轮重开的依据（至少5字）');if(note===null)return;await api('/side-effects/'+effectId+'/reconcile','POST',{status,note});notice('副作用台账已核对：'+status);await refresh();const el=document.getElementById('continuity-'+taskId);if(el)await showTaskContinuity(taskId)})}
+async function exportProjectBundle(){await safe(async()=>{if(!project)return;const bundle=await api('/projects/'+project+'/export');const root=document.getElementById('export-preview');const summary={schema_version:bundle.schema_version,exported_at:bundle.exported_at,secrets_included:bundle.secrets_included,sha256_digest:bundle.sha256_digest,counts:{tasks:bundle.tasks.length,checkpoints:bundle.checkpoints.length,side_effects:bundle.side_effects.length,memories:bundle.memories.length,decisions:bundle.decisions.length,skills:bundle.skills.length,skill_evaluations:bundle.skill_evaluations.length,cross_project_shares:bundle.cross_project_shares.length}};if(root){root.innerHTML=`<div class="callout" style="margin-top:14px"><code>schema_version=${esc(bundle.schema_version)}</code> · <code>secrets_included=${esc(bundle.secrets_included)}</code><br><code>sha256=${esc(bundle.sha256_digest)}</code></div><pre>${esc(JSON.stringify(summary,null,2))}</pre>`}const blob=new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`otternest-export-${bundle.project.id}.json`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);notice('已导出可携带项目 JSON 包（不含 Secret）')})}
+async function reviseMemory(id){await safe(async()=>{const cur=(globalThis._memMap&&globalThis._memMap[id])||{};const title=prompt('修订后标题',cur.title||'');if(title===null)return;const content=prompt('修订后内容',cur.content||'');if(content===null)return;const source=prompt('修订后出处',cur.source||'');if(source===null)return;const reason=prompt('请输入修订原因（至少5字）');if(reason===null)return;await api('/memories/'+id+'/revise','POST',{title,content,source,reason});notice('记忆已修订并提升版本号');await refresh()})}
+async function archiveMemory(id){await safe(async()=>{const reason=prompt('请输入归档记忆原因（至少5字，归档后不再注入后续上下文）');if(reason===null)return;await api('/memories/'+id+'/archive','POST',{reason});notice('记忆已归档');await refresh()})}
+async function publishSkill(id){await safe(async()=>{await api('/skills/'+id+'/publish','POST',{});notice('Skill 已发布');await refresh()})}
+async function evaluateSkill(id){await safe(async()=>{const verdict=prompt('请输入评价结论（pass / fail / concern）','pass');if(verdict===null)return;const notes=prompt('请输入评价依据（至少5字）');if(notes===null)return;const taskId=prompt('可选：关联本项目的 Task ID（留空则不关联）','')??'';await api('/skills/'+id+'/evaluations','POST',{verdict:verdict.trim(),notes,task_id:taskId.trim()||null});notice('Skill 评价已记录');await showSkillEvaluations(id)})}
+async function showSkillEvaluations(id){await safe(async()=>{const rows=await api('/skills/'+id+'/evaluations');const el=document.getElementById('skill-evals-'+id);if(!el)return;el.innerHTML=`<div class="continuity-box"><h3>Skill 评价历史</h3>`+(rows.map(ev=>item(`<div class="item-head"><span class="${tagCls(ev.verdict)}">${esc(ev.verdict)}</span><span class="muted">${esc(ev.actor_kind)}: <code>${esc(ev.actor_id)}</code>${ev.task_id?` · task <code>${esc(ev.task_id)}</code>`:''}</span></div><p>${esc(ev.notes)}</p>`)).join('')||'<p class="muted">暂无评价记录</p>')+`</div>`})}
+async function archiveSkill(id){await safe(async()=>{const reason=prompt('请输入归档 Skill 原因（至少5字，归档后仅保留审计不对外展示）');if(reason===null)return;await api('/skills/'+id+'/archive','POST',{reason});notice('Skill 已归档');await refresh()})}
+async function proposeShare(itemKind,itemId){await safe(async()=>{const hint=(projects||[]).filter(p=>p.id!==project).map(p=>`${p.name}:${p.id}`).join(', ');const targetProjectId=prompt('请输入目标 Project ID'+(hint?`（可选：${hint}）`:''));if(targetProjectId===null)return;const rationale=prompt('请输入跨项目共享理由（至少5字）');if(rationale===null)return;await api('/projects/'+project+'/knowledge-shares','POST',{target_project_id:targetProjectId.trim(),item_kind:itemKind,source_item_id:itemId,rationale});notice('已提交跨项目共享提案，等待管理员审批');await refresh()})}
+async function resolveShare(shareId,approved){await safe(async()=>{const note=prompt(approved?'请输入批准共享备注（至少5字）':'请输入拒绝共享备注（至少5字）');if(note===null)return;await api('/knowledge-shares/'+shareId+'/resolve','POST',{approved,note});notice(approved?'已批准共享并克隆到目标项目':'已拒绝共享提案');await refresh()})}
+</script>
+</body>
+</html>
