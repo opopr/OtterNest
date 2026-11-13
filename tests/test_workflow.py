@@ -201,3 +201,24 @@ def test_generic_agent_polling_context_and_skills(env, owner_headers):
     # No permission to read the other project's task context or R3 unapproved work.
     assert r3["id"] not in [t["id"] for t in env.get("/api/v1/agent/queue", headers=auth).json()]
     assert env.get(f"/api/v1/projects/{other}/skills", headers=auth).status_code == 404
+
+
+def test_worker_failure_requires_explicit_owner_recovery(env, owner_headers):
+    project = create_project(env, owner_headers)
+    agent = create_agent(env, owner_headers)
+    enroll(env, owner_headers, project, agent["id"])
+    auth = {"Authorization": "Bearer " + agent["token"]}
+    task = create_task(env, owner_headers, project, "R3")
+    env.post(f"/api/v1/tasks/{task['id']}/authorize", headers=owner_headers)
+    claim = env.post(f"/api/v1/tasks/{task['id']}/claim", headers=auth, json={}).json()
+    failed = env.post(f"/api/v1/tasks/{task['id']}/fail", headers=auth,
+                      json={"epoch": claim["lease_epoch"], "summary": "Tool failed"})
+    assert failed.status_code == 200 and failed.json()["status"] == "blocked"
+    assert env.post(f"/api/v1/tasks/{task['id']}/claim", headers=auth, json={}).status_code == 409
+    unblocked = env.post(f"/api/v1/tasks/{task['id']}/unblock", headers=owner_headers)
+    assert unblocked.json()["status"] == "waiting_approval"
+    assert env.post(f"/api/v1/tasks/{task['id']}/submit", headers=auth,
+                    json={"epoch": claim["lease_epoch"], "summary": "Zombie worker"}).status_code == 409
+    assert env.post(f"/api/v1/tasks/{task['id']}/claim", headers=auth, json={}).status_code == 409
+    env.post(f"/api/v1/tasks/{task['id']}/authorize", headers=owner_headers)
+    assert env.post(f"/api/v1/tasks/{task['id']}/claim", headers=auth, json={}).status_code == 200

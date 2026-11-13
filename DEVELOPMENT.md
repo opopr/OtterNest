@@ -25,3 +25,15 @@ f) 运行测试：`pytest -q`。早期单元/接口测试使用 SQLite；真实 
 - 仅绑定本机地址，不直接暴露公网。尤其不得公开数据库、管理 API 或未经安全审核的 Agent 接口。
 - 目前提供 Agent 通用轮询队列和任务上下文接口；**仍没有**真实第三方模型自动调用或云端唤醒能力，Agent 注册本身只代表身份登记。
 - 当前 artifacts 上传上限 5 MiB，超大文件需要后续对象存储/分段上传设计。
+
+## 通用 Agent Runner（隔离执行环境使用）
+
+Agent 通过所有者创建的受限令牌加入一个项目后，可以在**外部独立环境**上配置 
+
+a) `OTTERNEST_AGENT_TOKEN`（只交给 Runner，本机秘密）。
+
+b) 一个可信的可执行文件，**标准输入读取 JSON 上下文包**，标准输出返回文本或 `{"summary":"..."}`。
+
+c) 启动 `otternest-runner --server https://CONTROL_HOST --once -- /absolute/path/to/trusted-command`；去掉 `--once` 才会轮询接单。
+
+执行命令由操作者配置，**不会从任务文本拼接 shell 命令**；默认不继承 OtterNest 管理员令牌、Agent 令牌和数据库 URL。需要其他环境变量时显式使用 `--pass-env KEY`。运行账户、文件系统和网络沙箱需由环境所有者另外隔离。当前 Runner 只提交结果等待人工验收，不能宣称第三方平台已经被成功集成。

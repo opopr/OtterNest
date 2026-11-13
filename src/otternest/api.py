@@ -253,6 +253,37 @@ def submit(task_id: str, body: ResultIn, actor: Actor = Depends(authenticate), d
     return task_public(row)
 
 
+@router.post("/tasks/{task_id}/fail")
+def fail_task(task_id: str, body: ResultIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    """A failed worker blocks the task; it is never silently re-run."""
+    row = require_task(db, task_id, actor, lock=True)
+    ensure_lease(row, actor, body.epoch)
+    row.result_summary = body.summary
+    row.status = "blocked"
+    row.lease_until = None
+    row.version += 1
+    emit(db, actor, "task.blocked", task_id, row.project_id)
+    db.commit()
+    return task_public(row)
+
+
+@router.post("/tasks/{task_id}/unblock")
+def unblock_task(task_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    """Owner explicitly decides whether a blocked task may be retried."""
+    owner_only(actor)
+    row = require_task(db, task_id, actor, lock=True)
+    if row.status != "blocked":
+        raise Conflict("Task is not blocked")
+    row.status = "waiting_approval" if row.risk == "R3" else "ready"
+    row.assigned_agent_id = None
+    row.lease_epoch += 1
+    row.lease_until = None
+    row.version += 1
+    emit(db, actor, "task.unblocked", task_id, row.project_id)
+    db.commit()
+    return task_public(row)
+
+
 @router.post("/tasks/{task_id}/review")
 def review(task_id: str, body: ReviewIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     owner_only(actor)
