@@ -182,8 +182,9 @@ def test_postgres_concurrent_a2a_dispatchers_send_only_one_request(monkeypatch):
         delegation_id, task_id, endpoint_id = delegation.id, task.id, endpoint.id
     monkeypatch.setenv("OTTERNEST_A2A_ALLOWED_HOSTS", "a2a-peer.example.org")
     monkeypatch.setenv(token_env_name(endpoint_id), "valid-example-external-token-123")
-    # socket is shared globally: mock ONLY the external peer's lookup.
-    # psycopg must continue to resolve localhost to the CI PostgreSQL service.
+    # socket is a shared module: mock ONLY the external peer's lookup.
+    # Replacing all getaddrinfo calls would redirect psycopg's localhost DB
+    # connection to the test IP and turn a concurrency test into a timeout.
     import socket
     original_getaddrinfo = socket.getaddrinfo
 
@@ -216,4 +217,51 @@ def test_postgres_concurrent_a2a_dispatchers_send_only_one_request(monkeypatch):
     with factory() as db:
         assert db.get(A2ADelegation, delegation_id).status == "remote"
         assert db.get(Task, task_id).status == "running"
+    engine.dispose()
+
+
+@pytest.mark.skipif(not os.getenv("OTTERNEST_PG_TEST_URL"), reason="PostgreSQL integration URL not provided")
+def test_postgres_command_plans_revalidate_task_version_concurrently():
+    """Two different plans based on one task version cannot authorize twice."""
+    from datetime import timedelta
+    from otternest.models import CommandPlan, Event, now
+    from otternest.governance import confirm_command_plan
+
+    engine = create_engine(os.environ["OTTERNEST_PG_TEST_URL"], pool_pre_ping=True)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as db:
+        project = Project(name="Concurrent command previews")
+        db.add(project)
+        db.flush()
+        task = Task(project_id=project.id, title="Risky task", instruction="run",
+                    acceptance="tested", risk="R3", status="waiting_approval")
+        db.add(task)
+        db.flush()
+        plans = [CommandPlan(project_id=project.id, task_id=task.id, action="authorize_task",
+                             parameters={}, expected_version=1,
+                             expires_at=now() + timedelta(minutes=10)) for _ in range(2)]
+        db.add_all(plans)
+        db.commit()
+        plan_ids, task_id = [p.id for p in plans], task.id
+
+    barrier = Barrier(2)
+
+    def execute(plan_id):
+        with factory() as db:
+            barrier.wait(timeout=10)
+            try:
+                confirm_command_plan(plan_id, Actor("owner", "owner"), db)
+                return "executed"
+            except Conflict:
+                db.rollback()
+                return "conflict"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(execute, plan_ids))
+    assert sorted(outcomes) == ["conflict", "executed"]
+    with factory() as db:
+        task = db.get(Task, task_id)
+        assert task.status == "ready" and task.approval_granted and task.version == 2
+        assert len(db.scalars(select(Event).where(
+            Event.subject_id == task_id, Event.kind == "task.authorized")).all()) == 1
     engine.dispose()
