@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import Agent, Audit, Event, Goal, Membership, Outbox, Project, Task, now
+from .models import Agent, Audit, Event, Goal, Membership, Outbox, Project, Task, TaskDependency, now
 from .security import Actor
 
 
@@ -67,6 +67,15 @@ def claim(db: Session, task_id: str, actor: Actor, lease_seconds: int) -> Task:
         raise HTTPException(403, "Only agent credentials can claim")
     task = require_task(db, task_id, actor, lock=True)
     require_project(db, task.project_id, actor, roles=("worker", "manager", "reviewer"))
+    project = db.get(Project, task.project_id)
+    if not project or project.status != "active":
+        raise Conflict("Project is not active")
+    if task.target_agent_id and task.target_agent_id != actor.id:
+        raise Conflict("Task is assigned to a different agent")
+    if task.risk == "R3" and not task.approval_granted:
+        raise Conflict("High-risk task requires owner approval")
+    if not dependencies_completed(db, task.id):
+        raise Conflict("Task prerequisites have not been accepted")
     if task.status == "running":
         if task.lease_until is None:
             raise Conflict("Existing task has no expiry")
@@ -94,3 +103,83 @@ def claim(db: Session, task_id: str, actor: Actor, lease_seconds: int) -> Task:
 def validate_goal(db: Session, project_id: str, goal_id: str | None) -> None:
     if goal_id and not db.scalar(select(Goal.id).where(Goal.id == goal_id, Goal.project_id == project_id)):
         raise HTTPException(422, "Goal does not belong to project")
+
+
+MAX_DEPENDENCIES = 64
+MAX_GRAPH_SCAN = 2000
+
+
+def dependency_ids(db: Session, task_id: str) -> list[str]:
+    return list(db.scalars(select(TaskDependency.depends_on_id).where(TaskDependency.task_id == task_id)))
+
+
+def dependencies_completed(db: Session, task_id: str) -> bool:
+    predecessors = dependency_ids(db, task_id)
+    if not predecessors:
+        return True
+    rows = db.scalars(select(Task.id).where(Task.id.in_(predecessors), Task.status == "completed")).all()
+    return len(rows) == len(predecessors)
+
+
+def task_ready_status(db: Session, task: Task) -> str:
+    if task.risk == "R3" and not task.approval_granted:
+        return "waiting_approval"
+    return "ready" if dependencies_completed(db, task.id) else "waiting_dependencies"
+
+
+def update_dependencies(db: Session, task: Task, predecessor_id: str, actor: Actor, *, remove: bool = False) -> None:
+    """Project-lock serializes DAG edits in PostgreSQL and protects cycle detection."""
+    db.scalar(select(Project).where(Project.id == task.project_id).with_for_update())
+    db.refresh(task)
+    if task.status not in ("ready", "waiting_approval", "waiting_dependencies"):
+        raise Conflict("Cannot modify dependencies after execution or completion")
+    predecessor = db.get(Task, predecessor_id)
+    if predecessor is None or predecessor.project_id != task.project_id:
+        raise HTTPException(422, "Dependency must belong to the same project")
+    if predecessor_id == task.id:
+        raise Conflict("A task cannot depend on itself")
+    existing = db.get(TaskDependency, (task.id, predecessor_id))
+    if remove:
+        if existing is None:
+            raise HTTPException(404, "Dependency not found")
+        db.delete(existing)
+        db.flush()
+    else:
+        if existing is not None:
+            raise Conflict("Dependency already exists")
+        if len(dependency_ids(db, task.id)) >= MAX_DEPENDENCIES:
+            raise Conflict("Too many dependencies for one task")
+        # Walk the upstream dependencies of the proposed predecessor.
+        # Adding task -> predecessor would be cyclic if predecessor already reaches task.
+        visited: set[str] = set()
+        pending = [predecessor_id]
+        while pending:
+            if len(visited) >= MAX_GRAPH_SCAN:
+                raise Conflict("Dependency graph too large to validate")
+            candidate = pending.pop()
+            if candidate == task.id:
+                raise Conflict("Dependency would create a cycle")
+            if candidate in visited:
+                continue
+            visited.add(candidate)
+            pending.extend(dependency_ids(db, candidate))
+        db.add(TaskDependency(task_id=task.id, depends_on_id=predecessor_id))
+        db.flush()
+    task.status = task_ready_status(db, task)
+    task.version += 1
+    emit(db, actor, "task.dependency_removed" if remove else "task.dependency_added", task.id,
+         task.project_id, {"predecessor_id": predecessor_id})
+
+
+def release_dependents(db: Session, accepted: Task, actor: Actor) -> None:
+    """Called within the acceptance transaction; release only fully satisfied tasks."""
+    child_ids = db.scalars(select(TaskDependency.task_id).where(TaskDependency.depends_on_id == accepted.id)).all()
+    for child_id in child_ids:
+        child = db.scalar(select(Task).where(Task.id == child_id).with_for_update())
+        if child is None or child.status != "waiting_dependencies":
+            continue
+        next_status = task_ready_status(db, child)
+        if next_status != child.status:
+            child.status = next_status
+            child.version += 1
+            emit(db, actor, "task.dependencies_satisfied", child.id, child.project_id)

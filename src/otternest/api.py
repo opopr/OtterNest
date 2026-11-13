@@ -12,9 +12,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .db import get_session
-from .models import Agent, Artifact, Decision, Event, Goal, Membership, Memory, Project, Task, now
+from .models import Agent, Artifact, Decision, Event, Goal, Membership, Memory, Project, Task, TaskDependency, now
 from .security import Actor, authenticate, hash_token, new_agent_token, owner_only
-from .services import Conflict, claim, emit, ensure_lease, require_project, require_task, validate_goal
+from .services import Conflict, claim, dependency_ids, dependencies_completed, emit, ensure_lease, release_dependents, require_project, require_task, task_ready_status, update_dependencies, validate_goal
 
 router = APIRouter(prefix="/api/v1")
 
@@ -46,6 +46,16 @@ class TaskIn(BaseModel):
     acceptance: str = Field(min_length=1, max_length=6000)
     goal_id: str | None = None
     risk: Literal["R0", "R1", "R2", "R3"] = "R1"
+    priority: int = Field(default=50, ge=0, le=100)
+    dependency_ids: list[str] = Field(default_factory=list, max_length=64)
+
+
+class DependencyIn(BaseModel):
+    predecessor_id: str
+
+
+class TargetIn(BaseModel):
+    agent_id: str | None = None
 
 
 class LeaseIn(BaseModel):
@@ -188,17 +198,32 @@ def create_task(project_id: str, body: TaskIn, actor: Actor = Depends(authentica
     if project.status != "active":
         raise Conflict("Project is not active")
     validate_goal(db, project_id, body.goal_id)
-    task = Task(project_id=project_id, goal_id=body.goal_id, title=body.title, instruction=body.instruction,
-                acceptance=body.acceptance, risk=body.risk, status="waiting_approval" if body.risk == "R3" else "ready")
+    # Lock the project row so concurrent owner DAG edits validate against a stable graph.
+    db.scalar(select(Project).where(Project.id == project_id).with_for_update())
+    predecessor_ids = list(dict.fromkeys(body.dependency_ids))
+    if len(predecessor_ids) != len(body.dependency_ids):
+        raise HTTPException(422, "Duplicate dependency IDs")
+    if predecessor_ids:
+        found = db.scalars(select(Task.id).where(Task.id.in_(predecessor_ids), Task.project_id == project_id)).all()
+        if len(found) != len(predecessor_ids):
+            raise HTTPException(422, "All dependencies must belong to this project")
+    task = Task(project_id=project_id, goal_id=body.goal_id, title=body.title,
+                instruction=body.instruction, acceptance=body.acceptance,
+                priority=body.priority, risk=body.risk)
     db.add(task)
     db.flush()
-    emit(db, actor, "task.created", task.id, project_id, {"risk": task.risk})
+    for predecessor_id in predecessor_ids:
+        db.add(TaskDependency(task_id=task.id, depends_on_id=predecessor_id))
+    db.flush()
+    task.status = task_ready_status(db, task)
+    emit(db, actor, "task.created", task.id, project_id,
+         {"risk": task.risk, "dependency_ids": predecessor_ids, "priority": task.priority})
     db.commit()
     return task_public(task)
 
 
 def task_public(t: Task) -> dict:
-    return as_dict(t, "id", "project_id", "goal_id", "title", "instruction", "acceptance", "risk", "status", "assigned_agent_id", "lease_epoch", "lease_until", "version", "result_summary")
+    return as_dict(t, "id", "project_id", "goal_id", "title", "instruction", "acceptance", "risk", "status", "assigned_agent_id", "lease_epoch", "lease_until", "version", "result_summary", "priority", "target_agent_id", "approval_granted")
 
 
 @router.get("/projects/{project_id}/tasks")
@@ -207,9 +232,66 @@ def tasks(project_id: str, actor: Actor = Depends(authenticate), db: Session = D
     return [task_public(t) for t in db.scalars(select(Task).where(Task.project_id == project_id).order_by(Task.created_at.desc()))]
 
 
+@router.get("/projects/{project_id}/task-graph")
+def task_graph(project_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    """One snapshot of the project DAG for the Web UI and automation tools."""
+    require_project(db, project_id, actor)
+    tasks = db.scalars(select(Task).where(Task.project_id == project_id)
+                       .order_by(Task.priority.desc(), Task.created_at, Task.id)).all()
+    ids = [t.id for t in tasks]
+    edges = db.scalars(select(TaskDependency).where(TaskDependency.task_id.in_(ids))).all() if ids else []
+    return {"tasks": [task_public(t) for t in tasks],
+            "dependencies": [{"task_id": d.task_id, "depends_on_id": d.depends_on_id} for d in edges]}
+
+
 @router.get("/tasks/{task_id}")
 def task(task_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     return task_public(require_task(db, task_id, actor))
+
+
+@router.get("/tasks/{task_id}/dependencies")
+def get_dependencies(task_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    row = require_task(db, task_id, actor)
+    return {"task_id": task_id, "depends_on": dependency_ids(db, row.id),
+            "satisfied": dependencies_completed(db, row.id)}
+
+
+@router.post("/tasks/{task_id}/dependencies", status_code=201)
+def add_dependency(task_id: str, body: DependencyIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    owner_only(actor)
+    row = require_task(db, task_id, actor, lock=True)
+    update_dependencies(db, row, body.predecessor_id, actor)
+    db.commit()
+    return {"task": task_public(row), "depends_on": dependency_ids(db, row.id)}
+
+
+@router.delete("/tasks/{task_id}/dependencies/{predecessor_id}")
+def remove_dependency(task_id: str, predecessor_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    owner_only(actor)
+    row = require_task(db, task_id, actor, lock=True)
+    update_dependencies(db, row, predecessor_id, actor, remove=True)
+    db.commit()
+    return {"task": task_public(row), "depends_on": dependency_ids(db, row.id)}
+
+
+@router.put("/tasks/{task_id}/target")
+def target_task(task_id: str, body: TargetIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    """Owner routing is a reservation of intent, never a claim of remote execution."""
+    owner_only(actor)
+    row = require_task(db, task_id, actor, lock=True)
+    if row.status not in {"ready", "waiting_dependencies", "waiting_approval"}:
+        raise Conflict("Cannot reassign an active or terminal task")
+    if body.agent_id:
+        member = db.scalar(select(Membership).join(Agent, Membership.agent_id == Agent.id).where(
+            Membership.project_id == row.project_id, Membership.agent_id == body.agent_id,
+            Membership.role.in_(["worker", "manager", "reviewer"]), Agent.enabled.is_(True)))
+        if member is None:
+            raise HTTPException(422, "Target must be an enabled project worker")
+    row.target_agent_id = body.agent_id
+    row.version += 1
+    emit(db, actor, "task.routed", row.id, row.project_id, {"target_agent_id": body.agent_id})
+    db.commit()
+    return task_public(row)
 
 
 @router.post("/tasks/{task_id}/authorize")
@@ -218,7 +300,8 @@ def authorize_task(task_id: str, actor: Actor = Depends(authenticate), db: Sessi
     row = require_task(db, task_id, actor, lock=True)
     if row.status != "waiting_approval":
         raise Conflict("Task is not waiting for approval")
-    row.status = "ready"
+    row.approval_granted = True
+    row.status = task_ready_status(db, row)
     row.version += 1
     emit(db, actor, "task.authorized", task_id, row.project_id)
     db.commit()
@@ -274,7 +357,8 @@ def unblock_task(task_id: str, actor: Actor = Depends(authenticate), db: Session
     row = require_task(db, task_id, actor, lock=True)
     if row.status != "blocked":
         raise Conflict("Task is not blocked")
-    row.status = "waiting_approval" if row.risk == "R3" else "ready"
+    row.approval_granted = False if row.risk == "R3" else row.approval_granted
+    row.status = task_ready_status(db, row)
     row.assigned_agent_id = None
     row.lease_epoch += 1
     row.lease_until = None
@@ -290,10 +374,15 @@ def review(task_id: str, body: ReviewIn, actor: Actor = Depends(authenticate), d
     row = require_task(db, task_id, actor, lock=True)
     if row.status != "submitted":
         raise Conflict("Task has not been submitted")
-    row.status = "completed" if body.accepted else "ready"
+    if not body.accepted and row.risk == "R3":
+        row.approval_granted = False
+    row.status = "completed" if body.accepted else task_ready_status(db, row)
     row.assigned_agent_id = None
     row.version += 1
     emit(db, actor, "task.accepted" if body.accepted else "task.changes_requested", task_id, row.project_id, {"reason": body.reason})
+    if body.accepted:
+        db.flush()
+        release_dependents(db, row, actor)
     db.commit()
     return task_public(row)
 

@@ -12,8 +12,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install -e '.[dev]'
+      - run: python -m pip install -e '.[dev,mcp]'
       - run: pytest -q
+      - run: python -m compileall -q src
       - run: alembic upgrade head
         env:
           OTTERNEST_DATABASE_URL: sqlite+pysqlite:///./ci-migration.sqlite3

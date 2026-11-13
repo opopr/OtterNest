@@ -42,12 +42,13 @@ def agent_queue(limit: int = 20, actor: Actor = Depends(authenticate), db: Sessi
         select(Task)
         .join(Project, Task.project_id == Project.id)
         .where(Task.status == "ready", Project.status == "active", Task.project_id.in_(authorized))
-        .order_by(Task.created_at, Task.id)
+        .where((Task.target_agent_id.is_(None)) | (Task.target_agent_id == actor.id))
+        .order_by(Task.priority.desc(), Task.created_at, Task.id)
         .limit(limit)
     ).all()
     return [{"id": t.id, "project_id": t.project_id, "goal_id": t.goal_id,
              "title": t.title, "instruction": t.instruction, "acceptance": t.acceptance,
-             "risk": t.risk, "version": t.version} for t in tasks]
+             "risk": t.risk, "version": t.version, "priority": t.priority} for t in tasks]
 
 
 @router.get("/tasks/{task_id}/context")
