@@ -22,6 +22,7 @@ otternest-runner = "otternest.runner:main"
 otternest-webhooks = "otternest.webhooks:main"
 otternest-mcp = "otternest.mcp_bridge:main"
 otternest-scheduler = "otternest.scheduler:main"
+otternest-a2a-outbound = "otternest.a2a_outbound:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "httpx>=0.27,<1"]

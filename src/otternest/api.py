@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .db import get_session
-from .models import Agent, AgentRuntime, Artifact, Decision, Event, Goal, Membership, Memory, Project, Task, TaskDependency, now
+from .models import A2ADelegation, Agent, AgentRuntime, Artifact, Decision, Event, Goal, Membership, Memory, Project, Task, TaskDependency, now
 from .security import Actor, authenticate, hash_token, new_agent_token, owner_only
 from .services import Conflict, claim, dependency_ids, dependencies_completed, emit, ensure_lease, release_dependents, require_project, require_task, task_ready_status, update_dependencies, validate_goal, choose_dispatch_targets
 
@@ -476,6 +476,9 @@ def unblock_task(task_id: str, actor: Actor = Depends(authenticate), db: Session
     row = require_task(db, task_id, actor, lock=True)
     if row.status != "blocked":
         raise Conflict("Task is not blocked")
+    delegation = db.scalar(select(A2ADelegation).where(A2ADelegation.task_id == task_id))
+    if delegation is not None and delegation.status != "released":
+        raise Conflict("Release the terminal A2A delegation before retrying locally")
     row.approval_granted = False if row.risk == "R3" else row.approval_granted
     row.status = task_ready_status(db, row)
     row.assigned_agent_id = None
@@ -495,7 +498,12 @@ def review(task_id: str, body: ReviewIn, actor: Actor = Depends(authenticate), d
         raise Conflict("Task has not been submitted")
     if not body.accepted and row.risk == "R3":
         row.approval_granted = False
-    row.status = "completed" if body.accepted else task_ready_status(db, row)
+    delegation = db.scalar(select(A2ADelegation).where(A2ADelegation.task_id == task_id))
+    if delegation is not None and not body.accepted:
+        # Remote result cannot be implicitly re-dispatched using a stale mapping.
+        delegation.status = "changes_requested"
+        delegation.updated_at = now()
+    row.status = "completed" if body.accepted else ("blocked" if delegation else task_ready_status(db, row))
     row.assigned_agent_id = None
     row.version += 1
     emit(db, actor, "task.accepted" if body.accepted else "task.changes_requested", task_id, row.project_id, {"reason": body.reason})
@@ -512,6 +520,9 @@ def cancel_task(task_id: str, actor: Actor = Depends(authenticate), db: Session 
     row = require_task(db, task_id, actor, lock=True)
     if row.status in {"completed", "cancelled"}:
         raise Conflict("Task is already terminal")
+    external = db.scalar(select(A2ADelegation).where(A2ADelegation.task_id == task_id))
+    if external and external.status not in {"canceled", "failed", "submitted"}:
+        raise Conflict("External A2A delegation active or unknown; use the remote cancellation workflow")
     row.status = "cancelled"
     row.lease_epoch += 1  # fence old workers from writing to the central system
     row.lease_until = None

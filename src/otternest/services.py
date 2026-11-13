@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .models import Agent, AgentRuntime, Audit, Event, Goal, Membership, Outbox, Project, Task, TaskDependency, now
+from .models import A2ADelegation, Agent, AgentRuntime, Audit, Event, Goal, Membership, Outbox, Project, Task, TaskDependency, now
 from .security import Actor
 
 
@@ -73,6 +73,9 @@ def claim(db: Session, task_id: str, actor: Actor, lease_seconds: int) -> Task:
     agent = db.get(Agent, actor.id)
     if agent is None or not agent.enabled or not set(task.required_capabilities).issubset(set(agent.verified_capabilities)):
         raise Conflict("Agent lacks verified capabilities")
+    if db.scalar(select(A2ADelegation.id).where(
+            A2ADelegation.task_id == task.id, A2ADelegation.status != "released")):
+        raise Conflict("Task has an external A2A delegation; local claim forbidden")
     if task.target_agent_id and task.target_agent_id != actor.id:
         raise Conflict("Task is assigned to a different agent")
     if task.risk == "R3" and not task.approval_granted:
