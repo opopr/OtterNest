@@ -44,3 +44,7 @@ OtterNest 已进入**完整产品开发**。此文件是工程状态登记，而
 - **MCP stdio**：官方 MCP SDK FastMCP 建立 11 个工具，Agent Token 通过 REST 接口访问任务、租约、记忆及 Skills；后端权限逻辑不重复实现。
 - **正式迁移**：Alembic `0004_task_graph`，兼容既有记录的 R3 审批状态。
 - **明确不在本次声称完成**：A2A 标准互操作、真实第三方云端接单、全自动按能力调度、PostgreSQL 并发压力验证。
+
+## 持续集成补充
+
+新增 PostgreSQL 16 CI 工作：运行全部 Alembic 迁移，并在两个独立事务中并发领取同一任务，验证任务行级锁阻止重复领取。SQLite 单元测试与 PostgreSQL 集成测试分离运行。
