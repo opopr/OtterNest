@@ -57,3 +57,9 @@ OtterNest 已进入**完整产品开发**。此文件是工程状态登记，而
 - 通用 Runner 的可选 `--runtime-id` 用于上报状态；任务仍需使用原子 claim 才进入运行状态。
 - 本地与 PostgreSQL 并发测试覆盖调度事务、能力门禁及跨项目容量。
 - 尚未实现 A2A SDK 接入、真实远端唤醒、成本优化调度或独立的运行实例凭据。细节参见 [13 · Agent 执行实例与调度](13-agent-runtime-scheduler.md)。
+
+### A2A JSON-RPC v0.3 gateway
+
+`otternest.a2a` now exposes an explicit v0.3.0 Agent Card plus `message/send`, `tasks/get`, `tasks/cancel` with Bearer-based project authorization, durable request deduplication and truthful status mapping. Configure `OTTERNEST_A2A_BASE_URL` for the real external HTTPS origin before advertising discovery. Apply Alembic revision `0006` before serving requests. Details: [docs/14-a2a-gateway.md](14-a2a-gateway.md).
+
+This is the task ingress and status layer. It does not yet provide automatic remote wake-up, streaming/push, or proven interoperability with hosted third-party Agent products.
