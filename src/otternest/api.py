@@ -3,18 +3,19 @@ from __future__ import annotations
 
 import hashlib
 import os
+from datetime import timedelta, timezone
 from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .db import get_session
-from .models import Agent, Artifact, Decision, Event, Goal, Membership, Memory, Project, Task, TaskDependency, now
+from .models import Agent, AgentRuntime, Artifact, Decision, Event, Goal, Membership, Memory, Project, Task, TaskDependency, now
 from .security import Actor, authenticate, hash_token, new_agent_token, owner_only
-from .services import Conflict, claim, dependency_ids, dependencies_completed, emit, ensure_lease, release_dependents, require_project, require_task, task_ready_status, update_dependencies, validate_goal
+from .services import Conflict, claim, dependency_ids, dependencies_completed, emit, ensure_lease, release_dependents, require_project, require_task, task_ready_status, update_dependencies, validate_goal, choose_dispatch_targets
 
 router = APIRouter(prefix="/api/v1")
 
@@ -29,10 +30,37 @@ class GoalIn(BaseModel):
     success_criteria: str = Field(min_length=1, max_length=5000)
 
 
-class AgentIn(BaseModel):
+def valid_capabilities(values: list[str]) -> list[str]:
+    import re
+    if len(set(values)) != len(values) or any(not re.fullmatch(r"[a-z][a-z0-9._-]{0,63}", v) for v in values):
+        raise ValueError("Capabilities must be unique lower-case identifiers")
+    return values
+
+
+class CapabilityList(BaseModel):
+    capabilities: list[str] = Field(default_factory=list, max_length=32)
+
+    _validate_capabilities = field_validator("capabilities")(valid_capabilities)
+
+
+class AgentIn(CapabilityList):
     name: str = Field(min_length=1, max_length=120)
     platform: str = Field(min_length=1, max_length=80)
     execution_mode: Literal["manual", "polling", "remote"] = "manual"
+
+
+class RuntimeIn(BaseModel):
+    label: str = Field(min_length=1, max_length=120)
+    environment: str = Field(min_length=1, max_length=160)
+
+
+class RuntimeHeartbeat(BaseModel):
+    status: Literal["idle", "busy", "stopped"] = "idle"
+
+
+class ScheduleIn(BaseModel):
+    limit: int = Field(default=20, ge=1, le=100)
+    heartbeat_ttl_seconds: int = Field(default=180, ge=30, le=900)
 
 
 class MemberIn(BaseModel):
@@ -48,6 +76,9 @@ class TaskIn(BaseModel):
     risk: Literal["R0", "R1", "R2", "R3"] = "R1"
     priority: int = Field(default=50, ge=0, le=100)
     dependency_ids: list[str] = Field(default_factory=list, max_length=64)
+    required_capabilities: list[str] = Field(default_factory=list, max_length=32)
+
+    _validate_required = field_validator("required_capabilities")(valid_capabilities)
 
 
 class DependencyIn(BaseModel):
@@ -139,19 +170,104 @@ def goals(project_id: str, actor: Actor = Depends(authenticate), db: Session = D
 def register_agent(body: AgentIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     owner_only(actor)
     credential = new_agent_token()
-    agent = Agent(name=body.name, platform=body.platform, execution_mode=body.execution_mode, token_hash=hash_token(credential))
+    agent = Agent(name=body.name, platform=body.platform, execution_mode=body.execution_mode,
+                  declared_capabilities=body.capabilities, verified_capabilities=[], token_hash=hash_token(credential))
     db.add(agent)
     db.flush()
     emit(db, actor, "agent.registered", agent.id)
     db.commit()
     # The token is only returned at creation time; never included in list responses.
-    return {**as_dict(agent, "id", "name", "platform", "execution_mode", "enabled"), "token": credential}
+    return {**as_dict(agent, "id", "name", "platform", "execution_mode", "enabled", "declared_capabilities", "verified_capabilities"), "token": credential}
 
 
 @router.get("/agents")
 def agents(actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     owner_only(actor)
-    return [as_dict(a, "id", "name", "platform", "execution_mode", "enabled") for a in db.scalars(select(Agent))]
+    return [as_dict(a, "id", "name", "platform", "execution_mode", "enabled", "declared_capabilities", "verified_capabilities") for a in db.scalars(select(Agent))]
+
+
+@router.put("/agents/{agent_id}/verified-capabilities")
+def verify_agent_capabilities(agent_id: str, body: CapabilityList, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    """Owner verifies evidence outside this endpoint; an agent cannot certify itself."""
+    owner_only(actor)
+    agent = db.scalar(select(Agent).where(Agent.id == agent_id).with_for_update())
+    if agent is None:
+        raise HTTPException(404, "Agent not found")
+    if not set(body.capabilities).issubset(set(agent.declared_capabilities)):
+        raise HTTPException(422, "Only declared capabilities may be verified")
+    agent.verified_capabilities = body.capabilities
+    emit(db, actor, "agent.capabilities_verified", agent.id, payload={"capabilities": body.capabilities})
+    db.commit()
+    return {"id": agent.id, "verified_capabilities": agent.verified_capabilities}
+
+
+@router.post("/agents/{agent_id}/runtimes", status_code=201)
+def register_runtime(agent_id: str, body: RuntimeIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    owner_only(actor)
+    agent = db.get(Agent, agent_id)
+    if agent is None or not agent.enabled:
+        raise HTTPException(404, "Agent not available")
+    existing = db.scalar(select(AgentRuntime.id).where(AgentRuntime.agent_id == agent_id, AgentRuntime.label == body.label))
+    if existing:
+        raise Conflict("Runtime label already registered")
+    runtime = AgentRuntime(agent_id=agent_id, label=body.label, environment=body.environment)
+    db.add(runtime)
+    db.flush()
+    emit(db, actor, "agent.runtime_registered", runtime.id, payload={"agent_id": agent_id})
+    db.commit()
+    return as_dict(runtime, "id", "agent_id", "label", "environment", "enabled", "status", "last_seen")
+
+
+@router.get("/agents/{agent_id}/runtimes")
+def list_runtimes(agent_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    owner_only(actor)
+    if db.get(Agent, agent_id) is None:
+        raise HTTPException(404, "Agent not found")
+    cutoff = now() - timedelta(seconds=180)
+    result = []
+    for r in db.scalars(select(AgentRuntime).where(AgentRuntime.agent_id == agent_id)):
+        last_seen = r.last_seen
+        if last_seen is not None and last_seen.tzinfo is None:
+            last_seen = last_seen.replace(tzinfo=timezone.utc)
+        record = as_dict(r, "id", "agent_id", "label", "environment", "enabled", "status", "last_seen")
+        record["online"] = bool(r.enabled and last_seen and last_seen >= cutoff and r.status in {"idle", "busy"})
+        result.append(record)
+    return result
+
+
+@router.post("/agent/runtimes/{runtime_id}/heartbeat")
+def runtime_heartbeat(runtime_id: str, body: RuntimeHeartbeat, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    if actor.is_owner:
+        raise HTTPException(403, "Agent credential required")
+    runtime = db.scalar(select(AgentRuntime).where(AgentRuntime.id == runtime_id, AgentRuntime.agent_id == actor.id).with_for_update())
+    if runtime is None or not runtime.enabled:
+        raise HTTPException(404, "Runtime not found")
+    runtime.status = body.status
+    runtime.last_seen = now()
+    # Frequent self-reported status updates are deliberately not entered into the durable outbox.
+    db.commit()
+    return {"id": runtime.id, "status": runtime.status, "last_seen": runtime.last_seen}
+
+
+@router.post("/agents/{agent_id}/runtimes/{runtime_id}/disable")
+def disable_runtime(agent_id: str, runtime_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    owner_only(actor)
+    runtime = db.scalar(select(AgentRuntime).where(AgentRuntime.id == runtime_id, AgentRuntime.agent_id == agent_id).with_for_update())
+    if runtime is None:
+        raise HTTPException(404, "Runtime not found")
+    runtime.enabled = False
+    emit(db, actor, "agent.runtime_disabled", runtime.id, payload={"agent_id": agent_id})
+    db.commit()
+    return {"id": runtime.id, "enabled": False}
+
+
+@router.post("/projects/{project_id}/schedule")
+def schedule_project(project_id: str, body: ScheduleIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    """Route eligible work only; no external process is launched or falsely marked running."""
+    owner_only(actor)
+    result = choose_dispatch_targets(db, project_id, actor, body.limit, body.heartbeat_ttl_seconds)
+    db.commit()
+    return {"project_id": project_id, "routes": result, "count": len(result)}
 
 
 @router.post("/agents/{agent_id}/disable")
@@ -209,7 +325,7 @@ def create_task(project_id: str, body: TaskIn, actor: Actor = Depends(authentica
             raise HTTPException(422, "All dependencies must belong to this project")
     task = Task(project_id=project_id, goal_id=body.goal_id, title=body.title,
                 instruction=body.instruction, acceptance=body.acceptance,
-                priority=body.priority, risk=body.risk)
+                priority=body.priority, risk=body.risk, required_capabilities=body.required_capabilities)
     db.add(task)
     db.flush()
     for predecessor_id in predecessor_ids:
@@ -217,13 +333,13 @@ def create_task(project_id: str, body: TaskIn, actor: Actor = Depends(authentica
     db.flush()
     task.status = task_ready_status(db, task)
     emit(db, actor, "task.created", task.id, project_id,
-         {"risk": task.risk, "dependency_ids": predecessor_ids, "priority": task.priority})
+         {"risk": task.risk, "dependency_ids": predecessor_ids, "priority": task.priority, "required_capabilities": task.required_capabilities})
     db.commit()
     return task_public(task)
 
 
 def task_public(t: Task) -> dict:
-    return as_dict(t, "id", "project_id", "goal_id", "title", "instruction", "acceptance", "risk", "status", "assigned_agent_id", "lease_epoch", "lease_until", "version", "result_summary", "priority", "target_agent_id", "approval_granted")
+    return as_dict(t, "id", "project_id", "goal_id", "title", "instruction", "acceptance", "risk", "status", "assigned_agent_id", "lease_epoch", "lease_until", "version", "result_summary", "priority", "target_agent_id", "approval_granted", "required_capabilities")
 
 
 @router.get("/projects/{project_id}/tasks")
@@ -287,6 +403,9 @@ def target_task(task_id: str, body: TargetIn, actor: Actor = Depends(authenticat
             Membership.role.in_(["worker", "manager", "reviewer"]), Agent.enabled.is_(True)))
         if member is None:
             raise HTTPException(422, "Target must be an enabled project worker")
+        agent = db.get(Agent, body.agent_id)
+        if not set(row.required_capabilities).issubset(set(agent.verified_capabilities)):
+            raise HTTPException(422, "Target lacks verified task capabilities")
     row.target_agent_id = body.agent_id
     row.version += 1
     emit(db, actor, "task.routed", row.id, row.project_id, {"target_agent_id": body.agent_id})

@@ -89,7 +89,8 @@ def execute_command(command: list[str], packet: dict, timeout_seconds: int,
 
 class Runner:
     def __init__(self, server: str, token: str, command: list[str], timeout: int = 600,
-                 allow_r3: bool = False, pass_env: tuple[str, ...] = ()):
+                 allow_r3: bool = False, pass_env: tuple[str, ...] = (),
+                 runtime_id: str | None = None):
         if not token.startswith("on_agent_"):
             raise RunnerFailure("OTTERNEST_AGENT_TOKEN required (not the owner token)")
         if not server.startswith("https://") and not (server.startswith("http://127.0.0.1:") or server.startswith("http://localhost:")):
@@ -102,13 +103,20 @@ class Runner:
         self.timeout = timeout
         self.allow_r3 = allow_r3
         self.pass_env = pass_env
+        self.runtime_id = runtime_id
 
     def api(self, method: str, path: str, payload=None):
         response = self.client.request(method, "/api/v1" + path, json=payload)
         response.raise_for_status()
         return response.json()
 
+    def runtime_heartbeat(self, status: str = "idle") -> None:
+        """Opt-in heartbeat for a pre-registered runtime (self-reported status)."""
+        if self.runtime_id:
+            self.api("POST", f"/agent/runtimes/{self.runtime_id}/heartbeat", {"status": status})
+
     def run_one(self) -> bool:
+        self.runtime_heartbeat("idle")
         queue = self.api("GET", "/agent/queue")
         for item in queue:
             if item["risk"] == "R3" and not self.allow_r3:
@@ -122,9 +130,11 @@ class Runner:
                 raise
             epoch = claim["lease_epoch"]
             try:
+                self.runtime_heartbeat("busy")
                 packet = self.api("GET", f"/tasks/{task_id}/context")
                 def heartbeat():
                     self.api("POST", f"/tasks/{task_id}/heartbeat", {"epoch": epoch})
+                    self.runtime_heartbeat("busy")
                 summary = execute_command(self.command, packet, self.timeout, heartbeat, self.pass_env)
             except Exception as exc:
                 # Don't leak stderr, environment or traceback into an Agent-visible
@@ -135,9 +145,14 @@ class Runner:
                 except httpx.HTTPError:
                     pass  # lease may have been revoked; no unsafe overwrite
                 print(f"Task failed: {task_id}: {description}", file=sys.stderr)
+                try:
+                    self.runtime_heartbeat("idle")
+                except httpx.HTTPError:
+                    pass
                 return True
             self.api("POST", f"/tasks/{task_id}/submit", {"epoch": epoch, "summary": summary})
             print(f"Task submitted for review: {task_id}")
+            self.runtime_heartbeat("idle")
             return True
         return False
 
@@ -150,6 +165,8 @@ def main():
     parser.add_argument("--server", required=True)
     parser.add_argument("--once", action="store_true", help="Process at most one task and exit")
     parser.add_argument("--interval", type=int, default=15)
+    parser.add_argument("--runtime-id", default=os.environ.get("OTTERNEST_RUNTIME_ID", ""),
+                        help="Pre-registered Agent runtime ID for periodic heartbeat")
     parser.add_argument("--timeout", type=int, default=600)
     parser.add_argument("--allow-r3", action="store_true", help="Explicitly allow owner-authorized high-risk tasks")
     parser.add_argument("--pass-env", action="append", default=[], help="Explicitly expose one environment variable to the child")
@@ -160,14 +177,22 @@ def main():
         parser.error("--interval must be positive")
     try:
         runner = Runner(args.server, os.environ.get("OTTERNEST_AGENT_TOKEN", ""), command,
-                        timeout=args.timeout, allow_r3=args.allow_r3, pass_env=tuple(args.pass_env))
+                        timeout=args.timeout, allow_r3=args.allow_r3, pass_env=tuple(args.pass_env),
+                        runtime_id=args.runtime_id or None)
         try:
             while True:
                 worked = runner.run_one()
                 if args.once:
                     break
                 if not worked:
-                    time.sleep(args.interval)
+                    # Ensure liveness remains fresh even with long idle poll intervals.
+                    remaining = args.interval
+                    while remaining > 0:
+                        delay = min(remaining, 60)
+                        time.sleep(delay)
+                        remaining -= delay
+                        if remaining > 0:
+                            runner.runtime_heartbeat("idle")
         finally:
             runner.close()
     except (RunnerFailure, httpx.HTTPError) as exc:

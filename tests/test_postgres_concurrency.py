@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from otternest.models import Agent, Membership, Project, Task
@@ -56,4 +56,52 @@ def test_postgres_two_agent_claims_only_one_wins():
         assert persisted.status == "running"
         assert persisted.lease_epoch == 1
         assert persisted.assigned_agent_id in actor_ids
+    engine.dispose()
+
+
+@pytest.mark.skipif(not os.getenv("OTTERNEST_PG_TEST_URL"), reason="PostgreSQL integration URL not provided")
+def test_postgres_concurrent_schedulers_do_not_double_reserve():
+    """Project row lock serializes two schedulers; a worker has one outstanding slot."""
+    import secrets
+    from otternest.models import AgentRuntime, now
+    from otternest.services import choose_dispatch_targets
+    url = os.environ["OTTERNEST_PG_TEST_URL"]
+    if not url.startswith("postgresql+"):
+        pytest.fail("PostgreSQL required")
+    engine = create_engine(url, pool_pre_ping=True)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as db:
+        p = Project(name="Scheduler concurrency")
+        a = Agent(name="Scheduler worker", platform="test", execution_mode="polling",
+                  token_hash=secrets.token_hex(32), declared_capabilities=["python"],
+                  verified_capabilities=["python"])
+        db.add_all([p, a])
+        db.flush()
+        db.add(Membership(project_id=p.id, agent_id=a.id, role="worker"))
+        db.add(AgentRuntime(agent_id=a.id, label="live-runner", environment="ci",
+                            enabled=True, status="idle", last_seen=now()))
+        t1 = Task(project_id=p.id, title="Priority 1", instruction="run", acceptance="done",
+                  priority=90, required_capabilities=["python"])
+        t2 = Task(project_id=p.id, title="Priority 2", instruction="run", acceptance="done",
+                  priority=80, required_capabilities=["python"])
+        db.add_all([t1, t2])
+        db.commit()
+        project_id, task_ids, agent_id = p.id, (t1.id, t2.id), a.id
+
+    barrier = Barrier(2)
+
+    def route(_):
+        with factory() as db:
+            barrier.wait(timeout=10)
+            results = choose_dispatch_targets(db, project_id, Actor("owner", "scheduler"), limit=2)
+            db.commit()
+            return results
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(route, range(2)))
+    assert sum(map(len, results)) == 1
+    with factory() as db:
+        reserved = db.scalars(select(Task).where(Task.id.in_(task_ids), Task.target_agent_id == agent_id)).all()
+        assert len(reserved) == 1
+        assert reserved[0].id == task_ids[0]
     engine.dispose()

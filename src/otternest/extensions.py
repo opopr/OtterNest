@@ -38,17 +38,23 @@ def agent_queue(limit: int = 20, actor: Actor = Depends(authenticate), db: Sessi
         Membership.agent_id == actor.id,
         Membership.role.in_(["worker", "manager", "reviewer"]),
     )
-    tasks = db.scalars(
+    candidates = db.scalars(
         select(Task)
         .join(Project, Task.project_id == Project.id)
         .where(Task.status == "ready", Project.status == "active", Task.project_id.in_(authorized))
         .where((Task.target_agent_id.is_(None)) | (Task.target_agent_id == actor.id))
         .order_by(Task.priority.desc(), Task.created_at, Task.id)
-        .limit(limit)
-    ).all()
+    ).yield_per(100)
+    verified = set(db.get(Agent, actor.id).verified_capabilities)
+    tasks = []
+    for task in candidates:
+        if set(task.required_capabilities).issubset(verified):
+            tasks.append(task)
+            if len(tasks) >= limit:
+                break
     return [{"id": t.id, "project_id": t.project_id, "goal_id": t.goal_id,
              "title": t.title, "instruction": t.instruction, "acceptance": t.acceptance,
-             "risk": t.risk, "version": t.version, "priority": t.priority} for t in tasks]
+             "risk": t.risk, "version": t.version, "priority": t.priority, "required_capabilities": t.required_capabilities} for t in tasks]
 
 
 @router.get("/tasks/{task_id}/context")
