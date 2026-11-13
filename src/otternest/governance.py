@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .db import get_session
-from .models import (A2ADelegation, Agent, CommandPlan, Decision, DecisionReview,
+from .models import (A2ADelegation, Agent, CommandPlan, Decision, DecisionReview, DecisionDeliberation, DecisionRebuttal,
                      Membership, Project, Task, now)
 from .security import Actor, authenticate, owner_only
 from .services import (Conflict, emit, release_dependents, require_project,
@@ -215,6 +215,8 @@ def add_decision_review(decision_id: str, body: ReviewDraft,
                     roles=("worker", "reviewer", "manager", "advisor"))
     if decision.status != "proposed":
         raise Conflict("Decision is already resolved")
+    if db.get(DecisionDeliberation, decision.id) is not None:
+        raise Conflict("Independent review round is closed; no late entries")
     if any(not e.strip() or len(e) > 500 for e in body.evidence):
         raise HTTPException(422, "Invalid evidence reference")
     if db.scalar(select(DecisionReview.id).where(
@@ -236,8 +238,12 @@ def get_decision_reviews(decision_id: str, actor: Actor = Depends(authenticate),
                          db: Session = Depends(get_session)):
     decision = _decision(db, decision_id, actor)
     if not actor.is_owner and decision.status != "approved":
-        # Prevent anchoring while reviews are still being collected.
-        raise HTTPException(403, "Reviews remain blind until the owner resolves the decision")
+        state = db.get(DecisionDeliberation, decision.id)
+        participant = db.scalar(select(DecisionReview.id).where(
+            DecisionReview.decision_id == decision.id,
+            DecisionReview.agent_id == actor.id))
+        if state is None or participant is None:
+            raise HTTPException(403, "First round remains blind until round two or approval")
     reviews = db.scalars(select(DecisionReview).where(DecisionReview.decision_id == decision.id)
                          .order_by(DecisionReview.created_at, DecisionReview.id)).all()
     return [_review_public(r) for r in reviews]
@@ -250,15 +256,22 @@ def resolve_decision(decision_id: str, body: ResolutionDraft,
     decision = _decision(db, decision_id, actor, lock=True)
     if decision.status != "proposed":
         raise Conflict("Decision is no longer proposed")
+    round2 = db.get(DecisionDeliberation, decision.id)
+    if round2 is not None and round2.status != "closed":
+        raise Conflict("Second round must be closed before resolution")
     dissent = db.scalars(select(DecisionReview.id).where(
         DecisionReview.decision_id == decision.id,
         DecisionReview.stance.in_(("oppose", "alternative")))).all()
-    if dissent and len(body.owner_note.strip()) < 10:
+    rebuttal_dissent = db.scalars(select(DecisionRebuttal.id).where(
+        DecisionRebuttal.decision_id == decision.id,
+        DecisionRebuttal.stance.in_(("oppose", "alternative")))).all()
+    dissent_count = len(dissent) + len(rebuttal_dissent)
+    if dissent_count and len(body.owner_note.strip()) < 10:
         raise Conflict("Independent dissent requires a substantive owner resolution note")
     decision.status = "approved"
     decision.owner_review_note = body.owner_note.strip()
     emit(db, actor, "decision.approved", decision.id, decision.project_id,
-         {"dissent_count": len(dissent), "resolution_note": bool(decision.owner_review_note)})
+         {"dissent_count": dissent_count, "resolution_note": bool(decision.owner_review_note)})
     db.commit()
     return {"id": decision.id, "status": decision.status,
-            "dissent_count": len(dissent), "owner_review_note": decision.owner_review_note}
+            "dissent_count": dissent_count, "owner_review_note": decision.owner_review_note}
