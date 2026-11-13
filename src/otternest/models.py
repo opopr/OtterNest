@@ -285,6 +285,15 @@ class DecisionReview(Base):
     __table_args__ = (UniqueConstraint("decision_id", "agent_id", name="uq_decision_review_agent"),)
 
 
+class DecisionAutoPolicy(Base):
+    """Explicit owner-approved reviewer quorum; never authorizes decision approval."""
+    __tablename__ = "decision_auto_policies"
+    decision_id: Mapped[str] = mapped_column(ForeignKey("decisions.id"), primary_key=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    reviewer_ids: Mapped[list] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+
+
 class DecisionDeliberation(Base):
     """At most one explicitly opened second round for each decision."""
     __tablename__ = "decision_deliberations"

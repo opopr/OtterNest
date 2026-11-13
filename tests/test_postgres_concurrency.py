@@ -311,3 +311,51 @@ def test_postgres_one_rebuttal_per_agent_under_concurrent_requests():
         assert len(db.scalars(select(DecisionRebuttal).where(
             DecisionRebuttal.decision_id==did)).all())==1
     engine.dispose()
+
+
+
+@pytest.mark.skipif(not os.getenv("OTTERNEST_PG_TEST_URL"), reason="PostgreSQL integration URL not provided")
+def test_postgres_auto_deliberation_starts_once_after_invited_reviewers_finish():
+    """Decision-row locking keeps concurrent final first-round reviews single-shot."""
+    from uuid import uuid4
+    from otternest.governance import ReviewDraft, add_decision_review
+    from otternest.models import Decision, DecisionAutoPolicy, DecisionDeliberation, DecisionReview, Event
+
+    engine = create_engine(os.environ["OTTERNEST_PG_TEST_URL"], pool_pre_ping=True)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as db:
+        p = Project(name="Automatic round concurrency")
+        a1 = Agent(name="Independent A", platform="test", token_hash=uuid4().hex * 2)
+        a2 = Agent(name="Independent B", platform="test", token_hash=uuid4().hex * 2)
+        db.add_all([p, a1, a2])
+        db.flush()
+        d = Decision(project_id=p.id, question="Review?", resolution="A", rationale="Initial analysis")
+        db.add(d)
+        db.add_all([Membership(project_id=p.id, agent_id=a1.id, role="reviewer"),
+                    Membership(project_id=p.id, agent_id=a2.id, role="reviewer")])
+        db.flush()
+        db.add(DecisionAutoPolicy(decision_id=d.id, project_id=p.id, reviewer_ids=[a1.id, a2.id]))
+        db.commit()
+        decision_id = d.id
+        actors = [a1.id, a2.id]
+    barrier = Barrier(2)
+
+    def submit(agent_id):
+        with factory() as db:
+            barrier.wait(timeout=10)
+            row = add_decision_review(decision_id, ReviewDraft(
+                stance="oppose" if agent_id == actors[0] else "support",
+                reasoning="Independent evidence recommends a careful review."),
+                Actor("agent", agent_id), db)
+            return row["id"]
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(submit, actors))
+    assert len(set(results)) == 2
+    with factory() as db:
+        assert len(db.scalars(select(DecisionReview).where(DecisionReview.decision_id == decision_id)).all()) == 2
+        assert db.get(DecisionDeliberation, decision_id) is not None
+        events = db.scalars(select(Event).where(Event.subject_id == decision_id,
+                                                 Event.kind == "decision.second_round_opened")).all()
+        assert len(events) == 1
+    engine.dispose()

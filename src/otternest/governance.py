@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .db import get_session
-from .models import (A2ADelegation, Agent, CommandPlan, Decision, DecisionReview, DecisionDeliberation, DecisionRebuttal,
+from .models import (A2ADelegation, Agent, CommandPlan, Decision, DecisionReview, DecisionDeliberation, DecisionRebuttal, DecisionAutoPolicy,
                      Membership, Project, Task, now)
 from .security import Actor, authenticate, owner_only
 from .services import (Conflict, emit, release_dependents, require_project,
@@ -198,11 +198,14 @@ def _decision(db: Session, decision_id: str, actor: Actor, *, lock: bool = False
     return decision
 
 
-def _review_public(review: DecisionReview) -> dict:
+def _review_public(review: DecisionReview, db: Session | None = None) -> dict:
+    from .evidence import inspect_references
+    checks = inspect_references(db, review.project_id, review.evidence) if db is not None else []
     return {"id": review.id, "decision_id": review.decision_id,
             "agent_id": review.agent_id, "stance": review.stance,
             "reasoning": review.reasoning, "evidence": review.evidence,
-            "created_at": review.created_at, "evidence_verified": False}
+            "evidence_checks": checks, "created_at": review.created_at,
+            "evidence_verified": False}
 
 
 @router.post("/decisions/{decision_id}/reviews", status_code=201)
@@ -217,6 +220,9 @@ def add_decision_review(decision_id: str, body: ReviewDraft,
         raise Conflict("Decision is already resolved")
     if db.get(DecisionDeliberation, decision.id) is not None:
         raise Conflict("Independent review round is closed; no late entries")
+    policy = db.get(DecisionAutoPolicy, decision.id)
+    if policy and actor.id not in policy.reviewer_ids:
+        raise HTTPException(403, "Agent was not invited to the automatic review round")
     if any(not e.strip() or len(e) > 500 for e in body.evidence):
         raise HTTPException(422, "Invalid evidence reference")
     if db.scalar(select(DecisionReview.id).where(
@@ -229,8 +235,21 @@ def add_decision_review(decision_id: str, body: ReviewDraft,
     db.flush()
     emit(db, actor, "decision.review_submitted", decision.id, decision.project_id,
          {"review_id": review.id, "stance": review.stance})
+    if policy:
+        received = db.scalars(select(DecisionReview).where(
+            DecisionReview.decision_id == decision.id)).all()
+        if {r.agent_id for r in received} == set(policy.reviewer_ids):
+            if any(r.stance != "support" for r in received):
+                session = DecisionDeliberation(decision_id=decision.id, project_id=decision.project_id)
+                db.add(session)
+                db.flush()
+                emit(db, actor, "decision.second_round_opened", decision.id, decision.project_id,
+                     {"automated": True, "invited": len(policy.reviewer_ids)})
+            else:
+                emit(db, actor, "decision.first_round_completed", decision.id,
+                     decision.project_id, {"invited": len(policy.reviewer_ids), "automated": True})
     db.commit()
-    return _review_public(review)
+    return _review_public(review, db)
 
 
 @router.get("/decisions/{decision_id}/reviews")
@@ -246,7 +265,17 @@ def get_decision_reviews(decision_id: str, actor: Actor = Depends(authenticate),
             raise HTTPException(403, "First round remains blind until round two or approval")
     reviews = db.scalars(select(DecisionReview).where(DecisionReview.decision_id == decision.id)
                          .order_by(DecisionReview.created_at, DecisionReview.id)).all()
-    return [_review_public(r) for r in reviews]
+    return [_review_public(r, db) for r in reviews]
+
+
+def require_auto_review_quorum(db: Session, decision: Decision) -> None:
+    """An owner-approved roster is a commitment: no premature final decision."""
+    policy = db.get(DecisionAutoPolicy, decision.id)
+    if policy is not None:
+        received = set(db.scalars(select(DecisionReview.agent_id).where(
+            DecisionReview.decision_id == decision.id)))
+        if received != set(policy.reviewer_ids):
+            raise Conflict("All invited first-round reviewers must respond before approval")
 
 
 @router.post("/decisions/{decision_id}/resolve")
@@ -256,6 +285,7 @@ def resolve_decision(decision_id: str, body: ResolutionDraft,
     decision = _decision(db, decision_id, actor, lock=True)
     if decision.status != "proposed":
         raise Conflict("Decision is no longer proposed")
+    require_auto_review_quorum(db, decision)
     round2 = db.get(DecisionDeliberation, decision.id)
     if round2 is not None and round2.status != "closed":
         raise Conflict("Second round must be closed before resolution")
