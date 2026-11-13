@@ -103,6 +103,19 @@ class TaskDependency(Base):
     __table_args__ = (Index("ix_task_dependencies_predecessor", "depends_on_id"),)
 
 
+class A2AInboxMessage(Base):
+    """Durable and idempotent inbound A2A message ↔ authoritative task mapping."""
+    __tablename__ = "a2a_inbox_messages"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), nullable=False, unique=True)
+    actor_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    message_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+    __table_args__ = (UniqueConstraint("project_id", "actor_id", "message_id", name="uq_a2a_message_origin"),)
+
+
 class Memory(Base):
     __tablename__ = "memories"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)

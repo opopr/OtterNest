@@ -105,3 +105,43 @@ def test_postgres_concurrent_schedulers_do_not_double_reserve():
         assert len(reserved) == 1
         assert reserved[0].id == task_ids[0]
     engine.dispose()
+
+
+@pytest.mark.skipif(not os.getenv("OTTERNEST_PG_TEST_URL"), reason="PostgreSQL integration URL not provided")
+def test_postgres_a2a_duplicate_messages_create_one_task():
+    """One messageId must never fan out into multiple tasks under concurrent sends."""
+    from otternest.a2a import send_message
+    from otternest.models import A2AInboxMessage
+    import secrets
+
+    url = os.environ["OTTERNEST_PG_TEST_URL"]
+    if not url.startswith("postgresql+"):
+        pytest.fail("PostgreSQL required")
+    engine = create_engine(url, pool_pre_ping=True)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    with factory() as db:
+        project = Project(name="A2A dedupe concurrency")
+        db.add(project)
+        db.commit()
+        project_id = project.id
+
+    params = {
+        "message": {"kind": "message", "role": "user",
+                    "messageId": secrets.token_hex(16),
+                    "parts": [{"kind": "text", "text": "Build a checked report"}]},
+        "metadata": {"projectId": project_id, "title": "Report", "risk": "R1"},
+    }
+    barrier = Barrier(2)
+
+    def send(_):
+        with factory() as db:
+            barrier.wait(timeout=10)
+            return send_message(db, Actor("owner", "owner"), params)["id"]
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        ids = list(pool.map(send, range(2)))
+    assert ids[0] == ids[1]
+    with factory() as db:
+        assert len(db.scalars(select(A2AInboxMessage).where(A2AInboxMessage.project_id == project_id)).all()) == 1
+        assert len(db.scalars(select(Task).where(Task.project_id == project_id)).all()) == 1
+    engine.dispose()
