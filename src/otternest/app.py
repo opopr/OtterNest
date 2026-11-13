@@ -13,6 +13,7 @@ from .extensions import router as extension_router
 from .webhooks import router as webhook_router
 from .a2a import router as a2a_router
 from .a2a_outbound import router as a2a_outbound_router
+from .governance import router as governance_router
 from .db import get_engine
 
 app = FastAPI(
@@ -27,6 +28,7 @@ app.include_router(extension_router)
 app.include_router(webhook_router)
 app.include_router(a2a_router)
 app.include_router(a2a_outbound_router)
+app.include_router(governance_router)
 
 
 @app.get("/health/live")

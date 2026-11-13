@@ -70,3 +70,9 @@ The `otternest-a2a-outbound --once` CLI processes explicitly authorized outbound
 A2A work. It does not discover/launch third-party cloud agents automatically.
 See [docs/15-a2a-outbound.md](15-a2a-outbound.md) for credentials, trust model,
 network restrictions, manual reconciliation and cancellation semantics.
+
+## 受控指挥中心与独立决策复核（migration 0008）
+
+新增数据库持久的命令预览/确认机制，校验任务版本、到期时间与审批边界；重复确认不会再次执行。Agent 对提议中的项目决策可独立提交证据/支持/异议；存在异议时需所有者留下明确的解决说明。Web 新增人工操作预览页面与查看决策意见。见 [docs/16-command-governance.md](16-command-governance.md)。
+
+**尚未实现**自然语言意图解析、LLM 自动协商、证据真实性核实或无人工控制的自动执行。

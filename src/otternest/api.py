@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .db import get_session
-from .models import A2ADelegation, Agent, AgentRuntime, Artifact, Decision, Event, Goal, Membership, Memory, Project, Task, TaskDependency, now
+from .models import A2ADelegation, Agent, AgentRuntime, Artifact, Decision, DecisionReview, Event, Goal, Membership, Memory, Project, Task, TaskDependency, now
 from .security import Actor, authenticate, hash_token, new_agent_token, owner_only
 from .services import Conflict, claim, dependency_ids, dependencies_completed, emit, ensure_lease, release_dependents, require_project, require_task, task_ready_status, update_dependencies, validate_goal, choose_dispatch_targets
 
@@ -590,11 +590,15 @@ def decisions(project_id: str, actor: Actor = Depends(authenticate), db: Session
 @router.post("/decisions/{decision_id}/approve")
 def approve_decision(decision_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     owner_only(actor)
-    d = db.get(Decision, decision_id)
+    # Serialize with independent review submissions and the new /resolve path.
+    d = db.scalar(select(Decision).where(Decision.id == decision_id).with_for_update())
     if not d:
         raise HTTPException(404, "Decision not found")
     if d.status != "proposed":
         raise Conflict("Decision is not proposed")
+    if db.scalar(select(DecisionReview.id).where(DecisionReview.decision_id == d.id,
+                       DecisionReview.stance.in_(("oppose", "alternative")))):
+        raise Conflict("Independent dissent requires owner resolution note; use /resolve")
     d.status = "approved"
     emit(db, actor, "decision.approved", d.id, d.project_id)
     db.commit()
