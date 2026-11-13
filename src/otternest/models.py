@@ -44,7 +44,23 @@ class Agent(Base):
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     execution_mode: Mapped[str] = mapped_column(String(24), default="manual", nullable=False)
+    declared_capabilities: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    verified_capabilities: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+
+
+class AgentRuntime(Base):
+    """One real execution instance. Heartbeats are self-reported, not remote attestation."""
+    __tablename__ = "agent_runtimes"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    agent_id: Mapped[str] = mapped_column(ForeignKey("agents.id"), nullable=False, index=True)
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    environment: Mapped[str] = mapped_column(String(160), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="unknown", nullable=False)
+    last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+    __table_args__ = (UniqueConstraint("agent_id", "label", name="uq_runtime_label"),)
 
 
 class Membership(Base):
@@ -69,6 +85,7 @@ class Task(Base):
     assigned_agent_id: Mapped[str | None] = mapped_column(ForeignKey("agents.id"), nullable=True)
     target_agent_id: Mapped[str | None] = mapped_column(ForeignKey("agents.id"), nullable=True)
     priority: Mapped[int] = mapped_column(Integer, default=50, nullable=False)
+    required_capabilities: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     approval_granted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     lease_epoch: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

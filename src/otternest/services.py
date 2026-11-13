@@ -4,10 +4,10 @@ from __future__ import annotations
 from datetime import timedelta, timezone
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .models import Agent, Audit, Event, Goal, Membership, Outbox, Project, Task, TaskDependency, now
+from .models import Agent, AgentRuntime, Audit, Event, Goal, Membership, Outbox, Project, Task, TaskDependency, now
 from .security import Actor
 
 
@@ -70,6 +70,9 @@ def claim(db: Session, task_id: str, actor: Actor, lease_seconds: int) -> Task:
     project = db.get(Project, task.project_id)
     if not project or project.status != "active":
         raise Conflict("Project is not active")
+    agent = db.get(Agent, actor.id)
+    if agent is None or not agent.enabled or not set(task.required_capabilities).issubset(set(agent.verified_capabilities)):
+        raise Conflict("Agent lacks verified capabilities")
     if task.target_agent_id and task.target_agent_id != actor.id:
         raise Conflict("Task is assigned to a different agent")
     if task.risk == "R3" and not task.approval_granted:
@@ -183,3 +186,63 @@ def release_dependents(db: Session, accepted: Task, actor: Actor) -> None:
             child.status = next_status
             child.version += 1
             emit(db, actor, "task.dependencies_satisfied", child.id, child.project_id)
+
+
+def choose_dispatch_targets(db: Session, project_id: str, actor: Actor, limit: int = 20,
+                            heartbeat_ttl_seconds: int = 180) -> list[dict]:
+    """Capacity-aware deterministic routing for live polling agents.
+
+    Uses one project row lock for consistency with other project-level DAG operations.
+    Routing != accepting/starting remote execution; the worker must still claim.
+    """
+    from datetime import timedelta
+    project = db.scalar(select(Project).where(Project.id == project_id).with_for_update())
+    if project is None:
+        raise HTTPException(404, "Project not found")
+    if project.status != "active":
+        raise Conflict("Project is not active")
+    cutoff = now() - timedelta(seconds=heartbeat_ttl_seconds)
+    members = db.execute(
+        select(Membership, Agent)
+        .join(Agent, Membership.agent_id == Agent.id)
+        .where(Membership.project_id == project_id,
+               Membership.role.in_(("worker", "manager", "reviewer")),
+               Agent.enabled.is_(True), Agent.execution_mode == "polling")
+        .order_by(Agent.id)
+    ).all()
+    candidates: dict[str, Agent] = {}
+    for member, agent in members:
+        alive = db.scalars(select(AgentRuntime).where(
+            AgentRuntime.agent_id == agent.id, AgentRuntime.enabled.is_(True),
+            AgentRuntime.status == "idle", AgentRuntime.last_seen >= cutoff
+        )).first()
+        if alive is not None:
+            candidates[agent.id] = agent
+    if not candidates:
+        return []
+    # Bound outstanding work per agent: running leases and previously reserved ready tasks.
+    loads: dict[str, int] = {}
+    for agent_id in candidates:
+        loads[agent_id] = db.scalar(select(func.count()).select_from(Task).where(
+            ((Task.assigned_agent_id == agent_id) & (Task.status == "running")) |
+            ((Task.target_agent_id == agent_id) & (Task.status == "ready"))
+        )) or 0
+    tasks = db.scalars(select(Task).where(
+        Task.project_id == project_id, Task.status == "ready", Task.target_agent_id.is_(None)
+    ).order_by(Task.priority.desc(), Task.created_at, Task.id).with_for_update().limit(limit * 10)).all()
+    routes = []
+    for task in tasks:
+        if len(routes) >= limit:
+            break
+        eligible = [agent for aid, agent in candidates.items()
+                    if loads[aid] == 0 and set(task.required_capabilities).issubset(set(agent.verified_capabilities))]
+        if not eligible:
+            continue
+        chosen = min(eligible, key=lambda agent: (loads[agent.id], agent.id))
+        task.target_agent_id = chosen.id
+        task.version += 1
+        loads[chosen.id] += 1
+        emit(db, actor, "task.routed", task.id, task.project_id,
+             {"target_agent_id": chosen.id, "method": "live_verified_scheduler"})
+        routes.append({"task_id": task.id, "agent_id": chosen.id})
+    return routes
