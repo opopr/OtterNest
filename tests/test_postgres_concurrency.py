@@ -182,8 +182,17 @@ def test_postgres_concurrent_a2a_dispatchers_send_only_one_request(monkeypatch):
         delegation_id, task_id, endpoint_id = delegation.id, task.id, endpoint.id
     monkeypatch.setenv("OTTERNEST_A2A_ALLOWED_HOSTS", "a2a-peer.example.org")
     monkeypatch.setenv(token_env_name(endpoint_id), "valid-example-external-token-123")
-    monkeypatch.setattr("otternest.a2a_outbound.socket.getaddrinfo",
-                        lambda *a, **kw: [(None, None, None, None, ("93.184.215.14", 443))])
+    # socket is shared globally: mock ONLY the external peer's lookup.
+    # psycopg must continue to resolve localhost to the CI PostgreSQL service.
+    import socket
+    original_getaddrinfo = socket.getaddrinfo
+
+    def resolve(host, *args, **kwargs):
+        if host == "a2a-peer.example.org":
+            return [(None, None, None, None, ("93.184.215.14", 443))]
+        return original_getaddrinfo(host, *args, **kwargs)
+
+    monkeypatch.setattr("otternest.a2a_outbound.socket.getaddrinfo", resolve)
     barrier = Barrier(2)
     calls = []
     guard = Lock()
