@@ -317,3 +317,83 @@ class DecisionRebuttal(Base):
     evidence: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
     __table_args__ = (UniqueConstraint("decision_id", "agent_id", name="uq_decision_rebuttal_agent"),)
+
+
+class ProjectCharter(Base):
+    """Owner-governed project scope, stop conditions, and hard task/concurrency budgets."""
+    __tablename__ = "project_charters"
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), primary_key=True)
+    scope_boundary: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    stop_conditions: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    max_concurrent_tasks: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
+    max_total_tasks: Mapped[int] = mapped_column(Integer, default=200, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+
+
+class TaskCheckpoint(Base):
+    """Epoch-fenced work checkpoint; owner_verified status is separated from agent self-report."""
+    __tablename__ = "task_checkpoints"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), nullable=False, index=True)
+    agent_id: Mapped[str] = mapped_column(ForeignKey("agents.id"), nullable=False)
+    lease_epoch: Mapped[int] = mapped_column(Integer, nullable=False)
+    step_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    next_steps: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    artifact_ids: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    verification_status: Mapped[str] = mapped_column(String(24), default="self_reported", nullable=False)
+    owner_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    __table_args__ = (UniqueConstraint("task_id", "lease_epoch", "step_number", name="uq_task_checkpoint_epoch_step"),)
+
+
+class TaskSideEffect(Base):
+    """Idempotency and reconciliation ledger for external task side effects."""
+    __tablename__ = "task_side_effects"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), nullable=False, index=True)
+    agent_id: Mapped[str] = mapped_column(ForeignKey("agents.id"), nullable=False)
+    lease_epoch: Mapped[int] = mapped_column(Integer, nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    target_system: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False)
+    evidence_summary: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    owner_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+    __table_args__ = (UniqueConstraint("task_id", "idempotency_key", name="uq_task_side_effect_key"),)
+
+
+class SkillEvaluation(Base):
+    """Structured skill evaluation record; never self-authorizes root policy changes."""
+    __tablename__ = "skill_evaluations"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    skill_id: Mapped[str] = mapped_column(ForeignKey("skills.id"), nullable=False, index=True)
+    actor_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    actor_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    verdict: Mapped[str] = mapped_column(String(24), nullable=False)
+    notes: Mapped[str] = mapped_column(Text, nullable=False)
+    task_id: Mapped[str | None] = mapped_column(ForeignKey("tasks.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+
+
+class CrossProjectShare(Base):
+    """Owner-approved promotion of published knowledge/skills without opening source project ACLs."""
+    __tablename__ = "cross_project_shares"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    source_project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    target_project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    item_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    source_item_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    promoted_item_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    proposed_by: Mapped[str] = mapped_column(String(100), nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="proposed", nullable=False)
+    owner_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -33,7 +33,7 @@
 
 ## 使用正式 MCP SDK
 
-本版本采用 **Agent 侧 stdio** MCP 桥接，旨在让可运行 MCP Client 的 Agent 访问 OtterNest 已授权的业务工具，不是 Oracle 上面的公众匿名 MCP 服务。
+本版本采用 **Agent 侧 stdio** MCP 桥接，旨在让可运行 MCP Client 的 Agent 访问 OtterNest 已授权的业务工具，不是暴露在公网上的公众匿名 MCP 服务。
 
 安装可选依赖：
 

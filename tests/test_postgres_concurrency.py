@@ -359,3 +359,135 @@ def test_postgres_auto_deliberation_starts_once_after_invited_reviewers_finish()
                                                  Event.kind == "decision.second_round_opened")).all()
         assert len(events) == 1
     engine.dispose()
+
+
+@pytest.mark.skipif(not os.getenv("OTTERNEST_PG_TEST_URL"), reason="PostgreSQL integration URL not provided")
+def test_postgres_project_concurrency_budget_enforced_under_race():
+    """Project row lock prevents two concurrent claims on separate tasks from exceeding max_concurrent_tasks."""
+    from uuid import uuid4
+    from otternest.models import ProjectCharter
+
+    url = os.environ["OTTERNEST_PG_TEST_URL"]
+    if not url.startswith("postgresql+"):
+        pytest.fail("PostgreSQL required")
+    engine = create_engine(url, pool_pre_ping=True)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as db:
+        p = Project(name="Charter concurrency cap")
+        a1 = Agent(name="Cap A", platform="test", token_hash=uuid4().hex * 2)
+        a2 = Agent(name="Cap B", platform="test", token_hash=uuid4().hex * 2)
+        db.add_all([p, a1, a2])
+        db.flush()
+        db.add(ProjectCharter(project_id=p.id, max_concurrent_tasks=1, max_total_tasks=10))
+        db.add_all([
+            Membership(project_id=p.id, agent_id=a1.id, role="worker"),
+            Membership(project_id=p.id, agent_id=a2.id, role="worker"),
+        ])
+        t1 = Task(project_id=p.id, title="Task 1", instruction="run", acceptance="done", risk="R1")
+        t2 = Task(project_id=p.id, title="Task 2", instruction="run", acceptance="done", risk="R1")
+        db.add_all([t1, t2])
+        db.commit()
+        project_id = p.id
+        pairs = [(t1.id, a1.id), (t2.id, a2.id)]
+
+    barrier = Barrier(2)
+
+    def attempt(pair):
+        tid, aid = pair
+        with factory() as db:
+            barrier.wait(timeout=10)
+            try:
+                claim(db, tid, Actor("agent", aid), lease_seconds=120)
+                return "claimed"
+            except Conflict:
+                db.rollback()
+                return "conflict"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(attempt, pairs))
+    assert sorted(outcomes) == ["claimed", "conflict"]
+    with factory() as db:
+        running = db.scalars(select(Task).where(Task.project_id == project_id, Task.status == "running")).all()
+        assert len(running) == 1
+    engine.dispose()
+
+
+@pytest.mark.skipif(not os.getenv("OTTERNEST_PG_TEST_URL"), reason="PostgreSQL integration URL not provided")
+def test_postgres_side_effect_idempotency_key_registered_once():
+    """Two concurrent side-effect registrations with the same idempotency_key yield one success and one Conflict."""
+    from datetime import datetime, timedelta, timezone
+    from uuid import uuid4
+
+    from otternest.lifecycle import SideEffectIn, register_side_effect
+    from otternest.models import TaskSideEffect
+
+    url = os.environ["OTTERNEST_PG_TEST_URL"]
+    if not url.startswith("postgresql+"):
+        pytest.fail("PostgreSQL required")
+    engine = create_engine(url, pool_pre_ping=True)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+
+    suffix = uuid4().hex[:8]
+    with factory() as db:
+        p = Project(name=f"PG Side Effect {suffix}", description="concurrent side effect")
+        a = Agent(
+            name=f"PGWorker-{suffix}",
+            platform="generic",
+            execution_mode="polling",
+            declared_capabilities=[],
+            verified_capabilities=[],
+            token_hash=uuid4().hex * 2,
+        )
+        db.add_all([p, a])
+        db.flush()
+        db.add(Membership(project_id=p.id, agent_id=a.id, role="worker"))
+        t = Task(
+            project_id=p.id,
+            title="Concurrent Side Effect",
+            instruction="Register idempotently",
+            acceptance="Single ledger row",
+            status="running",
+            risk="R1",
+            assigned_agent_id=a.id,
+            lease_epoch=1,
+            lease_until=datetime.now(timezone.utc) + timedelta(minutes=5),
+        )
+        db.add(t)
+        db.commit()
+        task_id = t.id
+        agent_id = a.id
+
+    barrier = Barrier(2)
+
+    def attempt(_idx: int) -> str:
+        with factory() as db:
+            barrier.wait(timeout=10)
+            try:
+                register_side_effect(
+                    task_id,
+                    SideEffectIn(
+                        epoch=1,
+                        idempotency_key="pg:concurrent:deploy",
+                        target_system="prod-api",
+                        description="Concurrent deploy",
+                    ),
+                    Actor(kind="agent", id=agent_id),
+                    db,
+                )
+                return "created"
+            except Conflict:
+                db.rollback()
+                return "conflict"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(attempt, [0, 1]))
+    assert sorted(outcomes) == ["conflict", "created"]
+    with factory() as db:
+        rows = db.scalars(
+            select(TaskSideEffect).where(
+                TaskSideEffect.task_id == task_id,
+                TaskSideEffect.idempotency_key == "pg:concurrent:deploy",
+            )
+        ).all()
+        assert len(rows) == 1
+    engine.dispose()

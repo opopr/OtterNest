@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from .db import get_session
 from .models import A2ADelegation, Agent, AgentRuntime, Artifact, Decision, DecisionReview, DecisionDeliberation, DecisionRebuttal, Event, Goal, Membership, Memory, Project, Task, TaskDependency, now
 from .security import Actor, authenticate, hash_token, new_agent_token, owner_only
-from .services import Conflict, claim, dependency_ids, dependencies_completed, emit, ensure_lease, release_dependents, require_project, require_task, task_ready_status, update_dependencies, validate_goal, choose_dispatch_targets
+from .services import Conflict, claim, dependency_ids, dependencies_completed, emit, enforce_project_task_total_budget, ensure_lease, has_unreconciled_side_effects, release_dependents, require_project, require_task, task_ready_status, update_dependencies, validate_goal, choose_dispatch_targets
 
 router = APIRouter(prefix="/api/v1")
 
@@ -316,6 +316,7 @@ def create_task(project_id: str, body: TaskIn, actor: Actor = Depends(authentica
     validate_goal(db, project_id, body.goal_id)
     # Lock the project row so concurrent owner DAG edits validate against a stable graph.
     db.scalar(select(Project).where(Project.id == project_id).with_for_update())
+    enforce_project_task_total_budget(db, project_id)
     predecessor_ids = list(dict.fromkeys(body.dependency_ids))
     if len(predecessor_ids) != len(body.dependency_ids):
         raise HTTPException(422, "Duplicate dependency IDs")
@@ -479,6 +480,8 @@ def unblock_task(task_id: str, actor: Actor = Depends(authenticate), db: Session
     delegation = db.scalar(select(A2ADelegation).where(A2ADelegation.task_id == task_id))
     if delegation is not None and delegation.status != "released":
         raise Conflict("Release the terminal A2A delegation before retrying locally")
+    if has_unreconciled_side_effects(db, task_id):
+        raise Conflict("Reconcile pending or unknown external side effects before unblocking")
     row.approval_granted = False if row.risk == "R3" else row.approval_granted
     row.status = task_ready_status(db, row)
     row.assigned_agent_id = None

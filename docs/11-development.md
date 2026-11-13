@@ -4,25 +4,25 @@
 
 OtterNest 已进入**完整产品开发**。此文件是工程状态登记，而非缩减需求的 MVP 计划。未实现项不应被标记为已完成。
 
-**技术栈**：Python 3.11+、FastAPI、SQLAlchemy、PostgreSQL、Alembic、轻量原生 Web；部署仍以 Oracle ARM 1C6G 控制平面为目标，执行平面独立。
+**技术栈**：Python 3.11+、FastAPI、SQLAlchemy、PostgreSQL、Alembic、轻量原生 Web；控制平面与执行平面解耦部署。
 
 ## 功能矩阵
 
 | 领域 | 当前实际状态 | 完整产品目标 |
 |---|---|---|
-| 项目与长期目标 | 基础 API | 目标依赖、自治契约、Portfolio |
+| 项目与长期目标 | 基础 API、项目宪章与硬预算（范围/并发/总量）、生命周期暂停/归档 | 目标依赖、自治契约、Portfolio |
 | 账号 / Agent / 运行环境 | 注册、令牌、项目成员、运行实例与心跳、能力声明/核验、待办轮询、通用 CLI Runner | 能力验证、环境探测、健康状态、Agent 生命周期 |
-| 任务执行 | 领取、租约、epoch、提交、失败阻塞、人工验收；新增依赖 DAG、优先级、定向分配、在线轮询 Agent 能力匹配与一槽位调度 | 依赖 DAG、调度、checkpoint、恢复、外部副作用防重 |
-| 数据与记忆 | 记忆提案/发布、决策提案/批准、授权上下文包 | Context Broker、证据、修订、检索与知识推广 |
-| 权限与审批 | 单所有者、Agent 项目隔离、R3 任务门禁 | RBAC/ABAC 细粒度策略、临时能力、Secrets 管理 |
+| 任务执行 | 领取、租约、epoch、提交、失败阻塞、人工验收；依赖 DAG、优先级、定向分配、调度；epoch 检查点/核验、租约撤回与交接包 | 依赖 DAG、调度、checkpoint、恢复、外部副作用防重 |
+| 数据与记忆 | 记忆提案/发布/修订/归档、受审跨项目知识推广、可携带无密文项目导出、授权上下文包与内部证据检查 | 自动检索排序与全量导入还原 |
+| 权限与审批 | 单所有者、Agent 项目隔离、R3 任务门禁、版本化 CommandPlan 预览确认、受限中文模板/可选模型建议 | RBAC/ABAC 细粒度策略、临时能力、Secrets 管理 |
 | 成果 | 受限上传、SHA-256、元信息 | 不可变版本、审查、备份与 GC |
 | 事件 | 持久 Event + Outbox、SSE、签名 Webhook 及重试投递 | 工作流订阅规则、外部事件回调和完整恢复 |
-| MCP / A2A | MCP 标准 SDK stdio 桥接与受控 Agent 工具已编码；A2A 未实现，SDK 运行测试需 CI 验证 | 完整 MCP/A2A 互操作与能力协商 |
+| MCP / A2A | MCP 标准 SDK stdio 桥接（15 个工具）；A2A v0.3 入站网关与受控出站委托 | 完整 MCP/A2A 互操作与能力协商 |
 | OpenAPI | FastAPI 自动文档 | 版本兼容、规范校验与 SDK 示例 |
-| Skills / AG-UI / A2UI / WS | Skills 版本提案/发布已实现，AG-UI/A2UI/WS 未实现 | 安全可插拔的 Skills 和 UI 事件协议 |
-| 多 Agent 协商 / 动态团队 | 未实现 | 结构化提案、独立复核、组队与预算 |
-| 自主改进 / 质量评估 | 未实现 | 实验室、回归测试、策略发布/回滚 |
-| Web 管理台 | 可操作的项目/任务/Agent/知识/事件页面 | 指挥中心、审批、权限/资源和团队可视化 |
+| Skills / AG-UI / A2UI / WS | Skills 提案/发布/评估/归档与跨项目推广已实现，AG-UI/A2UI/WS 未实现 | 安全可插拔的 Skills 生命周期和 UI 事件协议 |
+| 多 Agent 协商 / 动态团队 | 第一/二轮独立决策复核、异议记录、显式受邀自动推进名单 | 结构化提案、独立复核、组队与预算 |
+| 自主改进 / 质量评估 | Skill 结构化评估记录（pass/fail/concern）与归档已实现；自动实验闭环未实现 | 实验室、回归测试、策略发布/回滚 |
+| Web 管理台 | 项目简报/宪章、导出包、操作预览、任务/检查点/副作用/交接、Agent/环境、知识/Skill 生命周期与跨项目审批、事件页面 | 指挥中心、审批、权限/资源和团队可视化 |
 | 备份 / 安全运维 | 配置框架与测试 | 加密与恢复演练、事故响应、日志保留 |
 
 **注意**：本仓库早期代码可用于本地开发验证，尚未进行第三方平台接入、真实 PostgreSQL 并发压力测试或生产安全审计。不要把它部署到公网。
@@ -81,3 +81,16 @@ network restrictions, manual reconciliation and cancellation semantics.
 ## 受限中文指令与两轮协商（migration 0009）
 
 指挥中心增加严格模板中文指令的解析预览，仍由管理员二次确认并按任务版本执行，不是自由自然语言模型推理。决策可由管理员在两位以上独立 Agent 第一轮复核后开启唯一第二轮，参与者独立回应其他观点；关闭协商后仍由管理员裁决，任意一轮的异议需留实质处理说明。见 [17 · 中文指令预览与两轮协商](17-intent-and-deliberation.md)。真实 LLM 自然语言规划、自动辩论调度、证据真实性检验与第三方平台接入尚未完成。
+
+## 可选模型规划、证据检查与自动协商推进（migration 0010）
+
+增加默认关闭的 OpenAI-compatible 候选操作建议接口 `POST /api/v1/command/interpret-model`（仅生成待二次确认的 `CommandPlan` 预览）、仅限项目内部引用的证据来源检查 `POST /api/v1/decisions/{id}/evidence/inspect`（仅校验记录存在性，不核验论点真伪），以及所有者预设 2–8 名评审员后自动推进到唯一第二轮的机制（决策最终批准仍归所有者）。见 [18 · 可选模型规划、证据来源检查与自动协商](18-model-planner-evidence-auto-debate.md)。
+
+## 项目宪章硬预算、Epoch 检查点、租约撤回与简报（migration 0011）
+
+增加 `ProjectCharter`（项目范围、停止条件与并发/任务总量硬上限，强制拦截任务创建、A2A 入站建单、领取及调度）、`active`/`paused`/`archived` 项目生命周期控制（暂停仅停止控制平面新调度与领取，不虚称停止远程进程）、受 `lease_epoch` 隔离的 `TaskCheckpoint` 与所有者核验分离、`POST /api/v1/tasks/{id}/revoke-lease` 租约撤回与交接包 `GET /api/v1/tasks/{id}/handoff`（同时注入 `task_context` 与 MCP 工具），以及诚实区分有效租约与过期租约的 `GET /api/v1/projects/{id}/briefing`。见 [19 · 项目宪章硬预算、Epoch 检查点、租约撤回与运行简报](19-charter-checkpoints-handoff.md)。
+
+## 外部副作用幂等、知识生命周期与可携带导出（migration 0012）
+
+增加 `TaskSideEffect` 不可回滚外部动作幂等台账（按 `(task_id, idempotency_key)` 防重、`reported_executed`/`unknown` 自述上报、阻断未对账任务的 `claim`/`unblock`，仅所有者 `reconcile` 核对 `verified_executed` 或 `verified_not_executed` 并在 MCP 桥接提供 2 个工具使总数达 15 个）、`Memory` 修订升级/归档（归档后自动退出上下文与非所有者列表）、`SkillEvaluation` 结构化评估与 `Skill` 归档、`CrossProjectShare` 双项目成员校验与所有者审批克隆（附来源溯源标记，拒绝时零污染），以及不含凭证的规范化 `GET /api/v1/projects/{id}/export`（`otternest.export.v1` + `sha256_digest`）。见 [20 · 外部副作用幂等、知识生命周期与可携带导出](20-side-effects-knowledge-portability.md)。
+

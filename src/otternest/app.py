@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from . import models  # noqa: F401 - load ORM models for schema registry
@@ -18,6 +19,8 @@ from .intent import router as intent_router
 from .model_planner import router as model_planner_router
 from .evidence import router as evidence_router
 from .deliberation import router as deliberation_router
+from .continuity import router as continuity_router
+from .lifecycle import router as lifecycle_router
 from .db import get_engine
 
 app = FastAPI(
@@ -37,6 +40,8 @@ app.include_router(intent_router)
 app.include_router(model_planner_router)
 app.include_router(evidence_router)
 app.include_router(deliberation_router)
+app.include_router(continuity_router)
+app.include_router(lifecycle_router)
 
 
 @app.get("/health/live")
@@ -57,3 +62,8 @@ def ready():
 @app.get("/", include_in_schema=False)
 def home():
     return FileResponse(Path(__file__).with_name("index.html"), media_type="text/html")
+
+
+_assets_dir = Path(__file__).with_name("assets")
+if _assets_dir.is_dir():
+    app.mount("/assets", StaticFiles(directory=_assets_dir), name="assets")

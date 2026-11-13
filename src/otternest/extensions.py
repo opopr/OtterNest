@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .db import get_engine, get_session
-from .models import Agent, Decision, Event, Goal, Membership, Memory, Project, Skill, Task, now
+from .models import Agent, Decision, Event, Goal, Membership, Memory, Project, Skill, Task, TaskCheckpoint, now
 from .security import Actor, actor_from_token, authenticate, owner_only
 from .services import Conflict, emit, ensure_lease, require_project, require_task
 
@@ -72,6 +72,15 @@ def task_context(task_id: str, actor: Actor = Depends(authenticate), db: Session
         select(Decision).where(Decision.project_id == task.project_id, Decision.status == "approved")
         .limit(10)
     ).all()
+    latest_verified_cp = db.scalar(
+        select(TaskCheckpoint)
+        .where(TaskCheckpoint.task_id == task.id, TaskCheckpoint.verification_status == "owner_verified")
+        .order_by(
+            TaskCheckpoint.lease_epoch.desc(),
+            TaskCheckpoint.step_number.desc(),
+            TaskCheckpoint.created_at.desc(),
+        )
+    )
     # Bound total context to reduce accidental disclosure/cost. Source text is
     # evidence, not a trusted instruction stream.
     budget = 18000
@@ -91,6 +100,17 @@ def task_context(task_id: str, actor: Actor = Depends(authenticate), db: Session
                  "lease_epoch": task.lease_epoch},
         "goal": None if not goal else {"id": goal.id, "title": goal.title,
                                          "success_criteria": goal.success_criteria},
+        "latest_verified_checkpoint": None if not latest_verified_cp else {
+            "id": latest_verified_cp.id,
+            "lease_epoch": latest_verified_cp.lease_epoch,
+            "step_number": latest_verified_cp.step_number,
+            "summary": latest_verified_cp.summary,
+            "next_steps": latest_verified_cp.next_steps,
+            "artifact_ids": latest_verified_cp.artifact_ids,
+            "verified_by_owner": True,
+            "owner_note": latest_verified_cp.owner_note,
+            "verified_at": latest_verified_cp.verified_at,
+        },
         "memories": items,
         "decisions": [{"id": d.id, "question": d.question, "resolution": d.resolution,
                        "rationale": d.rationale} for d in decisions],

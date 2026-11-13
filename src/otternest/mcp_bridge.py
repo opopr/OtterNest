@@ -101,6 +101,72 @@ class OtterNestMCPClient:
     def list_skills(self, project_id: str) -> list[dict]:
         return self._call("GET", f"/projects/{self._id(project_id)}/skills")
 
+    def record_checkpoint(
+        self,
+        task_id: str,
+        epoch: int,
+        summary: str,
+        next_steps: str = "",
+        artifact_ids: list[str] | None = None,
+    ) -> dict:
+        if not summary.strip():
+            raise MCPBridgeError("A non-empty checkpoint summary is required")
+        return self._call(
+            "POST",
+            f"/tasks/{self._id(task_id)}/checkpoints",
+            payload={
+                "epoch": epoch,
+                "summary": summary,
+                "next_steps": next_steps,
+                "artifact_ids": artifact_ids or [],
+            },
+        )
+
+    def task_handoff(self, task_id: str) -> dict:
+        return self._call("GET", f"/tasks/{self._id(task_id)}/handoff")
+
+    def register_side_effect(
+        self,
+        task_id: str,
+        epoch: int,
+        idempotency_key: str,
+        target_system: str,
+        description: str,
+    ) -> dict:
+        if not idempotency_key.strip() or not target_system.strip() or not description.strip():
+            raise MCPBridgeError("idempotency_key, target_system, and description are required")
+        return self._call(
+            "POST",
+            f"/tasks/{self._id(task_id)}/side-effects",
+            payload={
+                "epoch": epoch,
+                "idempotency_key": idempotency_key,
+                "target_system": target_system,
+                "description": description,
+            },
+        )
+
+    def report_side_effect(
+        self,
+        effect_id: str,
+        epoch: int,
+        status: str,
+        evidence_summary: str,
+    ) -> dict:
+        if status not in ("reported_executed", "unknown"):
+            raise MCPBridgeError("status must be 'reported_executed' or 'unknown'")
+        if not evidence_summary.strip():
+            raise MCPBridgeError("evidence_summary is required")
+        return self._call(
+            "POST",
+            f"/side-effects/{self._id(effect_id)}/report",
+            payload={
+                "epoch": epoch,
+                "status": status,
+                "evidence_summary": evidence_summary,
+            },
+        )
+
 
 def make_mcp_server(client: OtterNestMCPClient):
     """Register real MCP tools on the official FastMCP stdio server."""
@@ -174,6 +240,43 @@ def make_mcp_server(client: OtterNestMCPClient):
     def list_project_skills(project_id: str) -> list[dict]:
         """List approved SKILL.md instructions for an authorized project."""
         return client.list_skills(project_id)
+
+    @server.tool()
+    def record_task_checkpoint(
+        task_id: str,
+        epoch: int,
+        summary: str,
+        next_steps: str = "",
+        artifact_ids: list[str] | None = None,
+    ) -> dict:
+        """Record an epoch-fenced progress checkpoint for owner review."""
+        return client.record_checkpoint(task_id, epoch, summary, next_steps, artifact_ids)
+
+    @server.tool()
+    def get_task_handoff(task_id: str) -> dict:
+        """Fetch a task's authoritative handoff package including owner-verified checkpoints."""
+        return client.task_handoff(task_id)
+
+    @server.tool()
+    def register_task_side_effect(
+        task_id: str,
+        epoch: int,
+        idempotency_key: str,
+        target_system: str,
+        description: str,
+    ) -> dict:
+        """Register an idempotency key in OtterNest before executing an external side effect."""
+        return client.register_side_effect(task_id, epoch, idempotency_key, target_system, description)
+
+    @server.tool()
+    def report_task_side_effect(
+        effect_id: str,
+        epoch: int,
+        status: str,
+        evidence_summary: str,
+    ) -> dict:
+        """Report the observed execution outcome ('reported_executed' or 'unknown') of a registered side effect."""
+        return client.report_side_effect(effect_id, epoch, status, evidence_summary)
 
     return server
 

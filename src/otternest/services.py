@@ -7,8 +7,23 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .models import A2ADelegation, Agent, AgentRuntime, Audit, Event, Goal, Membership, Outbox, Project, Task, TaskDependency, now
+from .models import A2ADelegation, Agent, AgentRuntime, Audit, Event, Goal, Membership, Outbox, Project, ProjectCharter, Task, TaskDependency, TaskSideEffect, now
 from .security import Actor
+
+
+UNRECONCILED_SIDE_EFFECT_STATES = ("pending", "unknown")
+
+
+def has_unreconciled_side_effects(db: Session, task_id: str) -> bool:
+    """Return True while any external side effect remains pending or unknown."""
+    return bool(
+        db.scalar(
+            select(TaskSideEffect.id).where(
+                TaskSideEffect.task_id == task_id,
+                TaskSideEffect.status.in_(UNRECONCILED_SIDE_EFFECT_STATES),
+            )
+        )
+    )
 
 
 class Conflict(HTTPException):
@@ -22,6 +37,39 @@ def emit(db: Session, actor: Actor, action: str, subject: str, project_id: str |
     db.flush()
     db.add(Outbox(event_id=event.id))
     db.add(Audit(actor=f"{actor.kind}:{actor.id}", action=action, subject=subject))
+
+
+def enforce_project_task_total_budget(db: Session, project_id: str) -> None:
+    """Enforce the project charter's hard cap on non-cancelled tasks under a project lock."""
+    db.scalar(select(Project).where(Project.id == project_id).with_for_update())
+    charter = db.get(ProjectCharter, project_id)
+    if charter is None:
+        return
+    count = db.scalar(
+        select(func.count()).select_from(Task).where(
+            Task.project_id == project_id, Task.status != "cancelled"
+        )
+    ) or 0
+    if count >= charter.max_total_tasks:
+        raise Conflict("Project total task budget reached")
+
+
+def enforce_project_concurrency_budget(
+    db: Session, project_id: str, *, reclaiming_task_id: str | None = None
+) -> None:
+    """Enforce the project charter's hard cap on simultaneously running tasks."""
+    db.scalar(select(Project).where(Project.id == project_id).with_for_update())
+    charter = db.get(ProjectCharter, project_id)
+    if charter is None:
+        return
+    query = select(func.count()).select_from(Task).where(
+        Task.project_id == project_id, Task.status == "running"
+    )
+    if reclaiming_task_id is not None:
+        query = query.where(Task.id != reclaiming_task_id)
+    running = db.scalar(query) or 0
+    if running >= charter.max_concurrent_tasks:
+        raise Conflict("Project concurrent running task budget reached")
 
 
 def require_project(db: Session, project_id: str, actor: Actor, *, roles: tuple[str, ...] | None = None) -> Project:
@@ -65,6 +113,10 @@ def ensure_lease(task: Task, actor: Actor, epoch: int) -> None:
 def claim(db: Session, task_id: str, actor: Actor, lease_seconds: int) -> Task:
     if actor.is_owner:
         raise HTTPException(403, "Only agent credentials can claim")
+    # Lock the project row before the task row to stay consistent with scheduler lock ordering.
+    project_id = db.scalar(select(Task.project_id).where(Task.id == task_id))
+    if project_id is not None:
+        db.scalar(select(Project).where(Project.id == project_id).with_for_update())
     task = require_task(db, task_id, actor, lock=True)
     require_project(db, task.project_id, actor, roles=("worker", "manager", "reviewer"))
     project = db.get(Project, task.project_id)
@@ -95,6 +147,9 @@ def claim(db: Session, task_id: str, actor: Actor, lease_seconds: int) -> Task:
         # An expired lease is not proof a remote worker stopped. Epoch fences stale writes.
     elif task.status != "ready":
         raise Conflict("Task is not claimable")
+    if has_unreconciled_side_effects(db, task.id):
+        raise Conflict("Task has unreconciled external side effects; owner reconciliation required before claiming")
+    enforce_project_concurrency_budget(db, task.project_id, reclaiming_task_id=task.id)
     task.status = "running"
     task.assigned_agent_id = actor.id
     task.lease_epoch += 1
@@ -230,12 +285,22 @@ def choose_dispatch_targets(db: Session, project_id: str, actor: Actor, limit: i
             ((Task.assigned_agent_id == agent_id) & (Task.status == "running")) |
             ((Task.target_agent_id == agent_id) & (Task.status == "ready"))
         )) or 0
+    max_routes = limit
+    charter = db.get(ProjectCharter, project_id)
+    if charter is not None:
+        current_active_or_routed = db.scalar(select(func.count()).select_from(Task).where(
+            Task.project_id == project_id,
+            (Task.status == "running") | ((Task.status == "ready") & Task.target_agent_id.is_not(None)),
+        )) or 0
+        max_routes = min(limit, max(0, charter.max_concurrent_tasks - current_active_or_routed))
+    if max_routes <= 0:
+        return []
     tasks = db.scalars(select(Task).where(
         Task.project_id == project_id, Task.status == "ready", Task.target_agent_id.is_(None)
     ).order_by(Task.priority.desc(), Task.created_at, Task.id).with_for_update().limit(limit * 10)).all()
     routes = []
     for task in tasks:
-        if len(routes) >= limit:
+        if len(routes) >= max_routes:
             break
         eligible = [agent for aid, agent in candidates.items()
                     if loads[aid] == 0 and set(task.required_capabilities).issubset(set(agent.verified_capabilities))]

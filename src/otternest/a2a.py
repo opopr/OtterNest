@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from .db import get_session
 from .models import A2AInboxMessage, Project, Task
 from .security import Actor, authenticate
-from .services import emit, require_project, task_ready_status
+from .services import Conflict, emit, enforce_project_task_total_budget, require_project, task_ready_status
 
 router = APIRouter(include_in_schema=False)
 MAX_RPC_BYTES = 32 * 1024
@@ -191,6 +191,10 @@ def send_message(db: Session, actor: Actor, params: dict) -> dict:
                                    "running", "submitted", "blocked")))) or 0
         if outstanding >= 25:
             raise RPCError(-32004, "Agent outstanding A2A task limit reached")
+    try:
+        enforce_project_task_total_budget(db, project_id)
+    except Conflict:
+        raise RPCError(-32004, "Project total task budget reached") from None
     task = Task(project_id=project_id, title=title.strip(), instruction=instruction,
                 acceptance=acceptance.strip(), risk=risk)
     db.add(task)
