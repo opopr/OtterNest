@@ -2,18 +2,21 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import os
 from datetime import timedelta, timezone
 from pathlib import Path
 from typing import Literal
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .db import get_session
-from .models import A2ADelegation, Agent, AgentRuntime, Artifact, Decision, DecisionReview, DecisionDeliberation, DecisionRebuttal, Event, Goal, Membership, Memory, Project, Task, TaskDependency, now
+from .models import A2ADelegation, Agent, AgentRuntime, Artifact, Decision, DecisionReview, DecisionDeliberation, DecisionRebuttal, Event, Goal, Membership, Memory, Project, Task, TaskDependency, new_id, now
 from .security import Actor, authenticate, hash_token, new_agent_token, owner_only
 from .services import Conflict, claim, dependency_ids, dependencies_completed, emit, enforce_project_task_total_budget, ensure_lease, has_unreconciled_side_effects, release_dependents, require_project, require_task, task_ready_status, update_dependencies, validate_goal, choose_dispatch_targets
 
@@ -104,6 +107,11 @@ class ResultIn(EpochIn):
 class ReviewIn(BaseModel):
     accepted: bool
     reason: str = Field(default="", max_length=3000)
+
+
+class ArtifactReviewIn(BaseModel):
+    accepted: bool
+    note: str = Field(default="", max_length=3000)
 
 
 class MemoryIn(BaseModel):
@@ -341,6 +349,27 @@ def create_task(project_id: str, body: TaskIn, actor: Actor = Depends(authentica
 
 def task_public(t: Task) -> dict:
     return as_dict(t, "id", "project_id", "goal_id", "title", "instruction", "acceptance", "risk", "status", "assigned_agent_id", "lease_epoch", "lease_until", "version", "result_summary", "priority", "target_agent_id", "approval_granted", "required_capabilities")
+
+
+def _read_artifact_content(artifact: Artifact) -> bytes:
+    base = Path(os.environ.get("OTTERNEST_ARTIFACT_DIR", "./var/artifacts")).resolve()
+    project_root = (base / artifact.project_id).resolve()
+    try:
+        path = Path(artifact.uri).resolve(strict=True)
+        if not project_root.is_relative_to(base) or not path.is_relative_to(project_root) or not path.is_file():
+            raise HTTPException(404, "Artifact content is unavailable")
+        if path.stat().st_size > 5 * 1024 * 1024:
+            raise HTTPException(413, "Artifact exceeds the supported 5 MiB limit")
+        content = path.read_bytes()
+    except HTTPException:
+        raise
+    except (OSError, RuntimeError, ValueError):
+        raise HTTPException(410, "Artifact content is missing from local storage") from None
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(413, "Artifact exceeds the supported 5 MiB limit")
+    if not hmac.compare_digest(hashlib.sha256(content).hexdigest(), artifact.checksum):
+        raise HTTPException(409, "Artifact content checksum does not match its recorded SHA-256")
+    return content
 
 
 @router.get("/projects/{project_id}/tasks")
@@ -633,7 +662,7 @@ async def upload_artifact(task_id: str, request: Request, epoch: int | None = No
         if epoch is None:
             raise HTTPException(422, "epoch required for agent upload")
         ensure_lease(row, actor, epoch)
-    if len(filename) > 240 or not filename or any(ord(c) < 32 for c in filename):
+    if len(filename) > 240 or not filename or any(ord(c) < 32 for c in filename) or "/" in filename or "\\" in filename:
         raise HTTPException(422, "Invalid artifact filename")
     max_size = 5 * 1024 * 1024  # bounded until object storage policy is designed
     size = 0
@@ -645,7 +674,23 @@ async def upload_artifact(task_id: str, request: Request, epoch: int | None = No
         chunks.append(chunk)
     content = b"".join(chunks)
     checksum = hashlib.sha256(content).hexdigest()
-    record = Artifact(project_id=row.project_id, task_id=task_id, name=filename, checksum=checksum, uri="")
+    latest = db.scalar(
+        select(Artifact)
+        .where(Artifact.task_id == task_id, Artifact.name == filename)
+        .order_by(Artifact.version.desc(), Artifact.created_at.desc(), Artifact.id.desc())
+        .limit(1)
+        .with_for_update()
+    )
+    record = Artifact(
+        family_id=latest.family_id if latest else new_id(),
+        version=(latest.version + 1) if latest else 1,
+        project_id=row.project_id,
+        task_id=task_id,
+        name=filename,
+        checksum=checksum,
+        uri="",
+        review_status="pending",
+    )
     db.add(record)
     db.flush()
     base = Path(os.environ.get("OTTERNEST_ARTIFACT_DIR", "./var/artifacts")).resolve()
@@ -656,10 +701,58 @@ async def upload_artifact(task_id: str, request: Request, epoch: int | None = No
     record.uri = str(dest)
     emit(db, actor, "artifact.submitted", record.id, row.project_id, {"task_id": task_id, "sha256": checksum})
     db.commit()
-    return as_dict(record, "id", "project_id", "task_id", "name", "checksum")
+    return as_dict(record, "id", "family_id", "version", "project_id", "task_id", "name", "checksum", "review_status", "review_note", "reviewed_at", "created_at")
 
 
 @router.get("/tasks/{task_id}/artifacts")
 def artifacts(task_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     require_task(db, task_id, actor)
-    return [as_dict(a, "id", "name", "checksum", "created_at") for a in db.scalars(select(Artifact).where(Artifact.task_id == task_id))]
+    rows = db.scalars(
+        select(Artifact)
+        .where(Artifact.task_id == task_id)
+        .order_by(Artifact.name, Artifact.version, Artifact.created_at, Artifact.id)
+    ).all()
+    return [as_dict(a, "id", "family_id", "version", "name", "checksum", "review_status", "review_note", "reviewed_at", "created_at") for a in rows]
+
+
+@router.get("/artifacts/{artifact_id}/content")
+def download_artifact(artifact_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    artifact = db.get(Artifact, artifact_id)
+    if artifact is None:
+        raise HTTPException(404, "Artifact not found")
+    require_task(db, artifact.task_id, actor)
+    content = _read_artifact_content(artifact)
+    disposition_name = quote(artifact.name, safe="")
+    return Response(
+        content=content,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{disposition_name}"},
+    )
+
+
+@router.post("/artifacts/{artifact_id}/review")
+def review_artifact(artifact_id: str, body: ArtifactReviewIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    owner_only(actor)
+    note = body.note.strip()
+    if not body.accepted and len(note) < 5:
+        raise HTTPException(422, "A rejection note must be at least 5 characters")
+    artifact = db.scalar(select(Artifact).where(Artifact.id == artifact_id).with_for_update())
+    if artifact is None:
+        raise HTTPException(404, "Artifact not found")
+    if artifact.review_status != "pending":
+        raise Conflict("Artifact review is already final; upload a new version for changes")
+    if body.accepted:
+        _read_artifact_content(artifact)
+    artifact.review_status = "accepted" if body.accepted else "rejected"
+    artifact.review_note = note
+    artifact.reviewed_at = now()
+    emit(
+        db,
+        actor,
+        "artifact.accepted" if body.accepted else "artifact.rejected",
+        artifact.id,
+        artifact.project_id,
+        {"task_id": artifact.task_id, "family_id": artifact.family_id, "version": artifact.version},
+    )
+    db.commit()
+    return as_dict(artifact, "id", "family_id", "version", "project_id", "task_id", "name", "checksum", "review_status", "review_note", "reviewed_at", "created_at")

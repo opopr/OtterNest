@@ -4,7 +4,7 @@
 > Personal AI Team OS · Local-first ownership, distributed execution.
 
 **项目状态：完整产品开发已启动；核心控制平面的首批代码已经提交，尚未具备生产可用性。**  
-**文档基准日期：2026-11-13。**
+**文档基准日期：2026-11-14。**
 
 ## 名称与愿景
 
@@ -40,6 +40,9 @@ OtterNest 不是某一个 AI 模型，也不负责“把多个订阅额度合并
 | [08 · 质量、运维与自我优化](docs/08-assurance-operations.md) | 评估、资源预算、可观测性、回滚与备份 |
 | [09 · 架构决策记录](docs/09-decision-record.md) | 已确定决策及其边界 |
 | [10 · 待验证事项](docs/10-open-questions.md) | 真实平台可用性、部署前性能与安全验证 |
+| [11 · 正式产品开发跟踪](docs/11-development.md) | 当前实际进度与完整产品缺口 |
+| [21 · 项目包导入与恢复](docs/21-project-import-restore.md) | 无密文可携带包校验、预览、恢复与安全语义 |
+| [22 · 成果版本与验收](docs/22-artifact-lifecycle.md) | 不可变文件版本、校验下载与所有者审查 |
 
 ## 三大平面（逻辑）
 

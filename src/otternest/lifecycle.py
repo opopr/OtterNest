@@ -13,10 +13,12 @@ from sqlalchemy.orm import Session
 
 from .db import get_session
 from .models import (
+    Agent,
     Artifact,
     CrossProjectShare,
     Decision,
     DecisionRebuttal,
+    DecisionDeliberation,
     DecisionReview,
     Event,
     Goal,
@@ -597,6 +599,9 @@ def export_project_bundle(project_id: str, actor: Actor = Depends(authenticate),
         .where(DecisionRebuttal.project_id == project_id)
         .order_by(DecisionRebuttal.created_at, DecisionRebuttal.id)
     ).all()
+    decision_deliberations = db.scalars(
+        select(DecisionDeliberation).where(DecisionDeliberation.project_id == project_id).order_by(DecisionDeliberation.opened_at, DecisionDeliberation.decision_id)
+    ).all()
     skills = db.scalars(
         select(Skill).where(Skill.project_id == project_id).order_by(Skill.created_at, Skill.id)
     ).all()
@@ -617,8 +622,19 @@ def export_project_bundle(project_id: str, actor: Actor = Depends(authenticate),
         select(Artifact).where(Artifact.project_id == project_id).order_by(Artifact.created_at, Artifact.id)
     ).all()
     events = db.scalars(select(Event).where(Event.project_id == project_id).order_by(Event.id)).all()
+    agent_ids = {
+        *(m.agent_id for m in memberships),
+        *(agent_id for t in tasks for agent_id in (t.assigned_agent_id, t.target_agent_id) if agent_id),
+        *(cp.agent_id for cp in checkpoints),
+        *(effect.agent_id for effect in side_effects),
+        *(review.agent_id for review in decision_reviews),
+        *(rebuttal.agent_id for rebuttal in decision_rebuttals),
+        *(evaluation.actor_id for evaluation in skill_evaluations if evaluation.actor_kind == "agent"),
+    }
+    agents = db.scalars(select(Agent).where(Agent.id.in_(agent_ids)).order_by(Agent.id)).all() if agent_ids else []
 
     bundle_data = {
+        "agents": [{"id": a.id, "name": a.name, "platform": a.platform} for a in agents],
         "project": {
             "id": project.id,
             "name": project.name,
@@ -729,6 +745,16 @@ def export_project_bundle(project_id: str, actor: Actor = Depends(authenticate),
             }
             for rb in decision_rebuttals
         ],
+        "decision_deliberations": [
+            {
+                "decision_id": d.decision_id,
+                "status": d.status,
+                "closing_note": d.closing_note,
+                "opened_at": d.opened_at,
+                "closed_at": d.closed_at,
+            }
+            for d in decision_deliberations
+        ],
         "skills": [
             {
                 "id": s.id,
@@ -746,9 +772,14 @@ def export_project_bundle(project_id: str, actor: Actor = Depends(authenticate),
         "artifacts": [
             {
                 "id": a.id,
+                "family_id": a.family_id,
+                "version": a.version,
                 "task_id": a.task_id,
                 "name": a.name,
                 "checksum": a.checksum,
+                "review_status": a.review_status,
+                "review_note": a.review_note,
+                "reviewed_at": a.reviewed_at,
                 "created_at": a.created_at,
             }
             for a in artifacts

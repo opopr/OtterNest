@@ -22,6 +22,7 @@ from .deliberation import router as deliberation_router
 from .continuity import router as continuity_router
 from .lifecycle import router as lifecycle_router
 from .auth import router as auth_router
+from .portability import router as portability_router
 from .db import get_engine
 
 app = FastAPI(
@@ -44,6 +45,7 @@ app.include_router(deliberation_router)
 app.include_router(continuity_router)
 app.include_router(lifecycle_router)
 app.include_router(auth_router)
+app.include_router(portability_router)
 
 
 @app.get("/health/live")

@@ -473,7 +473,18 @@ def task_handoff_package(task_id: str, actor: Actor = Depends(authenticate), db:
         "latest_verified_checkpoint": _checkpoint_public(latest_verified) if latest_verified else None,
         "latest_self_reported_checkpoint": _checkpoint_public(latest_self_reported) if latest_self_reported else None,
         "artifacts": [
-            {"id": a.id, "name": a.name, "checksum": a.checksum, "created_at": a.created_at} for a in artifacts
+            {
+                "id": a.id,
+                "family_id": a.family_id,
+                "version": a.version,
+                "name": a.name,
+                "checksum": a.checksum,
+                "review_status": a.review_status,
+                "review_note": a.review_note,
+                "reviewed_at": a.reviewed_at,
+                "created_at": a.created_at,
+            }
+            for a in artifacts
         ],
         "approved_decisions": [
             {"id": d.id, "question": d.question, "resolution": d.resolution, "rationale": d.rationale}
@@ -595,7 +606,10 @@ def project_briefing(project_id: str, actor: Actor = Depends(authenticate), db: 
                 "id": a.id,
                 "task_id": a.task_id,
                 "name": a.name,
+                "family_id": a.family_id,
+                "version": a.version,
                 "checksum": a.checksum,
+                "review_status": a.review_status,
                 "created_at": a.created_at,
             }
             for a in recent_artifacts

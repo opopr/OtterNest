@@ -209,12 +209,18 @@ class Audit(Base):
 class Artifact(Base):
     __tablename__ = "artifacts"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    family_id: Mapped[str] = mapped_column(String(36), default=new_id, nullable=False, index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
     task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(240), nullable=False)
     checksum: Mapped[str] = mapped_column(String(64), nullable=False)
     uri: Mapped[str] = mapped_column(Text, nullable=False)
+    review_status: Mapped[str] = mapped_column(String(24), default="pending", nullable=False)
+    review_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+    __table_args__ = (UniqueConstraint("family_id", "version", name="uq_artifact_family_version"),)
 
 
 class Skill(Base):
