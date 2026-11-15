@@ -126,3 +126,12 @@ network restrictions, manual reconciliation and cancellation semantics.
 - 文本模型适配器在非可信参考区读取交接摘要，仍不可自行使用工具、授权或下载文件。测试覆盖两个独立 Agent 的前后任务工作流。
 - **未实现/未声称**：生产级不可信代码沙箱、跨 HTTP 成果上传事务、第三方产品真实账号联调、自动开发 GitHub 提交或多 Agent 无人自治。
 - 操作和安全边界见 [24 · Runner 成果自动回传与多 Agent 验收交接](24-runner-artifact-handoff.md)。
+
+
+## 本轮：可选 Linux bubblewrap 执行隔离（不依赖 Docker）
+
+- Runner 增加 `--sandbox bwrap`，只在显式启用、存在私有 `--workspace-root` 且 Linux 系统的 bubblewrap 命名空间预检成功时才领取任务；不可用就拒绝执行，**不**自动退回普通子进程。
+- 受控 Worker 仅可使用只读系统运行时、独立 `/work` 工作目录以及私有 `/tmp`/`/proc`/`/dev`，网络与进程/用户命名空间隔离，拒绝透传环境变量和非系统可执行路径。
+- 原成果版本、SHA-256、检查点和所有者验收流程保持不变；常规 CI 测试只验证防绕过策略和配置失败，真实命名空间验证需要在单独 Linux 主机上显式运行。
+- **尚未完成**：cgroup v2 CPU/内存/PID 硬限额、专用 seccomp 策略、恶意代码威胁模型验证、自动外部仓库写入、生产隔离等级认证。当前文本模型 Worker 仍不能在断网沙箱内调用云端 API。
+- 使用说明见 [25 · Linux 受控代码执行（bubblewrap，可选）](25-runner-bwrap-isolation.md)。

@@ -21,6 +21,8 @@ from pathlib import Path, PurePosixPath
 
 import httpx
 
+from .sandbox import SandboxError, build_bwrap_command
+
 
 class RunnerFailure(Exception):
     pass
@@ -133,10 +135,19 @@ def worker_environment(pass_env: tuple[str, ...] = ()) -> dict[str, str]:
 
 def execute_command(command: list[str], packet: dict, timeout_seconds: int,
                     heartbeat, pass_env: tuple[str, ...] = (), *,
-                    workspace: Path | None = None, structured: bool = False) -> str | WorkerResult:
+                    workspace: Path | None = None, structured: bool = False,
+                    sandbox: str = "none") -> str | WorkerResult:
     """Explicit executable, no shell; output bounded before returning to server."""
     if not command:
         raise RunnerFailure("No execution command configured")
+    if sandbox not in {"none", "bwrap"}:
+        raise RunnerFailure("Unsupported execution isolation mode")
+    if sandbox == "bwrap" and pass_env:
+        raise RunnerFailure("Sandboxed code execution does not pass through host credentials")
+    try:
+        launch_command = build_bwrap_command(command, workspace) if sandbox == "bwrap" else command
+    except SandboxError as exc:
+        raise RunnerFailure(str(exc)) from None
     content = json.dumps(packet, ensure_ascii=False).encode("utf-8")
     if len(content) > 300_000:
         raise RunnerFailure("Context too large for execution")
@@ -146,7 +157,7 @@ def execute_command(command: list[str], packet: dict, timeout_seconds: int,
     with tempfile.TemporaryFile() as stdin, tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
         stdin.write(content)
         stdin.seek(0)
-        with subprocess.Popen(command, shell=False, stdin=stdin, cwd=workspace,
+        with subprocess.Popen(launch_command, shell=False, stdin=stdin, cwd=workspace,
                               stdout=stdout, stderr=stderr, env=worker_environment(pass_env)) as proc:
             try:
                 started = time.monotonic()
@@ -189,7 +200,8 @@ def execute_command(command: list[str], packet: dict, timeout_seconds: int,
 class Runner:
     def __init__(self, server: str, token: str, command: list[str], timeout: int = 600,
                  allow_r3: bool = False, pass_env: tuple[str, ...] = (),
-                 runtime_id: str | None = None, workspace_root: str | None = None):
+                 runtime_id: str | None = None, workspace_root: str | None = None,
+                 sandbox: str = "none"):
         if not token.startswith("on_agent_"):
             raise RunnerFailure("OTTERNEST_AGENT_TOKEN required (not the owner token)")
         if not server.startswith("https://") and not (server.startswith("http://127.0.0.1:") or server.startswith("http://localhost:")):
@@ -210,6 +222,30 @@ class Runner:
             self.workspace_root = configured_root.resolve(strict=True)
         else:
             self.workspace_root = None
+        if sandbox not in {"none", "bwrap"}:
+            raise RunnerFailure("Unsupported execution isolation mode")
+        if sandbox == "bwrap":
+            if self.workspace_root is None:
+                raise RunnerFailure("--sandbox bwrap requires --workspace-root")
+            if self.pass_env:
+                raise RunnerFailure("Sandboxed code execution does not pass through host credentials")
+            # Check namespace support BEFORE taking a task lease. WSL2 and some
+            # Linux hosts disable unprivileged user namespaces even with bwrap.
+            with tempfile.TemporaryDirectory(prefix="otternest-sandbox-probe-",
+                                             dir=self.workspace_root) as probe_dir:
+                try:
+                    probe = build_bwrap_command(["true"], Path(probe_dir))
+                    verified = subprocess.run(
+                        probe, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL, env=worker_environment(),
+                        timeout=5, check=False,
+                    )
+                except (SandboxError, OSError, subprocess.TimeoutExpired) as exc:
+                    raise RunnerFailure("bubblewrap isolation preflight failed: " +
+                                        (str(exc) if isinstance(exc, SandboxError) else type(exc).__name__)) from None
+                if verified.returncode != 0:
+                    raise RunnerFailure("bubblewrap isolation preflight failed; task was not claimed")
+        self.sandbox = sandbox
 
     def upload_artifacts(self, task_id: str, epoch: int,
                          artifacts: tuple[WorkerArtifact, ...], heartbeat) -> list[str]:
@@ -285,7 +321,7 @@ class Runner:
                     result = execute_command(
                         self.command, packet, self.timeout, heartbeat, self.pass_env,
                         workspace=Path(workspace_dir) if workspace_dir else None,
-                        structured=True,
+                        structured=True, sandbox=self.sandbox,
                     )
                     assert isinstance(result, WorkerResult)
                     artifact_ids = self.upload_artifacts(task_id, epoch, result.artifacts, heartbeat)
@@ -332,6 +368,8 @@ def main():
     parser.add_argument("--timeout", type=int, default=600)
     parser.add_argument("--workspace-root", default=None,
                         help="Existing absolute private directory for opt-in artifact manifests")
+    parser.add_argument("--sandbox", choices=("none", "bwrap"), default="none",
+                        help="Opt-in Linux bubblewrap isolation for local code workers (fails closed)")
     parser.add_argument("--allow-r3", action="store_true", help="Explicitly allow owner-authorized high-risk tasks")
     parser.add_argument("--pass-env", action="append", default=[], help="Explicitly expose one environment variable to the child")
     parser.add_argument("command", nargs=argparse.REMAINDER, help="-- /path/to/your-agent-command [args]")
@@ -343,7 +381,7 @@ def main():
         runner = Runner(args.server, os.environ.get("OTTERNEST_AGENT_TOKEN", ""), command,
                         timeout=args.timeout, allow_r3=args.allow_r3, pass_env=tuple(args.pass_env),
                         runtime_id=args.runtime_id or None,
-                        workspace_root=args.workspace_root)
+                        workspace_root=args.workspace_root, sandbox=args.sandbox)
         try:
             while True:
                 worked = runner.run_one()
