@@ -151,3 +151,11 @@ network restrictions, manual reconciliation and cancellation semantics.
 - 每次领取任务后在已委托父目录内创建新的子组，写 `memory.max` / `cpu.max` / `pids.max`，由可信启动程序**先写 cgroup.procs，再 exec worker**，规避先运行再入组的竞态；结束时用 `cgroup.kill` 清理。
 - 现有 PostgreSQL、任务 epoch、模型文本 Worker、Agent 成果回传与人工验收无需变动。没有要求引入 Docker。
 - 单元测试覆盖资源配额参数、流程检查、进程预入组与失败关闭；真实 cgroup / WSL2 仅在具有委托权限的独立 Linux 测试机上 opt-in 验证。崩溃后的孤儿子组清理、系统级恶意代码安全审计、seccomp 和真实第三方 AI 平台接入仍待实现，见 [27 · cgroup v2 任务级资源控制](27-cgroup-v2-task-budgets.md)。
+
+
+## 本轮：cgroup 异常退出后的恢复与独占管理
+
+- 显式开启任务级 cgroup 的 Runner 启动时对委托父目录持有进程生命周期级 `flock`，降低多个执行器误用同一委托父组的风险；发现此前遗留的 `otternest-task-*` 资源组时，拒绝接单，不自动强杀运行中进程。
+- 新增 `otternest-cgroup-recover` 运维 CLI：默认只预览 `cgroup.events` 的真实 `populated` 状态；显式 `--apply` 才清理已空的资源组，额外 `--terminate-populated` 才对存活的遗留进程调用 `cgroup.kill`。
+- 只清理严格匹配命名的直属资源组，检查 owner、symlink、锁文件权限和父目录授权；不修改宿主机全局 cgroup 配额。
+- 这一功能不代替真实 Linux/WSL2 委托测试、安全审计或无人值守恢复机制。说明见 [28 · cgroup 崩溃恢复](28-cgroup-crash-recovery.md)。
