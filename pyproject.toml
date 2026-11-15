@@ -21,6 +21,7 @@ dependencies = [
 otternest-runner = "otternest.runner:main"
 otternest-cgroup-recover = "otternest.cgroup_recovery:main"
 otternest-model-worker = "otternest.model_worker:main"
+otternest-codex-worker = "otternest.codex_worker:main"
 otternest-webhooks = "otternest.webhooks:main"
 otternest-mcp = "otternest.mcp_bridge:main"
 otternest-scheduler = "otternest.scheduler:main"
