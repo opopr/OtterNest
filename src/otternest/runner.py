@@ -24,6 +24,7 @@ import httpx
 
 from .sandbox import SandboxError, build_bwrap_command, apply_linux_resource_limits
 from .cgroups import CgroupError, CgroupPolicy, TaskCgroup, validate_parent
+from .cgroup_recovery import CgroupOwnerLock, scan_scopes
 
 
 class RunnerFailure(Exception):
@@ -310,11 +311,21 @@ class Runner:
                                         (str(exc) if isinstance(exc, SandboxError) else type(exc).__name__)) from None
                 if verified.returncode != 0:
                     raise RunnerFailure("bubblewrap isolation preflight failed; task was not claimed")
+        self._cgroup_lock = None
         if policy is not None:
-            # Validate kernel delegation and child self-attachment BEFORE
-            # taking a task lease. Only a fixed no-op is executed here.
+            # Hold ownership for the entire Runner lifetime. A stale cgroup
+            # requires explicit operator recovery; never kill a possibly-live
+            # worker automatically during startup.
+            guard = None
             try:
-                validate_parent(policy)
+                parent = validate_parent(policy)
+                guard = CgroupOwnerLock(parent).acquire()
+                leftovers = scan_scopes(parent)
+                if leftovers:
+                    raise CgroupError(
+                        "Unrecovered task scopes exist: stop old Runners and use "
+                        "otternest-cgroup-recover before restarting"
+                    )
                 with TaskCgroup(policy) as probe_scope:
                     probe, fds = probe_scope.command(["/usr/bin/true"])
                     check = subprocess.run(
@@ -325,7 +336,11 @@ class Runner:
                     if check.returncode != 0:
                         raise CgroupError("cgroup bootstrap attach test failed")
             except (CgroupError, OSError, subprocess.TimeoutExpired) as exc:
-                raise RunnerFailure("cgroup v2 preflight failed: " + type(exc).__name__) from None
+                if guard is not None:
+                    guard.close()
+                self.client.close()
+                raise RunnerFailure("cgroup v2 preflight failed: " + str(exc)) from None
+            self._cgroup_lock = guard
         self.cgroup_policy = policy
         self.sandbox = sandbox
         self.cpu_seconds = cpu_seconds
@@ -442,7 +457,12 @@ class Runner:
         return False
 
     def close(self):
-        self.client.close()
+        try:
+            self.client.close()
+        finally:
+            if self._cgroup_lock is not None:
+                self._cgroup_lock.close()
+                self._cgroup_lock = None
 
 
 def main():
