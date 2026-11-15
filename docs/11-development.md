@@ -135,3 +135,11 @@ network restrictions, manual reconciliation and cancellation semantics.
 - 原成果版本、SHA-256、检查点和所有者验收流程保持不变；常规 CI 测试只验证防绕过策略和配置失败，真实命名空间验证需要在单独 Linux 主机上显式运行。
 - **尚未完成**：cgroup v2 CPU/内存/PID 硬限额、专用 seccomp 策略、恶意代码威胁模型验证、自动外部仓库写入、生产隔离等级认证。当前文本模型 Worker 仍不能在断网沙箱内调用云端 API。
 - 使用说明见 [25 · Linux 受控代码执行（bubblewrap，可选）](25-runner-bwrap-isolation.md)。
+
+
+## 本轮：Runner 子进程清理与可选 Linux 资源护栏
+
+- Runner 在任务执行结束、超时、心跳失效时，对独立 POSIX 进程组执行 TERM/KILL 回收，不再只停止主进程；对可信非沙箱子程序主动脱离进程组的情况仍不能保证完全回收。
+- 可选 `--cpu-seconds`、`--address-space-mib`，仅允许与 `--sandbox bwrap` 配合使用；在领取任务前检查 `prlimit` 和用户程序合法性，失败关闭、不默认降级。
+- 限额依赖每进程的 `RLIMIT_CPU` 和 `RLIMIT_AS`，**不是** cgroup v2 任务级 CPU/真实内存/PID 配额；不应据此宣称达到生产级不可信代码隔离。
+- 单元与 Linux 执行测试覆盖超时后的子进程回收及 CPU 限额，详细文档见 [26 · Runner 子进程回收与 Linux 资源限制](26-runner-process-limits.md)。
