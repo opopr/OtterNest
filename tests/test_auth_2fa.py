@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 
 from otternest import auth as auth_mod
-from tests.conftest import OWNER
+from conftest import OWNER
 
 
 def test_bootstrap_and_password_login_lockout(env):
