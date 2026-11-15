@@ -223,3 +223,118 @@ def test_runner_blocks_task_if_manifest_has_artifacts_without_workspace(env, own
 def test_runner_rejects_nonabsolute_workspace(tmp_path):
     with pytest.raises(RunnerFailure, match="existing absolute"):
         Runner("http://127.0.0.1:8000", "on_agent_test", ["echo", "hello"], workspace_root="relative")
+
+
+def test_two_agents_handoff_only_owner_reviewed_predecessor_data(env, owner_headers, monkeypatch, tmp_path):
+    """B remains blocked until A is accepted, then gets verified handoff context."""
+    monkeypatch.setenv("OTTERNEST_ARTIFACT_DIR", str(tmp_path / "stored"))
+    project_id, first_task_id, first_token = _setup_owner_project_and_agent(env, owner_headers)
+    b = env.post(
+        "/api/v1/agents", headers=owner_headers,
+        json={"name": "Verifier Agent B", "platform": "trusted-local",
+              "execution_mode": "polling", "capabilities": []},
+    )
+    assert b.status_code == 201, b.text
+    second_agent = b.json()
+    membership = env.post(
+        f"/api/v1/projects/{project_id}/members", headers=owner_headers,
+        json={"agent_id": second_agent["id"], "role": "worker"},
+    )
+    assert membership.status_code == 201
+    second = env.post(
+        f"/api/v1/projects/{project_id}/tasks", headers=owner_headers,
+        json={"title": "根据前置成果复核", "instruction": "读取前置成果元数据",
+              "acceptance": "返回前置成果校验和",
+              "dependency_ids": [first_task_id]},
+    )
+    assert second.status_code == 201, second.text
+    second_task_id = second.json()["id"]
+    assert second.json()["status"] == "waiting_dependencies"
+
+    # Explicit routing: the two agents have separate identities and tasks.
+    first_agent = env.get("/api/v1/agents", headers=owner_headers).json()
+    owner_of_first = next(a for a in first_agent if a["name"] == "Workspace Worker")
+    for task_id, agent_id in ((first_task_id, owner_of_first["id"]),
+                              (second_task_id, second_agent["id"])):
+        routed = env.put(f"/api/v1/tasks/{task_id}/target", headers=owner_headers,
+                         json={"agent_id": agent_id})
+        assert routed.status_code == 200, routed.text
+
+    consumer = [
+        sys.executable, "-c",
+        "import json,sys; packet=json.load(sys.stdin); "
+        "handoffs=packet['dependency_handoffs']; "
+        "assert len(handoffs)==1; "
+        "assert handoffs[0]['latest_owner_verified_checkpoint']['verified_by_owner']; "
+        "assert handoffs[0]['accepted_artifacts'][0]['review_status']=='accepted'; "
+        "print(json.dumps({'summary':handoffs[0]['accepted_artifacts'][0]['sha256']}))",
+    ]
+    second_runner = _asgi_runner(env, second_agent["token"], consumer)
+    try:
+        assert second_runner.run_one() is False  # dependency not accepted
+    finally:
+        second_runner.close()
+
+    root = tmp_path / "work"
+    root.mkdir()
+    creator = [
+        sys.executable, "-c",
+        "import json,pathlib; pathlib.Path('artifact.txt').write_bytes(b'auditable handoff'); "
+        "print(json.dumps({'summary':'First agent work complete', "
+        "'artifacts':[{'path':'artifact.txt'}],"
+        "'checkpoint':{'summary':'First agent checkpoint'}}))",
+    ]
+    first_runner = _asgi_runner(env, first_token, creator, workspace_root=str(root))
+    try:
+        assert first_runner.run_one() is True
+    finally:
+        first_runner.close()
+    first_artifact = env.get(f"/api/v1/tasks/{first_task_id}/artifacts", headers=owner_headers).json()[0]
+    first_cp = env.get(f"/api/v1/tasks/{first_task_id}/checkpoints", headers=owner_headers).json()[0]
+
+    # An unverified predecessor must not unblock B.
+    still_blocked = env.get(f"/api/v1/tasks/{second_task_id}", headers=owner_headers)
+    assert still_blocked.json()["status"] == "waiting_dependencies"
+
+    assert env.post(
+        f"/api/v1/artifacts/{first_artifact['id']}/review", headers=owner_headers,
+        json={"accepted": True, "note": "核验 SHA-256"},
+    ).status_code == 200
+    assert env.post(
+        f"/api/v1/checkpoints/{first_cp['id']}/verify", headers=owner_headers,
+        json={"status": "owner_verified", "note": "核验第一名 Agent 交接"},
+    ).status_code == 200
+    assert env.post(
+        f"/api/v1/tasks/{first_task_id}/review", headers=owner_headers,
+        json={"accepted": True, "reason": "第一任务验收通过"},
+    ).status_code == 200
+
+    ready = env.get(f"/api/v1/tasks/{second_task_id}", headers=owner_headers)
+    assert ready.json()["status"] == "ready"
+    second_runner = _asgi_runner(env, second_agent["token"], consumer)
+    try:
+        assert second_runner.run_one() is True
+    finally:
+        second_runner.close()
+    second_task = env.get(f"/api/v1/tasks/{second_task_id}", headers=owner_headers).json()
+    assert second_task["status"] == "submitted"
+    assert second_task["result_summary"] == first_artifact["checksum"]
+    assert env.post(
+        f"/api/v1/tasks/{second_task_id}/review", headers=owner_headers,
+        json={"accepted": True, "reason": "第二任务通过"},
+    ).status_code == 200
+
+
+def test_model_worker_includes_handoff_as_reference_data():
+    from otternest.model_worker import make_messages
+
+    packet = {
+        "task": {
+            "title": "审核第二任务", "instruction": "参考已验收任务",
+            "acceptance": "完成文本审核",
+        },
+        "dependency_handoffs": [{"result_summary": "untrusted prior text"}],
+    }
+    messages = make_messages(packet)
+    assert "untrusted prior text" in messages[1]["content"]
+    assert "untrusted prior text" not in messages[0]["content"]
