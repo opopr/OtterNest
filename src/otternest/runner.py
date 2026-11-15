@@ -461,6 +461,14 @@ def main():
                         help="Optional sandbox CPU-time RLIMIT (1..3600 seconds), requires prlimit")
     parser.add_argument("--address-space-mib", type=int, default=None,
                         help="Optional sandbox virtual-address-space limit (64..16384 MiB), not RSS")
+    parser.add_argument("--cgroup-parent", default=None,
+                        help="Operator-delegated Linux cgroup v2 parent path")
+    parser.add_argument("--memory-max-mib", type=int, default=None,
+                        help="Task cgroup memory.max, 64..16384 MiB")
+    parser.add_argument("--cpu-max-percent", type=int, default=None,
+                        help="Task cgroup CPU quota, 10..400 percent")
+    parser.add_argument("--pids-max", type=int, default=None,
+                        help="Task cgroup max processes/threads, 8..1024")
     parser.add_argument("--allow-r3", action="store_true", help="Explicitly allow owner-authorized high-risk tasks")
     parser.add_argument("--pass-env", action="append", default=[], help="Explicitly expose one environment variable to the child")
     parser.add_argument("command", nargs=argparse.REMAINDER, help="-- /path/to/your-agent-command [args]")
@@ -474,7 +482,11 @@ def main():
                         runtime_id=args.runtime_id or None,
                         workspace_root=args.workspace_root, sandbox=args.sandbox,
                         cpu_seconds=args.cpu_seconds,
-                        address_space_mib=args.address_space_mib)
+                        address_space_mib=args.address_space_mib,
+                        cgroup_parent=args.cgroup_parent,
+                        memory_max_mib=args.memory_max_mib,
+                        cpu_max_percent=args.cpu_max_percent,
+                        pids_max=args.pids_max)
         try:
             while True:
                 worked = runner.run_one()
