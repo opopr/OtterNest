@@ -199,3 +199,98 @@ def test_real_subprocess_adapter_through_local_fake_chat_server(monkeypatch):
         "authorization": "Bearer test-model-key",
         "model": "fake-model",
     }]
+
+
+def test_otternest_api_claim_model_submit_and_owner_accept(env, owner_headers, monkeypatch):
+    """Check task lifecycle via real ASGI endpoints and a model child process."""
+    from otternest.runner import Runner
+
+    project = env.post(
+        "/api/v1/projects", headers=owner_headers,
+        json={"name": "真实链路集成测试"},
+    )
+    assert project.status_code == 201
+    project_id = project.json()["id"]
+    agent = env.post(
+        "/api/v1/agents", headers=owner_headers,
+        json={"name": "Text API Agent", "platform": "openai-compatible",
+              "execution_mode": "polling", "capabilities": []},
+    )
+    assert agent.status_code == 201
+    agent_data = agent.json()
+    assigned = env.post(
+        f"/api/v1/projects/{project_id}/members", headers=owner_headers,
+        json={"agent_id": agent_data["id"], "role": "worker"},
+    )
+    assert assigned.status_code == 201
+    task = env.post(
+        f"/api/v1/projects/{project_id}/tasks", headers=owner_headers,
+        json={"title": "起草三条建议", "instruction": "只编写文字，不执行外部动作",
+              "acceptance": "有三条建议", "risk": "R1"},
+    )
+    assert task.status_code == 201
+    task_id = task.json()["id"]
+
+    class ProviderHandler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            assert payload["model"] == "fake-model"
+            data = json.dumps({"choices": [
+                {"finish_reason": "stop", "message": {"content": "三条建议，尚待人工验收。"}}
+            ]}, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def log_message(self, *_args):
+            pass
+
+    provider = ThreadingHTTPServer(("127.0.0.1", 0), ProviderHandler)
+    thread = threading.Thread(target=provider.serve_forever, daemon=True)
+    thread.start()
+    monkeypatch.setenv("OTTERNEST_MODEL_API_KEY", "test-only-key")
+    child_command = [
+        sys.executable, "-m", "otternest.model_worker",
+        "--endpoint", f"http://127.0.0.1:{provider.server_port}/v1/chat/completions",
+        "--allow-local-http", "--model", "fake-model",
+    ]
+    runner = Runner(
+        "http://127.0.0.1:8000", agent_data["token"], child_command,
+        timeout=30, pass_env=("OTTERNEST_MODEL_API_KEY",),
+    )
+
+    def otternest_api_transport(request: httpx.Request) -> httpx.Response:
+        response = env.request(
+            request.method, request.url.path, content=request.content,
+            headers=dict(request.headers),
+        )
+        return httpx.Response(
+            response.status_code, content=response.content, headers=dict(response.headers)
+        )
+
+    runner.client.close()
+    runner.client = httpx.Client(
+        base_url="http://127.0.0.1:8000",
+        headers={"Authorization": "Bearer " + agent_data["token"]},
+        transport=httpx.MockTransport(otternest_api_transport),
+    )
+    try:
+        assert runner.run_one() is True
+    finally:
+        runner.close()
+        provider.shutdown()
+        provider.server_close()
+        thread.join(timeout=5)
+
+    submitted = env.get(f"/api/v1/tasks/{task_id}", headers=owner_headers)
+    assert submitted.status_code == 200
+    assert submitted.json()["status"] == "submitted"
+    assert submitted.json()["result_summary"] == "三条建议，尚待人工验收。"
+    accepted = env.post(
+        f"/api/v1/tasks/{task_id}/review", headers=owner_headers,
+        json={"accepted": True, "reason": "人工复核内容完成"},
+    )
+    assert accepted.status_code == 200
+    assert accepted.json()["status"] == "completed"
