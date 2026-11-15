@@ -201,7 +201,7 @@ def run_codex(
                        (github_repo is None) == (local_repo is None)):
         raise CodexWorkerError("Pinned repository requires source, ref and full commit SHA")
     if mode == "workspace-write" and not (artifacts or has_source):
-        raise CodexWorkerError("Workspace-write requires a declared artifact or pinned source patch")
+        raise CodexWorkerError("Workspace-write requires at least one declared artifact or pinned source patch")
     if len(artifacts) + (2 if has_source and mode == "workspace-write" else 0) > 8:
         raise CodexWorkerError("Too many artifact paths")
     if len(set(artifacts)) != len(artifacts):
