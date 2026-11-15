@@ -65,6 +65,9 @@ def test_manifest_rejects_hardlinks_oversize_and_bad_names(tmp_path):
     os.link(tmp_path / "first.txt", tmp_path / "second.txt")
     with pytest.raises(RunnerFailure, match="hard links"):
         parse_worker_output(_manifest(artifacts=[{"path": "second.txt"}]), tmp_path)
+    # Removing the second directory entry restores first.txt to a single link;
+    # the remaining assertions should exercise their own validation branches.
+    (tmp_path / "second.txt").unlink()
     with pytest.raises(RunnerFailure, match="ASCII"):
         parse_worker_output(_manifest(artifacts=[{"path": "first.txt", "name": "成果.txt"}]), tmp_path)
     with pytest.raises(RunnerFailure, match="unique"):
