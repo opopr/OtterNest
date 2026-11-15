@@ -23,6 +23,7 @@ from pathlib import Path, PurePosixPath
 import httpx
 
 from .sandbox import SandboxError, build_bwrap_command, apply_linux_resource_limits
+from .cgroups import CgroupError, CgroupPolicy, TaskCgroup, validate_parent
 
 
 class RunnerFailure(Exception):
@@ -172,7 +173,8 @@ def execute_command(command: list[str], packet: dict, timeout_seconds: int,
                     heartbeat, pass_env: tuple[str, ...] = (), *,
                     workspace: Path | None = None, structured: bool = False,
                     sandbox: str = "none", cpu_seconds: int | None = None,
-                    address_space_mib: int | None = None) -> str | WorkerResult:
+                    address_space_mib: int | None = None,
+                    cgroup_policy: CgroupPolicy | None = None) -> str | WorkerResult:
     """Explicit executable, no shell; output bounded before returning to server."""
     if not command:
         raise RunnerFailure("No execution command configured")
@@ -180,7 +182,8 @@ def execute_command(command: list[str], packet: dict, timeout_seconds: int,
         raise RunnerFailure("Unsupported execution isolation mode")
     if sandbox == "bwrap" and pass_env:
         raise RunnerFailure("Sandboxed code execution does not pass through host credentials")
-    if sandbox != "bwrap" and (cpu_seconds is not None or address_space_mib is not None):
+    if sandbox != "bwrap" and (cpu_seconds is not None or address_space_mib is not None
+                               or cgroup_policy is not None):
         raise RunnerFailure("Resource limits require --sandbox bwrap")
     try:
         launch_command = build_bwrap_command(command, workspace) if sandbox == "bwrap" else command
@@ -195,35 +198,43 @@ def execute_command(command: list[str], packet: dict, timeout_seconds: int,
     # A PIPE write may block forever if a child does not read stdin. Stage the
     # bounded packet in an unnamed temporary file before starting the process,
     # so the execution timeout and lease heartbeats cover all child behavior.
-    with tempfile.TemporaryFile() as stdin, tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
-        stdin.write(content)
-        stdin.seek(0)
-        with subprocess.Popen(launch_command, shell=False, stdin=stdin, cwd=workspace,
-                              stdout=stdout, stderr=stderr, env=worker_environment(pass_env),
-                              start_new_session=(os.name == "posix")) as proc:
-            try:
-                started = time.monotonic()
-                next_heartbeat = started + 30
-                while proc.poll() is None:
-                    if time.monotonic() - started >= timeout_seconds:
-                        raise RunnerFailure("Execution exceeded configured timeout")
-                    if time.monotonic() >= next_heartbeat:
-                        heartbeat()  # abort on revoked or expired lease
-                        next_heartbeat = time.monotonic() + 30
-                    time.sleep(0.1)
-            finally:
-                _stop_worker_tree(proc)
-            stdout.seek(0)
-            data = stdout.read(20001)
-            if proc.returncode:
-                raise RunnerFailure(f"Configured executable exited with status {proc.returncode}")
-            if len(data) > 20000:
-                raise RunnerFailure("Executable output exceeded 20000 bytes")
-            output = data.decode("utf-8", errors="replace").strip()
-            if not output:
-                raise RunnerFailure("Executable produced no result")
-            result = parse_worker_output(output, workspace)
-            return result if structured else result.summary
+    try:
+        scope_manager = TaskCgroup(cgroup_policy) if cgroup_policy else nullcontext(None)
+        with scope_manager as scope:
+            fds: tuple[int, ...] = ()
+            if scope is not None:
+                launch_command, fds = scope.command(launch_command)
+            with tempfile.TemporaryFile() as stdin, tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
+                stdin.write(content)
+                stdin.seek(0)
+                with subprocess.Popen(launch_command, shell=False, stdin=stdin, cwd=workspace,
+                                      stdout=stdout, stderr=stderr, env=worker_environment(pass_env),
+                                      start_new_session=(os.name == "posix"), pass_fds=fds) as proc:
+                    try:
+                        started = time.monotonic()
+                        next_heartbeat = started + 30
+                        while proc.poll() is None:
+                            if time.monotonic() - started >= timeout_seconds:
+                                raise RunnerFailure("Execution exceeded configured timeout")
+                            if time.monotonic() >= next_heartbeat:
+                                heartbeat()  # abort on revoked or expired lease
+                                next_heartbeat = time.monotonic() + 30
+                            time.sleep(0.1)
+                    finally:
+                        _stop_worker_tree(proc)
+                    stdout.seek(0)
+                    data = stdout.read(20001)
+                    if proc.returncode:
+                        raise RunnerFailure(f"Configured executable exited with status {proc.returncode}")
+                    if len(data) > 20000:
+                        raise RunnerFailure("Executable output exceeded 20000 bytes")
+                    output = data.decode("utf-8", errors="replace").strip()
+                    if not output:
+                        raise RunnerFailure("Executable produced no result")
+                    result = parse_worker_output(output, workspace)
+                    return result if structured else result.summary
+    except CgroupError as exc:
+        raise RunnerFailure(str(exc)) from None
 
 
 class Runner:
@@ -231,7 +242,9 @@ class Runner:
                  allow_r3: bool = False, pass_env: tuple[str, ...] = (),
                  runtime_id: str | None = None, workspace_root: str | None = None,
                  sandbox: str = "none", cpu_seconds: int | None = None,
-                 address_space_mib: int | None = None):
+                 address_space_mib: int | None = None,
+                 cgroup_parent: str | None = None, memory_max_mib: int | None = None,
+                 cpu_max_percent: int | None = None, pids_max: int | None = None):
         if not token.startswith("on_agent_"):
             raise RunnerFailure("OTTERNEST_AGENT_TOKEN required (not the owner token)")
         if not server.startswith("https://") and not (server.startswith("http://127.0.0.1:") or server.startswith("http://localhost:")):
@@ -256,6 +269,19 @@ class Runner:
             raise RunnerFailure("Unsupported execution isolation mode")
         if sandbox != "bwrap" and (cpu_seconds is not None or address_space_mib is not None):
             raise RunnerFailure("Resource limits require --sandbox bwrap")
+        has_cgroup = any(value is not None for value in (
+            cgroup_parent, memory_max_mib, cpu_max_percent, pids_max,
+        ))
+        if has_cgroup and (sandbox != "bwrap" or any(value is None for value in (
+            cgroup_parent, memory_max_mib, cpu_max_percent, pids_max,
+        ))):
+            raise RunnerFailure("cgroup budgets require --sandbox bwrap and all four cgroup flags")
+        try:
+            policy = None if not has_cgroup else CgroupPolicy(
+                Path(cgroup_parent), memory_max_mib, cpu_max_percent, pids_max,
+            )
+        except (CgroupError, TypeError) as exc:
+            raise RunnerFailure("Invalid cgroup task budget") from exc
         if sandbox == "bwrap":
             if self.workspace_root is None:
                 raise RunnerFailure("--sandbox bwrap requires --workspace-root")
@@ -284,6 +310,23 @@ class Runner:
                                         (str(exc) if isinstance(exc, SandboxError) else type(exc).__name__)) from None
                 if verified.returncode != 0:
                     raise RunnerFailure("bubblewrap isolation preflight failed; task was not claimed")
+        if policy is not None:
+            # Validate kernel delegation and child self-attachment BEFORE
+            # taking a task lease. Only a fixed no-op is executed here.
+            try:
+                validate_parent(policy)
+                with TaskCgroup(policy) as probe_scope:
+                    probe, fds = probe_scope.command(["/usr/bin/true"])
+                    check = subprocess.run(
+                        probe, pass_fds=fds, timeout=5, check=False,
+                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL, env=worker_environment(),
+                    )
+                    if check.returncode != 0:
+                        raise CgroupError("cgroup bootstrap attach test failed")
+            except (CgroupError, OSError, subprocess.TimeoutExpired) as exc:
+                raise RunnerFailure("cgroup v2 preflight failed: " + type(exc).__name__) from None
+        self.cgroup_policy = policy
         self.sandbox = sandbox
         self.cpu_seconds = cpu_seconds
         self.address_space_mib = address_space_mib
@@ -365,6 +408,7 @@ class Runner:
                         structured=True, sandbox=self.sandbox,
                         cpu_seconds=self.cpu_seconds,
                         address_space_mib=self.address_space_mib,
+                        cgroup_policy=self.cgroup_policy,
                     )
                     assert isinstance(result, WorkerResult)
                     artifact_ids = self.upload_artifacts(task_id, epoch, result.artifacts, heartbeat)
@@ -417,6 +461,14 @@ def main():
                         help="Optional sandbox CPU-time RLIMIT (1..3600 seconds), requires prlimit")
     parser.add_argument("--address-space-mib", type=int, default=None,
                         help="Optional sandbox virtual-address-space limit (64..16384 MiB), not RSS")
+    parser.add_argument("--cgroup-parent", default=None,
+                        help="Operator-delegated Linux cgroup v2 parent path")
+    parser.add_argument("--memory-max-mib", type=int, default=None,
+                        help="Task cgroup memory.max, 64..16384 MiB")
+    parser.add_argument("--cpu-max-percent", type=int, default=None,
+                        help="Task cgroup CPU quota, 10..400 percent")
+    parser.add_argument("--pids-max", type=int, default=None,
+                        help="Task cgroup max processes/threads, 8..1024")
     parser.add_argument("--allow-r3", action="store_true", help="Explicitly allow owner-authorized high-risk tasks")
     parser.add_argument("--pass-env", action="append", default=[], help="Explicitly expose one environment variable to the child")
     parser.add_argument("command", nargs=argparse.REMAINDER, help="-- /path/to/your-agent-command [args]")
@@ -430,7 +482,11 @@ def main():
                         runtime_id=args.runtime_id or None,
                         workspace_root=args.workspace_root, sandbox=args.sandbox,
                         cpu_seconds=args.cpu_seconds,
-                        address_space_mib=args.address_space_mib)
+                        address_space_mib=args.address_space_mib,
+                        cgroup_parent=args.cgroup_parent,
+                        memory_max_mib=args.memory_max_mib,
+                        cpu_max_percent=args.cpu_max_percent,
+                        pids_max=args.pids_max)
         try:
             while True:
                 worked = runner.run_one()
