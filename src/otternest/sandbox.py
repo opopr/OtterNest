@@ -99,3 +99,37 @@ def build_bwrap_command(command: list[str], workspace: Path | None) -> list[str]
         executable, *command[1:],
     ]
     return argv
+
+
+def apply_linux_resource_limits(
+    command: list[str], *, cpu_seconds: int | None = None,
+    address_space_mib: int | None = None,
+) -> list[str]:
+    """Set inherited RLIMIT_CPU and RLIMIT_AS with util-linux prlimit.
+
+    Address space is VIRTUAL memory, not resident memory; these limits are
+    additional guardrails, NOT cgroup memory.max / pids.max guarantees.
+    """
+    if cpu_seconds is None and address_space_mib is None:
+        return command
+    if sys.platform != "linux":
+        raise SandboxError("Resource limits require Linux")
+    if cpu_seconds is not None and (type(cpu_seconds) is not int or not 1 <= cpu_seconds <= 3600):
+        raise SandboxError("CPU limit must be 1..3600 seconds")
+    if address_space_mib is not None and (
+        type(address_space_mib) is not int or not 64 <= address_space_mib <= 16384
+    ):
+        raise SandboxError("Address-space limit must be 64..16384 MiB")
+    binary = shutil.which("prlimit")
+    if not binary:
+        raise SandboxError("util-linux prlimit is required for requested resource limits")
+    executable = _trusted_system_binary(binary)
+    info = os.stat(executable)
+    if info.st_uid != 0 or (info.st_mode & 0o022):
+        raise SandboxError("prlimit must be root-owned and not group/world writable")
+    options = []
+    if cpu_seconds is not None:
+        options.append(f"--cpu={cpu_seconds}")
+    if address_space_mib is not None:
+        options.append(f"--as={address_space_mib * 1024 * 1024}")
+    return [executable, *options, "--", *command]
