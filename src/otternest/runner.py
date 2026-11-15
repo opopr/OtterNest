@@ -242,7 +242,9 @@ class Runner:
                  allow_r3: bool = False, pass_env: tuple[str, ...] = (),
                  runtime_id: str | None = None, workspace_root: str | None = None,
                  sandbox: str = "none", cpu_seconds: int | None = None,
-                 address_space_mib: int | None = None):
+                 address_space_mib: int | None = None,
+                 cgroup_parent: str | None = None, memory_max_mib: int | None = None,
+                 cpu_max_percent: int | None = None, pids_max: int | None = None):
         if not token.startswith("on_agent_"):
             raise RunnerFailure("OTTERNEST_AGENT_TOKEN required (not the owner token)")
         if not server.startswith("https://") and not (server.startswith("http://127.0.0.1:") or server.startswith("http://localhost:")):
@@ -267,6 +269,19 @@ class Runner:
             raise RunnerFailure("Unsupported execution isolation mode")
         if sandbox != "bwrap" and (cpu_seconds is not None or address_space_mib is not None):
             raise RunnerFailure("Resource limits require --sandbox bwrap")
+        has_cgroup = any(value is not None for value in (
+            cgroup_parent, memory_max_mib, cpu_max_percent, pids_max,
+        ))
+        if has_cgroup and (sandbox != "bwrap" or any(value is None for value in (
+            cgroup_parent, memory_max_mib, cpu_max_percent, pids_max,
+        ))):
+            raise RunnerFailure("cgroup budgets require --sandbox bwrap and all four cgroup flags")
+        try:
+            policy = None if not has_cgroup else CgroupPolicy(
+                Path(cgroup_parent), memory_max_mib, cpu_max_percent, pids_max,
+            )
+        except (CgroupError, TypeError) as exc:
+            raise RunnerFailure("Invalid cgroup task budget") from exc
         if sandbox == "bwrap":
             if self.workspace_root is None:
                 raise RunnerFailure("--sandbox bwrap requires --workspace-root")
@@ -295,6 +310,23 @@ class Runner:
                                         (str(exc) if isinstance(exc, SandboxError) else type(exc).__name__)) from None
                 if verified.returncode != 0:
                     raise RunnerFailure("bubblewrap isolation preflight failed; task was not claimed")
+        if policy is not None:
+            # Validate kernel delegation and child self-attachment BEFORE
+            # taking a task lease. Only a fixed no-op is executed here.
+            try:
+                validate_parent(policy)
+                with TaskCgroup(policy) as probe_scope:
+                    probe, fds = probe_scope.command(["/usr/bin/true"])
+                    check = subprocess.run(
+                        probe, pass_fds=fds, timeout=5, check=False,
+                        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL, env=worker_environment(),
+                    )
+                    if check.returncode != 0:
+                        raise CgroupError("cgroup bootstrap attach test failed")
+            except (CgroupError, OSError, subprocess.TimeoutExpired) as exc:
+                raise RunnerFailure("cgroup v2 preflight failed: " + type(exc).__name__) from None
+        self.cgroup_policy = policy
         self.sandbox = sandbox
         self.cpu_seconds = cpu_seconds
         self.address_space_mib = address_space_mib
@@ -376,6 +408,7 @@ class Runner:
                         structured=True, sandbox=self.sandbox,
                         cpu_seconds=self.cpu_seconds,
                         address_space_mib=self.address_space_mib,
+                        cgroup_policy=self.cgroup_policy,
                     )
                     assert isinstance(result, WorkerResult)
                     artifact_ids = self.upload_artifacts(task_id, epoch, result.artifacts, heartbeat)
