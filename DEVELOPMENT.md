@@ -64,3 +64,7 @@ c) 启动 `otternest-runner --server https://CONTROL_HOST --once -- /absolute/pa
 内置 `otternest-model-worker` 可以作为通用 Runner 的子进程，通过操作者明确配置的 OpenAI-compatible Chat Completions HTTPS API 生成文本成果。它不具备代码执行与浏览器工具，不代表已接通任何平台的个人订阅，也不自动验收成果。
 
 独立设置 `OTTERNEST_MODEL_API_KEY` 并用 `--pass-env OTTERNEST_MODEL_API_KEY` **仅对可信子进程放行**。完整命令、验证方式、明文数据外发边界和平台兼容限制见 [23 · 模型 Runner 适配器](docs/23-model-worker.md)。
+
+## Workspace 成果自动回传与多 Agent 交接
+
+在可信执行主机上，通用 Runner 可选 `--workspace-root /absolute/private/workspaces`。每项任务创建独立临时目录作为可执行程序 cwd；可信 Worker 可返回 `{"summary":"...","artifacts":[{"path":"result.txt"}],"checkpoint":{"summary":"..."}}`。Runner 将使用本身的 Agent Token 上传校验后的成果，在同一租约 epoch 记录自述检查点并提交任务。后继 Agent 只能从**已完成并验收**的 DAG 依赖中取得有界交接元数据。此功能**不是**不可信代码安全沙箱，不应将任意任务文本转为 shell。详见 [24 · Runner 成果与交接](docs/24-runner-artifact-handoff.md)。

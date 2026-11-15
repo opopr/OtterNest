@@ -73,6 +73,8 @@ def make_messages(packet: Any) -> list[dict[str, str]]:
     }
     reference = {
         "latest_verified_checkpoint": packet.get("latest_verified_checkpoint"),
+        "dependency_handoffs": packet.get("dependency_handoffs", []),
+        "dependency_handoffs_truncated": packet.get("dependency_handoffs_truncated", False),
         "memories": packet.get("memories", []),
         "decisions": packet.get("decisions", []),
     }

@@ -7,19 +7,118 @@ for running that executable under an appropriately isolated OS identity.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import stat
 import subprocess
 import sys
 import tempfile
 import time
-from pathlib import Path
+from contextlib import nullcontext
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
 
 import httpx
 
 
 class RunnerFailure(Exception):
     pass
+
+
+MAX_ARTIFACTS_PER_TASK = 8
+MAX_ARTIFACT_BYTES = 5 * 1024 * 1024
+MAX_TOTAL_ARTIFACT_BYTES = 20 * 1024 * 1024
+
+
+@dataclass(frozen=True)
+class WorkerArtifact:
+    path: Path
+    name: str
+
+
+@dataclass(frozen=True)
+class WorkerResult:
+    summary: str
+    artifacts: tuple[WorkerArtifact, ...] = ()
+    checkpoint_summary: str | None = None
+    checkpoint_next_steps: str = ""
+
+
+def parse_worker_output(output: str, workspace: Path | None = None) -> WorkerResult:
+    """Parse an optional manifest without trusting output paths or arbitrary URLs.
+
+    Legacy plain text / {"summary": "..."} output remains supported.
+    Artifact files must be inside an operator-supplied per-task workspace.
+    """
+    try:
+        document = json.loads(output)
+    except (ValueError, TypeError):
+        document = None
+    if not isinstance(document, dict) or not isinstance(document.get("summary"), str):
+        if isinstance(document, dict) and ("artifacts" in document or "checkpoint" in document):
+            raise RunnerFailure("Worker manifest requires a textual summary")
+        return WorkerResult(summary=output)
+    summary = document["summary"].strip()
+    if not summary or len(summary) > 20000:
+        raise RunnerFailure("Worker result summary is empty or too large")
+
+    artifacts_data = document.get("artifacts", [])
+    if not isinstance(artifacts_data, list) or len(artifacts_data) > MAX_ARTIFACTS_PER_TASK:
+        raise RunnerFailure("Worker manifest has too many artifacts")
+    if artifacts_data and workspace is None:
+        raise RunnerFailure("Artifact manifest requires --workspace-root")
+    root = workspace.resolve(strict=True) if workspace is not None else None
+    artifacts: list[WorkerArtifact] = []
+    names: set[str] = set()
+    source_paths: set[Path] = set()
+    for item in artifacts_data:
+        if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+            raise RunnerFailure("Worker artifact needs a relative path")
+        relative = item["path"]
+        parts = PurePosixPath(relative).parts
+        if (not relative or relative.startswith("/") or "\\" in relative or
+                not parts or any(p in {".", ".."} for p in parts) or ":" in parts[0]):
+            raise RunnerFailure("Worker artifact path must be a safe relative POSIX path")
+        name = item.get("name", parts[-1])
+        if (not isinstance(name, str) or not 1 <= len(name) <= 240 or
+                not name.isascii() or any(not 32 <= ord(c) <= 126 for c in name) or
+                "/" in name or "\\" in name or name in names):
+            raise RunnerFailure("Artifact names must be unique, printable ASCII filenames")
+        assert root is not None
+        candidate = root.joinpath(*parts)
+        # Reject links even when their targets remain inside the workspace.
+        if any((root.joinpath(*parts[:i])).is_symlink() for i in range(1, len(parts) + 1)):
+            raise RunnerFailure("Artifact manifest cannot contain symlinks")
+        try:
+            resolved = candidate.resolve(strict=True)
+            details = resolved.stat()
+        except (OSError, ValueError, RuntimeError):
+            raise RunnerFailure("Artifact manifest references a missing or invalid file") from None
+        if not resolved.is_relative_to(root) or not stat.S_ISREG(details.st_mode):
+            raise RunnerFailure("Artifact must be a regular workspace file")
+        if details.st_nlink != 1:
+            raise RunnerFailure("Artifact hard links are not allowed")
+        if details.st_size > MAX_ARTIFACT_BYTES:
+            raise RunnerFailure("Artifact exceeds 5 MiB")
+        if resolved in source_paths:
+            raise RunnerFailure("Duplicate artifact source path")
+        names.add(name)
+        source_paths.add(resolved)
+        artifacts.append(WorkerArtifact(resolved, name))
+
+    checkpoint = document.get("checkpoint")
+    checkpoint_summary = None
+    checkpoint_next_steps = ""
+    if checkpoint is not None:
+        if not isinstance(checkpoint, dict) or not isinstance(checkpoint.get("summary"), str):
+            raise RunnerFailure("Checkpoint must contain a summary")
+        checkpoint_summary = checkpoint["summary"].strip()
+        checkpoint_next_steps = checkpoint.get("next_steps", "")
+        if (not checkpoint_summary or len(checkpoint_summary) > 10000 or
+                not isinstance(checkpoint_next_steps, str) or len(checkpoint_next_steps) > 6000):
+            raise RunnerFailure("Checkpoint content is invalid")
+    return WorkerResult(summary, tuple(artifacts), checkpoint_summary, checkpoint_next_steps)
 
 
 def worker_environment(pass_env: tuple[str, ...] = ()) -> dict[str, str]:
@@ -33,7 +132,8 @@ def worker_environment(pass_env: tuple[str, ...] = ()) -> dict[str, str]:
 
 
 def execute_command(command: list[str], packet: dict, timeout_seconds: int,
-                    heartbeat, pass_env: tuple[str, ...] = ()) -> str:
+                    heartbeat, pass_env: tuple[str, ...] = (), *,
+                    workspace: Path | None = None, structured: bool = False) -> str | WorkerResult:
     """Explicit executable, no shell; output bounded before returning to server."""
     if not command:
         raise RunnerFailure("No execution command configured")
@@ -46,7 +146,7 @@ def execute_command(command: list[str], packet: dict, timeout_seconds: int,
     with tempfile.TemporaryFile() as stdin, tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
         stdin.write(content)
         stdin.seek(0)
-        with subprocess.Popen(command, shell=False, stdin=stdin,
+        with subprocess.Popen(command, shell=False, stdin=stdin, cwd=workspace,
                               stdout=stdout, stderr=stderr, env=worker_environment(pass_env)) as proc:
             try:
                 started = time.monotonic()
@@ -82,19 +182,14 @@ def execute_command(command: list[str], packet: dict, timeout_seconds: int,
             output = data.decode("utf-8", errors="replace").strip()
             if not output:
                 raise RunnerFailure("Executable produced no result")
-            try:
-                parsed = json.loads(output)
-                if isinstance(parsed, dict) and isinstance(parsed.get("summary"), str):
-                    output = parsed["summary"]
-            except (ValueError, TypeError):
-                pass
-            return output[:20000]
+            result = parse_worker_output(output, workspace)
+            return result if structured else result.summary
 
 
 class Runner:
     def __init__(self, server: str, token: str, command: list[str], timeout: int = 600,
                  allow_r3: bool = False, pass_env: tuple[str, ...] = (),
-                 runtime_id: str | None = None):
+                 runtime_id: str | None = None, workspace_root: str | None = None):
         if not token.startswith("on_agent_"):
             raise RunnerFailure("OTTERNEST_AGENT_TOKEN required (not the owner token)")
         if not server.startswith("https://") and not (server.startswith("http://127.0.0.1:") or server.startswith("http://localhost:")):
@@ -108,6 +203,49 @@ class Runner:
         self.allow_r3 = allow_r3
         self.pass_env = pass_env
         self.runtime_id = runtime_id
+        if workspace_root is not None:
+            configured_root = Path(workspace_root)
+            if not configured_root.is_absolute() or not configured_root.is_dir():
+                raise RunnerFailure("--workspace-root must be an existing absolute directory")
+            self.workspace_root = configured_root.resolve(strict=True)
+        else:
+            self.workspace_root = None
+
+    def upload_artifacts(self, task_id: str, epoch: int,
+                         artifacts: tuple[WorkerArtifact, ...], heartbeat) -> list[str]:
+        """Upload only verified private-workspace files under the active lease."""
+        uploaded: list[str] = []
+        total_bytes = 0
+        for artifact in artifacts:
+            # O_NOFOLLOW protects the final component against link replacement;
+            # the directory must also be isolated with OS-level permissions.
+            fd = os.open(artifact.path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            with os.fdopen(fd, "rb") as file:
+                info = os.fstat(file.fileno())
+                if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                    raise RunnerFailure("Artifact file was replaced or hard-linked")
+                if info.st_size > MAX_ARTIFACT_BYTES:
+                    raise RunnerFailure("Artifact exceeds 5 MiB")
+                content = file.read(MAX_ARTIFACT_BYTES + 1)
+            if len(content) > MAX_ARTIFACT_BYTES:
+                raise RunnerFailure("Artifact exceeds 5 MiB")
+            total_bytes += len(content)
+            if total_bytes > MAX_TOTAL_ARTIFACT_BYTES:
+                raise RunnerFailure("Artifact uploads exceed 20 MiB task limit")
+            heartbeat()
+            response = self.client.post(
+                f"/api/v1/tasks/{task_id}/artifacts",
+                params={"epoch": epoch},
+                headers={"X-Artifact-Name": artifact.name, "Content-Type": "application/octet-stream"},
+                content=content,
+            )
+            response.raise_for_status()
+            record = response.json()
+            if (not isinstance(record, dict) or not isinstance(record.get("id"), str) or
+                    record.get("checksum") != hashlib.sha256(content).hexdigest()):
+                raise RunnerFailure("Server artifact acknowledgement is invalid")
+            uploaded.append(record["id"])
+        return uploaded
 
     def api(self, method: str, path: str, payload=None):
         response = self.client.request(method, "/api/v1" + path, json=payload)
@@ -139,7 +277,28 @@ class Runner:
                 def heartbeat():
                     self.api("POST", f"/tasks/{task_id}/heartbeat", {"epoch": epoch})
                     self.runtime_heartbeat("busy")
-                summary = execute_command(self.command, packet, self.timeout, heartbeat, self.pass_env)
+                workspace_manager = (
+                    tempfile.TemporaryDirectory(prefix="otternest-task-", dir=self.workspace_root)
+                    if self.workspace_root is not None else nullcontext(None)
+                )
+                with workspace_manager as workspace_dir:
+                    result = execute_command(
+                        self.command, packet, self.timeout, heartbeat, self.pass_env,
+                        workspace=Path(workspace_dir) if workspace_dir else None,
+                        structured=True,
+                    )
+                    assert isinstance(result, WorkerResult)
+                    artifact_ids = self.upload_artifacts(task_id, epoch, result.artifacts, heartbeat)
+                    if artifact_ids or result.checkpoint_summary is not None:
+                        heartbeat()
+                        self.api("POST", f"/tasks/{task_id}/checkpoints", {
+                            "epoch": epoch,
+                            "summary": result.checkpoint_summary or "Runner uploaded task artifacts for owner review",
+                            "next_steps": result.checkpoint_next_steps,
+                            "artifact_ids": artifact_ids,
+                        })
+                # The task remains submitted, not accepted, until a human reviews.
+                self.api("POST", f"/tasks/{task_id}/submit", {"epoch": epoch, "summary": result.summary})
             except Exception as exc:
                 # Don't leak stderr, environment or traceback into an Agent-visible
                 # task summary. Worker still needs local operator diagnostics.
@@ -154,7 +313,6 @@ class Runner:
                 except httpx.HTTPError:
                     pass
                 return True
-            self.api("POST", f"/tasks/{task_id}/submit", {"epoch": epoch, "summary": summary})
             print(f"Task submitted for review: {task_id}")
             self.runtime_heartbeat("idle")
             return True
@@ -172,6 +330,8 @@ def main():
     parser.add_argument("--runtime-id", default=os.environ.get("OTTERNEST_RUNTIME_ID", ""),
                         help="Pre-registered Agent runtime ID for periodic heartbeat")
     parser.add_argument("--timeout", type=int, default=600)
+    parser.add_argument("--workspace-root", default=None,
+                        help="Existing absolute private directory for opt-in artifact manifests")
     parser.add_argument("--allow-r3", action="store_true", help="Explicitly allow owner-authorized high-risk tasks")
     parser.add_argument("--pass-env", action="append", default=[], help="Explicitly expose one environment variable to the child")
     parser.add_argument("command", nargs=argparse.REMAINDER, help="-- /path/to/your-agent-command [args]")
@@ -182,7 +342,8 @@ def main():
     try:
         runner = Runner(args.server, os.environ.get("OTTERNEST_AGENT_TOKEN", ""), command,
                         timeout=args.timeout, allow_r3=args.allow_r3, pass_env=tuple(args.pass_env),
-                        runtime_id=args.runtime_id or None)
+                        runtime_id=args.runtime_id or None,
+                        workspace_root=args.workspace_root)
         try:
             while True:
                 worked = runner.run_one()
