@@ -168,3 +168,12 @@ network restrictions, manual reconciliation and cancellation semantics.
 - 使用操作者本机安装和认证的 Codex CLI；不从 OtterNest 获取登录 Cookie、API Key 或会话，不宣称已接入用户真实个人订阅。模拟 CLI 的端到端测试覆盖 Agent 任务领取到人工验收；真实 WSL2/账户联调尚待进行。
 - Cloud Codex CLI 需要网络与单独受控的认证目录；不能放入此前断网的 bubblewrap Worker 后又声称可访问云模型。当前以专用可信执行身份运行 CLI，进一步的恶意代码沙箱/独立节点隔离仍为必做项。
 - 使用方式、来源和边界参见 [29 · Codex CLI 非交互 Worker](29-codex-cli-worker.md)。
+
+
+## 本轮：固定 GitHub 提交快照与 Codex 代码补丁交接
+
+- Codex CLI Worker 可由执行机操作员指定 GitHub 公共仓库 `owner/repo` 或可信本地 Git 仓库，必须一并指定完整 commit SHA 与明确的 `refs/heads/...`。只接受经核对的分支头，不接受任务内容修改来源或 Git 身份凭据。
+- 使用有界 `git archive` 生成不包含 `.git` 的独立代码快照，限制文件数量/体积并拒绝特殊文件、链接及不安全路径；默认只读时拒绝实际源码修改。
+- 显式授权 `workspace-write` 时，比较源基线和结果工作区并输出 `changes.patch` 与 `otternest-provenance.json`，记录原始提交、补丁 SHA-256 和变更数量；**不会自动向 GitHub push、提交 PR、应用补丁或合并**。
+- 自动化测试基于临时真实 Git 源仓库、模拟 Codex CLI、Git 补丁校验和完整 Runner/API/人工验收流水线。真实公共 GitHub 网络拉取、个人 Codex 登录、WSL2/ARM 联调、私有仓库认证、完整代码安全隔离及人工审核后的 PR 创建仍未完成。
+- 边界与操作说明见 [30 · GitHub 固定提交快照与代码补丁](30-git-snapshot-patch.md)。
