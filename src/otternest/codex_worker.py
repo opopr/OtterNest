@@ -9,6 +9,7 @@ sandbox for adversarial code.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -20,6 +21,8 @@ from pathlib import Path
 from typing import Any
 
 from .runner import RunnerFailure, parse_worker_output
+from .git_snapshot import (SnapshotError, SnapshotSpec, import_snapshot,
+                           compare_snapshot, make_patch, PATCH_NAME)
 
 MAX_INPUT_BYTES = 300_000
 MAX_PROMPT_BYTES = 180_000
@@ -62,6 +65,7 @@ def build_prompt(packet: dict) -> str:
             "id", "project_id", "title", "instruction", "acceptance", "risk"
         )},
         "goal": packet.get("goal"),
+        "source_snapshot": packet.get("source_snapshot"),
     }
     reference = {
         "latest_verified_checkpoint": packet.get("latest_verified_checkpoint"),
@@ -181,7 +185,9 @@ def run_codex(
     packet: dict, *, cli: str = "codex", model: str | None = None,
     mode: str = "read-only", enable_workspace_write: bool = False,
     timeout: int = 600, artifacts: tuple[str, ...] = (),
-    workspace: Path | None = None,
+    workspace: Path | None = None, github_repo: str | None = None,
+    local_repo: Path | None = None, repo_ref: str | None = None,
+    repo_commit: str | None = None, patch_file: str = "changes.patch",
 ) -> dict[str, Any]:
     if mode not in {"read-only", "workspace-write"}:
         raise CodexWorkerError("Unsupported Codex permission mode")
@@ -189,10 +195,22 @@ def run_codex(
         raise CodexWorkerError("Workspace-write requires explicit operator opt-in")
     if artifacts and mode != "workspace-write":
         raise CodexWorkerError("Artifact paths require workspace-write permission")
-    if mode == "workspace-write" and not artifacts:
-        raise CodexWorkerError("Workspace-write requires at least one operator-declared artifact")
-    if len(artifacts) > 8 or len(set(artifacts)) != len(artifacts):
-        raise CodexWorkerError("Artifact list must be unique and contain at most 8 paths")
+    has_source = (github_repo is not None or local_repo is not None or
+                  repo_ref is not None or repo_commit is not None)
+    if has_source and (repo_ref is None or repo_commit is None or
+                       (github_repo is None) == (local_repo is None)):
+        raise CodexWorkerError("Pinned repository requires source, ref and full commit SHA")
+    if mode == "workspace-write" and not (artifacts or has_source):
+        raise CodexWorkerError("Workspace-write requires a declared artifact or pinned source patch")
+    if len(artifacts) + (2 if has_source and mode == "workspace-write" else 0) > 8:
+        raise CodexWorkerError("Too many artifact paths")
+    if len(set(artifacts)) != len(artifacts):
+        raise CodexWorkerError("Artifact list must be unique")
+    if has_source and mode == "workspace-write":
+        if not PATCH_NAME.fullmatch(patch_file) or patch_file in {
+            "otternest-provenance.json", *artifacts,
+        } or "otternest-provenance.json" in artifacts:
+            raise CodexWorkerError("Patch and provenance artifact names must be distinct safe filenames")
     if type(timeout) is not int or not 30 <= timeout <= 3600:
         raise CodexWorkerError("Codex timeout must be 30..3600 seconds")
     if model is not None and (
@@ -203,6 +221,27 @@ def run_codex(
         raise CodexWorkerError("Codex worker requires an existing task workspace")
     command = resolve_cli(cli)
     env = codex_environment(mode)
+    snapshot = None
+    if has_source:
+        try:
+            spec = SnapshotSpec(
+                ref=repo_ref, commit=repo_commit,
+                github_repo=github_repo, local_repo=local_repo,
+            )
+            snapshot = import_snapshot(spec, workspace)
+            if (mode == "workspace-write" and (
+                patch_file in snapshot.files or
+                "otternest-provenance.json" in snapshot.files
+            )):
+                raise SnapshotError("Snapshot contains reserved patch/provenance filenames")
+        except SnapshotError as exc:
+            raise CodexWorkerError(str(exc)) from None
+        packet = dict(packet)
+        packet["source_snapshot"] = {
+            "origin": snapshot.origin, "ref": snapshot.ref,
+            "commit": snapshot.commit,
+            "workspace": "a detached source snapshot without .git metadata",
+        }
     prompt = build_prompt(packet)
     # Output path is not in the model-writable workspace and has a private parent.
     with tempfile.TemporaryDirectory(prefix="otternest-codex-") as output_dir:
@@ -236,6 +275,34 @@ def run_codex(
             events = event_file.read(MAX_EVENTS_BYTES + 1)
         validate_events(events)
         summary = _read_final_message(final_path)
+    if snapshot is not None:
+        try:
+            if mode == "read-only":
+                if compare_snapshot(snapshot, workspace):
+                    raise SnapshotError("Read-only Codex task modified the pinned source snapshot")
+            else:
+                patch, changed_count = make_patch(
+                    snapshot, workspace,
+                    reserved=frozenset({patch_file, "otternest-provenance.json"}),
+                )
+                (workspace / patch_file).write_bytes(patch)
+                provenance = {
+                    "schema": "otternest.git-patch.v1",
+                    "origin": snapshot.origin, "ref": snapshot.ref,
+                    "base_commit": snapshot.commit,
+                    "patch_filename": patch_file,
+                    "patch_sha256": hashlib.sha256(patch).hexdigest(),
+                    "changed_files": changed_count,
+                    "auto_applied": False,
+                    "tests_verified_by_owner": False,
+                }
+                (workspace / "otternest-provenance.json").write_text(
+                    json.dumps(provenance, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+                    encoding="utf-8",
+                )
+                artifacts = (*artifacts, patch_file, "otternest-provenance.json")
+        except SnapshotError as exc:
+            raise CodexWorkerError(str(exc)) from None
     manifest: dict[str, Any] = {"summary": summary}
     if artifacts:
         manifest["artifacts"] = [{"path": name} for name in artifacts]
@@ -261,13 +328,27 @@ def main() -> None:
     parser.add_argument("--artifact", action="append", default=[],
                         help="Operator-approved relative output file (repeatable)")
     parser.add_argument("--timeout", type=int, default=600)
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument("--github-repo", default=None,
+                        help="Public GitHub owner/repository (no arbitrary URLs)")
+    source.add_argument("--local-repo", default=None,
+                        help="Operator-trusted absolute local Git repository")
+    parser.add_argument("--repo-ref", default=None,
+                        help="Pinned branch ref such as refs/heads/main")
+    parser.add_argument("--repo-commit", default=None,
+                        help="Full expected Git commit SHA")
+    parser.add_argument("--patch-file", default="changes.patch",
+                        help="Generated review-only text patch file name")
     args = parser.parse_args()
     try:
         result = run_codex(
             read_packet(), cli=args.cli, model=args.model, mode=args.mode,
             enable_workspace_write=args.enable_workspace_write,
             artifacts=tuple(args.artifact), timeout=args.timeout,
-            workspace=Path.cwd(),
+            workspace=Path.cwd(), github_repo=args.github_repo,
+            local_repo=Path(args.local_repo) if args.local_repo else None,
+            repo_ref=args.repo_ref, repo_commit=args.repo_commit,
+            patch_file=args.patch_file,
         )
     except CodexWorkerError as exc:
         print("OtterNest Codex worker: " + str(exc), file=sys.stderr)
