@@ -74,7 +74,7 @@ def test_artifact_versions_are_immutable_and_review_is_final(env, owner_headers,
     assert env.post(
         f"/api/v1/artifacts/{second['id']}/review",
         headers=owner_headers,
-        json={"accepted": False, "note": "short"},
+        json={"accepted": False, "note": "bad"},
     ).status_code == 422
     rejected = env.post(
         f"/api/v1/artifacts/{second['id']}/review",
