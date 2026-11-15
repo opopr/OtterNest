@@ -147,6 +147,8 @@ def validate_events(raw: bytes) -> None:
                 if not seen_start or seen_end:
                     raise ValueError("Unexpected turn completion")
                 seen_end = True
+    except CodexWorkerError:
+        raise
     except (ValueError, UnicodeDecodeError):
         raise CodexWorkerError("Invalid Codex JSONL event stream") from None
     if not (seen_start and seen_end):
