@@ -97,6 +97,9 @@ def test_preflight_probes_membership_before_claim(monkeypatch, tmp_path):
     monkeypatch.setattr(runner, "build_bwrap_command", lambda c, d: ["/usr/bin/true"])
     monkeypatch.setattr(runner, "apply_linux_resource_limits", lambda cmd, **kw: cmd)
     monkeypatch.setattr(runner, "validate_parent", lambda _: events.append("validate"))
+    monkeypatch.setattr(runner, "CgroupOwnerLock", lambda _: SimpleNamespace(
+        acquire=lambda: SimpleNamespace(close=lambda: None)))
+    monkeypatch.setattr(runner, "scan_scopes", lambda _: ())
     class FakeScope:
         def __init__(self, p): events.append("create")
         def __enter__(self): events.append("enter"); return self
