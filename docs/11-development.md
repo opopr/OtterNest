@@ -11,7 +11,7 @@ OtterNest 已进入**完整产品开发**。此文件是工程状态登记，而
 | 领域 | 当前实际状态 | 完整产品目标 |
 |---|---|---|
 | 项目与长期目标 | 基础 API、项目宪章与硬预算（范围/并发/总量）、生命周期暂停/归档 | 目标依赖、自治契约、Portfolio |
-| 账号 / Agent / 运行环境 | 注册、令牌、项目成员、运行实例与心跳、能力声明/核验、待办轮询、通用 CLI Runner | 能力验证、环境探测、健康状态、Agent 生命周期 |
+| 账号 / Agent / 运行环境 | 注册、令牌、项目成员、运行实例与心跳、能力声明/核验、待办轮询、通用 CLI Runner、可配置的 OpenAI-compatible 文本模型子进程 | 能力验证、环境探测、健康状态、Agent 生命周期与真实多平台联调 |
 | 任务执行 | 领取、租约、epoch、提交、失败阻塞、人工验收；依赖 DAG、优先级、定向分配、调度；epoch 检查点/核验、租约撤回与交接包 | 依赖 DAG、调度、checkpoint、恢复、外部副作用防重 |
 | 数据与记忆 | 记忆提案/发布/修订/归档、受审跨项目知识推广、无密文项目导出及暂停状态导入恢复、授权上下文包与内部证据检查 | 自动检索排序、成果文件内容的完整迁移与自动化恢复 |
 | 权限与审批 | 单所有者、Agent 项目隔离、R3 任务门禁、版本化 CommandPlan 预览确认、受限中文模板/可选模型建议 | RBAC/ABAC 细粒度策略、临时能力、Secrets 管理 |
@@ -110,3 +110,10 @@ network restrictions, manual reconciliation and cancellation semantics.
 
 增加 `TaskSideEffect` 不可回滚外部动作幂等台账（按 `(task_id, idempotency_key)` 防重、`reported_executed`/`unknown` 自述上报、阻断未对账任务的 `claim`/`unblock`，仅所有者 `reconcile` 核对 `verified_executed` 或 `verified_not_executed` 并在 MCP 桥接提供 2 个工具使总数达 15 个）、`Memory` 修订升级/归档（归档后自动退出上下文与非所有者列表）、`SkillEvaluation` 结构化评估与 `Skill` 归档、`CrossProjectShare` 双项目成员校验与所有者审批克隆（附来源溯源标记，拒绝时零污染），以及不含凭证的规范化 `GET /api/v1/projects/{id}/export`（`otternest.export.v1` + `sha256_digest`）。见 [20 · 外部副作用幂等、知识生命周期与可携带导出](20-side-effects-knowledge-portability.md)。
 
+
+## 本轮：文本模型执行适配与 Runner 输入稳健性
+
+- 新增 `otternest-model-worker`：明确配置可信 HTTPS Chat Completions 端点、模型 ID 与独立的模型 API Key；单次文本生成后由既有 Runner 提交 `submitted`，仍需所有者验收。
+- 模型适配器不继承 OtterNest 控制平面令牌，不支持外部工具/文件写入/自动授权，不假装已接通 Codex、Gemini 或 Muse 的个人订阅账号。
+- 通用 Runner 使用匿名临时文件提供 stdin，避免子进程不读取上下文时管道写入导致挂起；超出上限的 stdout 不再截断后提交。
+- 新增 MockTransport 与本地 HTTP 子进程联调测试；真实第三方模型仍待接入验证。运行与安全边界见 [23 · OpenAI-compatible 文本模型 Runner 适配器](23-model-worker.md)。

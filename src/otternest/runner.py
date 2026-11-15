@@ -40,13 +40,15 @@ def execute_command(command: list[str], packet: dict, timeout_seconds: int,
     content = json.dumps(packet, ensure_ascii=False).encode("utf-8")
     if len(content) > 300_000:
         raise RunnerFailure("Context too large for execution")
-    with tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
-        with subprocess.Popen(command, shell=False, stdin=subprocess.PIPE,
+    # A PIPE write may block forever if a child does not read stdin. Stage the
+    # bounded packet in an unnamed temporary file before starting the process,
+    # so the execution timeout and lease heartbeats cover all child behavior.
+    with tempfile.TemporaryFile() as stdin, tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
+        stdin.write(content)
+        stdin.seek(0)
+        with subprocess.Popen(command, shell=False, stdin=stdin,
                               stdout=stdout, stderr=stderr, env=worker_environment(pass_env)) as proc:
             try:
-                assert proc.stdin is not None
-                proc.stdin.write(content)
-                proc.stdin.close()
                 started = time.monotonic()
                 next_heartbeat = started + 30
                 while proc.poll() is None:
@@ -72,9 +74,11 @@ def execute_command(command: list[str], packet: dict, timeout_seconds: int,
                         proc.wait()
                 raise
             stdout.seek(0)
-            data = stdout.read(20000)
+            data = stdout.read(20001)
             if proc.returncode:
                 raise RunnerFailure(f"Configured executable exited with status {proc.returncode}")
+            if len(data) > 20000:
+                raise RunnerFailure("Executable output exceeded 20000 bytes")
             output = data.decode("utf-8", errors="replace").strip()
             if not output:
                 raise RunnerFailure("Executable produced no result")
