@@ -143,3 +143,11 @@ network restrictions, manual reconciliation and cancellation semantics.
 - 可选 `--cpu-seconds`、`--address-space-mib`，仅允许与 `--sandbox bwrap` 配合使用；在领取任务前检查 `prlimit` 和用户程序合法性，失败关闭、不默认降级。
 - 限额依赖每进程的 `RLIMIT_CPU` 和 `RLIMIT_AS`，**不是** cgroup v2 任务级 CPU/真实内存/PID 配额；不应据此宣称达到生产级不可信代码隔离。
 - 单元与 Linux 执行测试覆盖超时后的子进程回收及 CPU 限额，详细文档见 [26 · Runner 子进程回收与 Linux 资源限制](26-runner-process-limits.md)。
+
+
+## 本轮：Linux cgroup v2 任务级硬配额（需提前委托）
+
+- 为显式启用 `--sandbox bwrap` 的独立执行器增加可选 `--cgroup-parent`、`--memory-max-mib`、`--cpu-max-percent`、`--pids-max`。只有 Linux cgroup v2 父目录已委托、对应控制器启用且测试进程能够成功入组时才允许领取任务。
+- 每次领取任务后在已委托父目录内创建新的子组，写 `memory.max` / `cpu.max` / `pids.max`，由可信启动程序**先写 cgroup.procs，再 exec worker**，规避先运行再入组的竞态；结束时用 `cgroup.kill` 清理。
+- 现有 PostgreSQL、任务 epoch、模型文本 Worker、Agent 成果回传与人工验收无需变动。没有要求引入 Docker。
+- 单元测试覆盖资源配额参数、流程检查、进程预入组与失败关闭；真实 cgroup / WSL2 仅在具有委托权限的独立 Linux 测试机上 opt-in 验证。崩溃后的孤儿子组清理、系统级恶意代码安全审计、seccomp 和真实第三方 AI 平台接入仍待实现，见 [27 · cgroup v2 任务级资源控制](27-cgroup-v2-task-budgets.md)。
