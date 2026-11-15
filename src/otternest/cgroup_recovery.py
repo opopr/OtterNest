@@ -105,6 +105,8 @@ def scan_scopes(parent: Path) -> tuple[TaskScope, ...]:
             if len(populated) != 1 or populated[0] not in {"0", "1"}:
                 raise CgroupError("Cannot establish orphan cgroup population state")
             scopes.append(TaskScope(child.name, populated[0] == "1"))
+    except CgroupError:
+        raise
     except (OSError, ValueError, RuntimeError) as exc:
         raise CgroupError("Unable to inspect delegated cgroup children") from exc
     return tuple(scopes)
