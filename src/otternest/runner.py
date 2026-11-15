@@ -23,6 +23,7 @@ from pathlib import Path, PurePosixPath
 import httpx
 
 from .sandbox import SandboxError, build_bwrap_command, apply_linux_resource_limits
+from .cgroups import CgroupError, CgroupPolicy, TaskCgroup, validate_parent
 
 
 class RunnerFailure(Exception):
@@ -172,7 +173,8 @@ def execute_command(command: list[str], packet: dict, timeout_seconds: int,
                     heartbeat, pass_env: tuple[str, ...] = (), *,
                     workspace: Path | None = None, structured: bool = False,
                     sandbox: str = "none", cpu_seconds: int | None = None,
-                    address_space_mib: int | None = None) -> str | WorkerResult:
+                    address_space_mib: int | None = None,
+                    cgroup_policy: CgroupPolicy | None = None) -> str | WorkerResult:
     """Explicit executable, no shell; output bounded before returning to server."""
     if not command:
         raise RunnerFailure("No execution command configured")
@@ -180,7 +182,8 @@ def execute_command(command: list[str], packet: dict, timeout_seconds: int,
         raise RunnerFailure("Unsupported execution isolation mode")
     if sandbox == "bwrap" and pass_env:
         raise RunnerFailure("Sandboxed code execution does not pass through host credentials")
-    if sandbox != "bwrap" and (cpu_seconds is not None or address_space_mib is not None):
+    if sandbox != "bwrap" and (cpu_seconds is not None or address_space_mib is not None
+                               or cgroup_policy is not None):
         raise RunnerFailure("Resource limits require --sandbox bwrap")
     try:
         launch_command = build_bwrap_command(command, workspace) if sandbox == "bwrap" else command
@@ -195,35 +198,43 @@ def execute_command(command: list[str], packet: dict, timeout_seconds: int,
     # A PIPE write may block forever if a child does not read stdin. Stage the
     # bounded packet in an unnamed temporary file before starting the process,
     # so the execution timeout and lease heartbeats cover all child behavior.
-    with tempfile.TemporaryFile() as stdin, tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
-        stdin.write(content)
-        stdin.seek(0)
-        with subprocess.Popen(launch_command, shell=False, stdin=stdin, cwd=workspace,
-                              stdout=stdout, stderr=stderr, env=worker_environment(pass_env),
-                              start_new_session=(os.name == "posix")) as proc:
-            try:
-                started = time.monotonic()
-                next_heartbeat = started + 30
-                while proc.poll() is None:
-                    if time.monotonic() - started >= timeout_seconds:
-                        raise RunnerFailure("Execution exceeded configured timeout")
-                    if time.monotonic() >= next_heartbeat:
-                        heartbeat()  # abort on revoked or expired lease
-                        next_heartbeat = time.monotonic() + 30
-                    time.sleep(0.1)
-            finally:
-                _stop_worker_tree(proc)
-            stdout.seek(0)
-            data = stdout.read(20001)
-            if proc.returncode:
-                raise RunnerFailure(f"Configured executable exited with status {proc.returncode}")
-            if len(data) > 20000:
-                raise RunnerFailure("Executable output exceeded 20000 bytes")
-            output = data.decode("utf-8", errors="replace").strip()
-            if not output:
-                raise RunnerFailure("Executable produced no result")
-            result = parse_worker_output(output, workspace)
-            return result if structured else result.summary
+    try:
+        scope_manager = TaskCgroup(cgroup_policy) if cgroup_policy else nullcontext(None)
+        with scope_manager as scope:
+            fds: tuple[int, ...] = ()
+            if scope is not None:
+                launch_command, fds = scope.command(launch_command)
+            with tempfile.TemporaryFile() as stdin, tempfile.TemporaryFile() as stdout, tempfile.TemporaryFile() as stderr:
+                stdin.write(content)
+                stdin.seek(0)
+                with subprocess.Popen(launch_command, shell=False, stdin=stdin, cwd=workspace,
+                                      stdout=stdout, stderr=stderr, env=worker_environment(pass_env),
+                                      start_new_session=(os.name == "posix"), pass_fds=fds) as proc:
+                    try:
+                        started = time.monotonic()
+                        next_heartbeat = started + 30
+                        while proc.poll() is None:
+                            if time.monotonic() - started >= timeout_seconds:
+                                raise RunnerFailure("Execution exceeded configured timeout")
+                            if time.monotonic() >= next_heartbeat:
+                                heartbeat()  # abort on revoked or expired lease
+                                next_heartbeat = time.monotonic() + 30
+                            time.sleep(0.1)
+                    finally:
+                        _stop_worker_tree(proc)
+                    stdout.seek(0)
+                    data = stdout.read(20001)
+                    if proc.returncode:
+                        raise RunnerFailure(f"Configured executable exited with status {proc.returncode}")
+                    if len(data) > 20000:
+                        raise RunnerFailure("Executable output exceeded 20000 bytes")
+                    output = data.decode("utf-8", errors="replace").strip()
+                    if not output:
+                        raise RunnerFailure("Executable produced no result")
+                    result = parse_worker_output(output, workspace)
+                    return result if structured else result.summary
+    except CgroupError as exc:
+        raise RunnerFailure(str(exc)) from None
 
 
 class Runner:
