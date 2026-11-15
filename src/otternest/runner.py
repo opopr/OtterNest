@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import json
 import os
+import signal
 import stat
 import subprocess
 import sys
@@ -21,7 +22,7 @@ from pathlib import Path, PurePosixPath
 
 import httpx
 
-from .sandbox import SandboxError, build_bwrap_command
+from .sandbox import SandboxError, build_bwrap_command, apply_linux_resource_limits
 
 
 class RunnerFailure(Exception):
@@ -31,6 +32,40 @@ class RunnerFailure(Exception):
 MAX_ARTIFACTS_PER_TASK = 8
 MAX_ARTIFACT_BYTES = 5 * 1024 * 1024
 MAX_TOTAL_ARTIFACT_BYTES = 20 * 1024 * 1024
+
+
+def _stop_worker_tree(proc: subprocess.Popen) -> None:
+    """Reap the leader and signal its private process group on every exit.
+
+    The host session is never signaled. In bwrap mode, killing the namespace
+    leader also tears down processes inside its PID namespace. A TRUSTED
+    worker which deliberately escapes its process group is not contained.
+    """
+    if os.name == "posix":
+        try:
+            os.killpg(proc.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            proc.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            pass
+        # Always send KILL to remaining descendants, even when the leader has
+        # already exited successfully. A leader-only terminate leaks children.
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        if proc.poll() is None:
+            proc.kill()
+    elif proc.poll() is None:
+        proc.terminate()
+        try:
+            proc.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    proc.wait()
+
 
 
 @dataclass(frozen=True)
@@ -136,7 +171,8 @@ def worker_environment(pass_env: tuple[str, ...] = ()) -> dict[str, str]:
 def execute_command(command: list[str], packet: dict, timeout_seconds: int,
                     heartbeat, pass_env: tuple[str, ...] = (), *,
                     workspace: Path | None = None, structured: bool = False,
-                    sandbox: str = "none") -> str | WorkerResult:
+                    sandbox: str = "none", cpu_seconds: int | None = None,
+                    address_space_mib: int | None = None) -> str | WorkerResult:
     """Explicit executable, no shell; output bounded before returning to server."""
     if not command:
         raise RunnerFailure("No execution command configured")
@@ -144,8 +180,13 @@ def execute_command(command: list[str], packet: dict, timeout_seconds: int,
         raise RunnerFailure("Unsupported execution isolation mode")
     if sandbox == "bwrap" and pass_env:
         raise RunnerFailure("Sandboxed code execution does not pass through host credentials")
+    if sandbox != "bwrap" and (cpu_seconds is not None or address_space_mib is not None):
+        raise RunnerFailure("Resource limits require --sandbox bwrap")
     try:
         launch_command = build_bwrap_command(command, workspace) if sandbox == "bwrap" else command
+        launch_command = apply_linux_resource_limits(
+            launch_command, cpu_seconds=cpu_seconds, address_space_mib=address_space_mib,
+        )
     except SandboxError as exc:
         raise RunnerFailure(str(exc)) from None
     content = json.dumps(packet, ensure_ascii=False).encode("utf-8")
@@ -158,32 +199,20 @@ def execute_command(command: list[str], packet: dict, timeout_seconds: int,
         stdin.write(content)
         stdin.seek(0)
         with subprocess.Popen(launch_command, shell=False, stdin=stdin, cwd=workspace,
-                              stdout=stdout, stderr=stderr, env=worker_environment(pass_env)) as proc:
+                              stdout=stdout, stderr=stderr, env=worker_environment(pass_env),
+                              start_new_session=(os.name == "posix")) as proc:
             try:
                 started = time.monotonic()
                 next_heartbeat = started + 30
                 while proc.poll() is None:
                     if time.monotonic() - started >= timeout_seconds:
-                        proc.terminate()
-                        try:
-                            proc.wait(timeout=5)
-                        except subprocess.TimeoutExpired:
-                            proc.kill()
-                            proc.wait()
                         raise RunnerFailure("Execution exceeded configured timeout")
                     if time.monotonic() >= next_heartbeat:
                         heartbeat()  # abort on revoked or expired lease
                         next_heartbeat = time.monotonic() + 30
                     time.sleep(0.1)
-            except Exception:
-                if proc.poll() is None:
-                    proc.terminate()
-                    try:
-                        proc.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        proc.kill()
-                        proc.wait()
-                raise
+            finally:
+                _stop_worker_tree(proc)
             stdout.seek(0)
             data = stdout.read(20001)
             if proc.returncode:
@@ -201,7 +230,8 @@ class Runner:
     def __init__(self, server: str, token: str, command: list[str], timeout: int = 600,
                  allow_r3: bool = False, pass_env: tuple[str, ...] = (),
                  runtime_id: str | None = None, workspace_root: str | None = None,
-                 sandbox: str = "none"):
+                 sandbox: str = "none", cpu_seconds: int | None = None,
+                 address_space_mib: int | None = None):
         if not token.startswith("on_agent_"):
             raise RunnerFailure("OTTERNEST_AGENT_TOKEN required (not the owner token)")
         if not server.startswith("https://") and not (server.startswith("http://127.0.0.1:") or server.startswith("http://localhost:")):
@@ -224,6 +254,8 @@ class Runner:
             self.workspace_root = None
         if sandbox not in {"none", "bwrap"}:
             raise RunnerFailure("Unsupported execution isolation mode")
+        if sandbox != "bwrap" and (cpu_seconds is not None or address_space_mib is not None):
+            raise RunnerFailure("Resource limits require --sandbox bwrap")
         if sandbox == "bwrap":
             if self.workspace_root is None:
                 raise RunnerFailure("--sandbox bwrap requires --workspace-root")
@@ -234,7 +266,14 @@ class Runner:
             with tempfile.TemporaryDirectory(prefix="otternest-sandbox-probe-",
                                              dir=self.workspace_root) as probe_dir:
                 try:
+                    # Validate the configured executable before leasing a task,
+                    # but NEVER execute its program during preflight.
+                    build_bwrap_command(self.command, Path(probe_dir))
                     probe = build_bwrap_command(["true"], Path(probe_dir))
+                    probe = apply_linux_resource_limits(
+                        probe, cpu_seconds=cpu_seconds,
+                        address_space_mib=address_space_mib,
+                    )
                     verified = subprocess.run(
                         probe, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL, env=worker_environment(),
@@ -246,6 +285,8 @@ class Runner:
                 if verified.returncode != 0:
                     raise RunnerFailure("bubblewrap isolation preflight failed; task was not claimed")
         self.sandbox = sandbox
+        self.cpu_seconds = cpu_seconds
+        self.address_space_mib = address_space_mib
 
     def upload_artifacts(self, task_id: str, epoch: int,
                          artifacts: tuple[WorkerArtifact, ...], heartbeat) -> list[str]:
@@ -322,6 +363,8 @@ class Runner:
                         self.command, packet, self.timeout, heartbeat, self.pass_env,
                         workspace=Path(workspace_dir) if workspace_dir else None,
                         structured=True, sandbox=self.sandbox,
+                        cpu_seconds=self.cpu_seconds,
+                        address_space_mib=self.address_space_mib,
                     )
                     assert isinstance(result, WorkerResult)
                     artifact_ids = self.upload_artifacts(task_id, epoch, result.artifacts, heartbeat)
@@ -370,6 +413,10 @@ def main():
                         help="Existing absolute private directory for opt-in artifact manifests")
     parser.add_argument("--sandbox", choices=("none", "bwrap"), default="none",
                         help="Opt-in Linux bubblewrap isolation for local code workers (fails closed)")
+    parser.add_argument("--cpu-seconds", type=int, default=None,
+                        help="Optional sandbox CPU-time RLIMIT (1..3600 seconds), requires prlimit")
+    parser.add_argument("--address-space-mib", type=int, default=None,
+                        help="Optional sandbox virtual-address-space limit (64..16384 MiB), not RSS")
     parser.add_argument("--allow-r3", action="store_true", help="Explicitly allow owner-authorized high-risk tasks")
     parser.add_argument("--pass-env", action="append", default=[], help="Explicitly expose one environment variable to the child")
     parser.add_argument("command", nargs=argparse.REMAINDER, help="-- /path/to/your-agent-command [args]")
@@ -381,7 +428,9 @@ def main():
         runner = Runner(args.server, os.environ.get("OTTERNEST_AGENT_TOKEN", ""), command,
                         timeout=args.timeout, allow_r3=args.allow_r3, pass_env=tuple(args.pass_env),
                         runtime_id=args.runtime_id or None,
-                        workspace_root=args.workspace_root, sandbox=args.sandbox)
+                        workspace_root=args.workspace_root, sandbox=args.sandbox,
+                        cpu_seconds=args.cpu_seconds,
+                        address_space_mib=args.address_space_mib)
         try:
             while True:
                 worked = runner.run_one()
