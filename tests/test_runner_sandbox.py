@@ -41,7 +41,8 @@ def test_builder_no_host_home_no_network_and_read_only_system(monkeypatch, tmp_p
         str(tmp_path.resolve()), "/work"
     ]
     assert args[args.index("--chdir") + 1] == "/work"
-    assert args[-2:] == ["true", "--some-argument"] or args[-2:] == ["/usr/bin/true", "--some-argument"]
+    assert Path(args[-2]) == Path(shutil.which("true")).resolve()
+    assert args[-1] == "--some-argument"
     assert "--share-net" not in args
     assert "--bind" not in args[:args.index("--ro-bind")]
     assert "/home" not in args and "/root" not in args and "/etc" not in args
