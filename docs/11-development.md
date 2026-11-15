@@ -159,3 +159,12 @@ network restrictions, manual reconciliation and cancellation semantics.
 - 新增 `otternest-cgroup-recover` 运维 CLI：默认只预览 `cgroup.events` 的真实 `populated` 状态；显式 `--apply` 才清理已空的资源组，额外 `--terminate-populated` 才对存活的遗留进程调用 `cgroup.kill`。
 - 只清理严格匹配命名的直属资源组，检查 owner、symlink、锁文件权限和父目录授权；不修改宿主机全局 cgroup 配额。
 - 这一功能不代替真实 Linux/WSL2 委托测试、安全审计或无人值守恢复机制。说明见 [28 · cgroup 崩溃恢复](28-cgroup-crash-recovery.md)。
+
+
+## 本轮：Codex CLI 真实非交互协议 Worker（需操作员自行登录）
+
+- 新增 `otternest-codex-worker`：接收授权的 Task Context Packet，调用官方 `codex exec` 非交互命令，并以 `--json` 事件和 `--output-last-message` 核验完成状态；原始模型/CLI 日志不作为成功摘要写入控制面。
+- 默认 `read-only`；显式授权 `workspace-write` 且声明具体成果路径后，才允许操作独立任务目录内文件，之后沿用 Runner 文件 SHA-256、检查点和人工验收。未提供 `danger-full-access`、自动 Git push/PR 或生产部署。
+- 使用操作者本机安装和认证的 Codex CLI；不从 OtterNest 获取登录 Cookie、API Key 或会话，不宣称已接入用户真实个人订阅。模拟 CLI 的端到端测试覆盖 Agent 任务领取到人工验收；真实 WSL2/账户联调尚待进行。
+- Cloud Codex CLI 需要网络与单独受控的认证目录；不能放入此前断网的 bubblewrap Worker 后又声称可访问云模型。当前以专用可信执行身份运行 CLI，进一步的恶意代码沙箱/独立节点隔离仍为必做项。
+- 使用方式、来源和边界参见 [29 · Codex CLI 非交互 Worker](29-codex-cli-worker.md)。
