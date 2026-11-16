@@ -198,6 +198,7 @@ export default function ArtifactsPage() {
       <section className="panel project-toolbar"><div><div className="eyebrow">PROJECT WORKSPACE</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedProjectId} onChange={setSelectedProjectId} /><label className="task-select"><span>选择任务</span><select value={selectedTaskId} onChange={(event) => setSelectedTaskId(event.target.value)}><option value="">选择任务…</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label></section>
       <section className="panel">
         <div className="panel-heading"><div className="panel-title"><FileCheck2 size={17} /><h3>成果版本</h3><span className="count-chip">{artifacts.length}</span></div></div>
+        <p className="form-hint">当前任务：{selectedTask?.title || "未选择任务"}</p>
         <div className="artifact-upload">
           <label>上传文件<input type="file" onChange={(event) => setUploadFile(event.target.files?.[0] || null)} /></label>
           <label>敏感级<select value={sensitivity} onChange={(event) => setSensitivity(event.target.value)}><option value="public">公开</option><option value="internal">内部</option><option value="confidential">机密</option><option value="restricted">受限</option></select></label>
