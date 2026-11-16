@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, ClipboardCheck, Filter, RefreshCw, ShieldCheck, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, ClipboardCheck, Eye, Filter, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { request } from "../api/client";
 import type { Project, Task } from "../api/types";
+import { useAuth } from "../auth/AuthProvider";
+import TaskDetailPanel, { type TaskDetailSelection } from "../components/TaskDetailPanel";
 
 interface Row extends Task { project_name: string; }
 interface Plan { id:string; task_id:string; action:string; status:string; expires_at:string; expected_version:number; task_title?:string; }
@@ -11,6 +13,8 @@ const risks:Record<string,string>={R0:"低风险",R1:"一般风险",R2:"较高�
 const time=(v:string)=>new Date(v).toLocaleString("zh-CN",{hour12:false});
 
 export default function TaskCenterPage(){
+ const {user}=useAuth();
+ const [detailSelection,setDetailSelection]=useState<TaskDetailSelection|null>(null);
  const [projects,setProjects]=useState<Project[]>([]),[tasks,setTasks]=useState<Row[]>([]);
  const [project,setProject]=useState("all"),[status,setStatus]=useState("all"),[risk,setRisk]=useState("all"),[query,setQuery]=useState("");
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[plan,setPlan]=useState<Plan|null>(null);
@@ -62,10 +66,12 @@ export default function TaskCenterPage(){
      <p>{t.project_name} · 优先级 {t.priority} · {t.sensitivity}</p>
      <small>{t.result_summary||t.failure_reason||t.instruction}</small><small>任务 ID：{t.id}</small>
     </div><div className="task-center-actions">
+     <button className="secondary-button compact" onClick={()=>setDetailSelection({id:t.id,projectId:t.project_id,projectName:t.project_name})}><Eye size={14}/>详情</button>
      {t.status==="waiting_approval"&&<button className="secondary-button compact" disabled={saving} onClick={()=>void preview(t,"authorize_task")}><ShieldCheck size={14}/>预览授权</button>}
      {t.status==="submitted"&&<button className="secondary-button compact" disabled={saving} onClick={()=>void preview(t,"review_task")}><CheckCircle2 size={14}/>预览验收</button>}
     </div></article>)}</div>:<div className="empty-state"><ClipboardCheck size={24}/><strong>没有符合条件的任务</strong><p>调整筛选条件，或先在项目中创建任务。</p></div>}
   </section>
+  {detailSelection&&<TaskDetailPanel selection={detailSelection} isOwner={user?.kind==="owner"} onClose={()=>setDetailSelection(null)} onChanged={()=>void load()}/>}
   {plan&&<div className="modal-backdrop"><section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="command-title">
    <div className="panel-heading"><div className="panel-title"><ShieldCheck size={18}/><h3 id="command-title">确认任务操作</h3></div><button className="icon-button" onClick={()=>setPlan(null)}><X size={16}/></button></div>
    <p>服务端已生成限时命令预览。请核对操作，再明确确认。</p>
