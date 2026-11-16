@@ -7,6 +7,7 @@ import ProjectsPage from "./pages/ProjectsPage";
 import AgentsPage from "./pages/AgentsPage";
 import RuntimeMonitorPage from "./pages/RuntimeMonitorPage";
 import TaskCenterPage from "./pages/TaskCenterPage";
+import CommandCenterPage from "./pages/CommandCenterPage";
 import GovernancePage from "./pages/GovernancePage";
 import GoalsWorkflowPage from "./pages/GoalsWorkflowPage";
 import KnowledgePage from "./pages/KnowledgePage";
@@ -29,6 +30,7 @@ function AuthGate() {
           <Route index element={<OverviewPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/tasks" element={<TaskCenterPage />} />
+          <Route path="/command" element={<CommandCenterPage />} />
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/runtimes" element={<RuntimeMonitorPage />} />
           <Route path="/governance" element={<GovernancePage />} />

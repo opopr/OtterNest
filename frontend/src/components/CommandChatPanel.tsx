@@ -15,7 +15,7 @@ interface ChatMessage extends ChatTurn {
   a2ui?: A2UIResult;
   candidates?: Array<{ id: string; title: string; status: string; risk: string }>;
 }
-interface CommandPlan {
+export interface CommandPlan {
   id: string;
   task_id: string;
   project_id: string;
@@ -43,7 +43,9 @@ interface Props {
   onPlan: (plan: CommandPlan) => void;
 }
 
-const statusLabel: Record<string, string> = { waiting_approval: "等待授权", submitted: "等待验收", blocked: "阻塞", ready: "待执行" };
+const statusLabel: Record<string, string> = { waiting_approval: "等待授权", submitted: "等待验收", blocked: "阻塞", ready: "待执行", waiting_dependencies: "等待依赖", running: "执行中", completed: "已完成", cancelled: "已取消" };
+
+interface PlannerStatus { enabled: boolean; model: string | null; }
 
 export default function CommandChatPanel({ projectId, tasks, onPlan }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -52,6 +54,16 @@ export default function CommandChatPanel({ projectId, tasks, onPlan }: Props) {
   const [focusTaskId, setFocusTaskId] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [mode, setMode] = useState<"template" | "model">("template");
+  const [plannerStatus, setPlannerStatus] = useState<PlannerStatus>({ enabled: false, model: null });
+
+  useEffect(() => {
+    let active = true;
+    request<PlannerStatus>("/command/planner/status")
+      .then((status) => { if (active) setPlannerStatus(status); })
+      .catch(() => { if (active) setPlannerStatus({ enabled: false, model: null }); });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     setMessages([]);
@@ -81,7 +93,7 @@ export default function CommandChatPanel({ projectId, tasks, onPlan }: Props) {
           text: utterance,
           focus_task_id: focusTaskId || null,
           history,
-          mode: "template"
+          mode
         })
       });
       const assistantTurn: ChatTurn = {
@@ -119,15 +131,16 @@ export default function CommandChatPanel({ projectId, tasks, onPlan }: Props) {
 
   const chooseCandidate = (candidate: NonNullable<ChatMessage["candidates"]>[number]) => {
     setFocusTaskId(candidate.id);
-    setText("继续");
+    setText("为什么任务被阻塞？");
   };
 
   return (
     <section className="panel command-chat-panel">
       <div className="panel-heading"><div className="panel-title"><MessageSquare size={17} /><h3>多轮 Command Center</h3><span className="status-tag tag-blue">服务端上下文</span></div><button className="text-button" onClick={clear}><RefreshCw size={13} />清空会话</button></div>
       <div className="command-chat-toolbar">
+        <label>解析模式<select value={mode} onChange={(event) => setMode(event.target.value as "template" | "model")}><option value="template">规则模板（不调用外部模型）</option><option value="model" disabled={!plannerStatus.enabled}>模型建议{plannerStatus.enabled && plannerStatus.model ? " · " + plannerStatus.model : "（服务器未配置）"}</option></select></label>
         <label>当前任务上下文<select value={focusTaskId} onChange={(event) => setFocusTaskId(event.target.value)}><option value="">由系统根据会话判断</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title} · {statusLabel[task.status] || task.status}</option>)}</select></label>
-        <span className="muted-inline">保留最近 20 轮对话上下文</span>
+        <span className="muted-inline">{mode === "model" ? "模型将接收当前项目任务摘要、Agent 名称及最近 20 轮对话" : "规则模板仅使用本地白名单解析，不向外部发送项目内容"}</span>
       </div>
       <div className="command-chat-transcript">
         {!messages.length && <div className="chat-welcome"><div className="chat-welcome-icon"><Sparkles size={21} /></div><strong>你可以直接询问项目，也可以要求执行任务操作。</strong><p>系统会先查询权威状态；遇到对象不明确时会向你澄清，不会猜测任务。</p><div className="chat-suggestions"><button onClick={() => setText("查看项目状态和指标")}>查看项目状态和指标</button><button onClick={() => setText("为什么任务被阻塞？")}>解释任务阻塞原因</button><button onClick={() => setText("请批准它")}>批准当前任务</button></div></div>}
@@ -139,12 +152,12 @@ export default function CommandChatPanel({ projectId, tasks, onPlan }: Props) {
             <A2UIRenderer value={message.a2ui} />
           </div>
         </article>)}
-        {sending && <div className="chat-typing"><span className="spinner" />正在读取项目上下文…</div>}
+        {sending && <div className="chat-typing"><span className="spinner" />正在分析项目上下文…</div>}
       </div>
       {error && <div className="inline-error"><span>{error}</span></div>}
       <form className="command-chat-composer" onSubmit={(event) => void send(event)}>
         <textarea rows={2} value={text} onChange={(event) => setText(event.target.value)} maxLength={3500} placeholder="询问项目状态、解释任务原因，或提出任务操作指令…" />
-        <div className="command-chat-composer-foot"><span>模式：受限模板 + 项目上下文 · 不调用外部 LLM</span><button className="primary-button compact" disabled={sending || !text.trim()}><Send size={14} />发送</button></div>
+        <div className="command-chat-composer-foot"><span>{mode === "model" ? "模型建议 · 服务端密钥 · 仍需所有者确认" : "规则模板 · 本地解析 · 不调用外部 LLM"}</span><button className="primary-button compact" disabled={sending || !text.trim()}><Send size={14} />发送</button></div>
       </form>
     </section>
   );

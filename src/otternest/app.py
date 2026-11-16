@@ -18,6 +18,7 @@ from .a2a import router as a2a_router
 from .a2a_outbound import router as a2a_outbound_router
 from .governance import router as governance_router
 from .intent import router as intent_router
+from .command_center import router as command_center_router
 from .model_planner import router as model_planner_router
 from .evidence import router as evidence_router
 from .deliberation import router as deliberation_router
@@ -71,6 +72,7 @@ app.include_router(a2a_outbound_router)
 app.include_router(governance_router)
 app.include_router(intent_router)
 app.include_router(model_planner_router)
+app.include_router(command_center_router)
 app.include_router(evidence_router)
 app.include_router(deliberation_router)
 app.include_router(continuity_router)
