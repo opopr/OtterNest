@@ -5,6 +5,11 @@ import LoginPage from "./pages/LoginPage";
 import OverviewPage from "./pages/OverviewPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import AgentsPage from "./pages/AgentsPage";
+import GovernancePage from "./pages/GovernancePage";
+import GoalsWorkflowPage from "./pages/GoalsWorkflowPage";
+import KnowledgePage from "./pages/KnowledgePage";
+import PortfolioPage from "./pages/PortfolioPage";
+import SystemPage from "./pages/SystemPage";
 
 function AuthGate() {
   const { checking, isAuthenticated } = useAuth();
@@ -19,6 +24,11 @@ function AuthGate() {
           <Route index element={<OverviewPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/agents" element={<AgentsPage />} />
+          <Route path="/governance" element={<GovernancePage />} />
+          <Route path="/goals-workflows" element={<GoalsWorkflowPage />} />
+          <Route path="/knowledge" element={<KnowledgePage />} />
+          <Route path="/portfolio" element={<PortfolioPage />} />
+          <Route path="/system" element={<SystemPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

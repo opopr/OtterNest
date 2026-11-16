@@ -19,9 +19,9 @@ React 代码分层：
 - frontend/src/api：HTTP 客户端、DTO 和 OpenAPI 生成类型。
 - frontend/src/auth：所有者登录、初始化、2FA 和会话状态。
 - frontend/src/components：布局、导航和通用 UI。
-- frontend/src/pages：总览、项目任务和 Agent 页面。
+- frontend/src/pages：总览、项目任务、Agent、指挥中心、目标与工作流、知识库、Portfolio、系统与事件页面。
 
-第一阶段已经迁移登录、总览、项目/任务基础操作、Agent 登记和令牌一次性展示。审批、目标依赖、记忆、工作流、实验、成果归档、完整设置和 Command Center 等复杂页面暂时由 /legacy 承接，后续按领域逐页迁移；旧页面不在本阶段删除。
+第一阶段迁移登录、总览、项目/任务基础操作、Agent 登记和令牌一次性展示。第二阶段进一步迁移任务审批/决策审查、目标依赖/工作流、记忆/项目章程/跨项目共享、Portfolio/通知/实验、系统保护模式/项目状态/事件流。成果版本/归档、TaskGrant、Skills 完整管理、运行时诊断和深度 Command Center 仍由 /legacy 承接；旧页面不在迁移期间删除。
 
 ## 本地开发
 
@@ -70,3 +70,16 @@ FastAPI 运行时暴露 /openapi.json。启动本地 API 后执行 npm run api:t
 - 业务 API 的超时、错误和未知状态必须明确展示，不用模拟数据掩盖。
 - WebSocket 只用于事件提示；页面状态仍从权威 REST API 刷新。
 - 旧管理台至少保留到新前端覆盖全部高频操作并通过回归验收。
+
+
+## 第二阶段页面路由
+
+| React 路由 | 页面 | 核心后端接口 |
+|---|---|---|
+| /governance | 指挥中心与审批 | /command/plans、/decisions/*/reviews、/decisions/*/deliberation/*、/decisions/*/resolve |
+| /goals-workflows | 目标与工作流 | /projects/*/goal-board、/goals/*/status、/goals/*/dependencies、/projects/*/workflow-* |
+| /knowledge | 知识库与项目章程 | /projects/*/memories、/memories/*、/projects/*/charter、/projects/*/knowledge-shares |
+| /portfolio | Portfolio 总览 | /portfolio/metrics、/briefing/daily、/notifications、/projects/*/experiments、/portfolio/schedule |
+| /system | 系统设置与运行事件 | /system/mode、/projects/*/status、/projects/*/events |
+
+所有副作用操作都通过页面中的明确操作按钮触发；关键治理、调度、模式切换和归档类操作会要求用户确认。前端展示的是 API 响应，不以本地状态代替服务端状态。

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
-  Activity, ArrowUpRight, Bot, ChevronDown, CircleHelp, FolderKanban,
-  LayoutDashboard, LogOut, ShieldCheck, Wifi
+  Activity, ArrowUpRight, Bot, BookOpen, Gauge, ChevronDown, CircleHelp,
+  FolderKanban, GitBranch, LayoutDashboard, LogOut, Settings2, ShieldCheck, Wifi
 } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { request } from "../api/client";
@@ -11,7 +11,12 @@ import { useAuth } from "../auth/AuthProvider";
 const navigation = [
   { to: "/", label: "总览", icon: LayoutDashboard, end: true },
   { to: "/projects", label: "项目与任务", icon: FolderKanban },
-  { to: "/agents", label: "Agent 管理", icon: Bot }
+  { to: "/agents", label: "Agent 管理", icon: Bot },
+  { to: "/governance", label: "指挥中心", icon: ShieldCheck },
+  { to: "/goals-workflows", label: "目标与工作流", icon: GitBranch },
+  { to: "/knowledge", label: "知识库", icon: BookOpen },
+  { to: "/portfolio", label: "Portfolio", icon: ChartNoAxesCombined },
+  { to: "/system", label: "系统与事件", icon: Settings2 }
 ];
 
 export default function AppShell() {

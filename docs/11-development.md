@@ -22,7 +22,7 @@ OtterNest 已进入**完整产品开发**。此文件是工程状态登记，而
 | Skills / AG-UI / A2UI / WS | Skills 生命周期已实现；已新增项目 WebSocket 实时事件流、AG-UI 事件投影与 A2UI 组件白名单安全校验 | 全量客户端深度双向 AG-UI/A2UI 渲染 |
 | 多 Agent 协商 / 动态团队 | 第一/二轮独立决策复核、异议记录、显式受邀自动推进名单 | 自动辩论调度与动态成本预算组队 |
 | 自主改进 / 质量评估 | Skill 结构化评估、质量指标与失败归因统计、受控优化实验与回归门禁（`promote`/`rollback`） | 自动化沙箱回归数据集与灰度发布 |
-| Web 管理台 | 旧版管理台继续覆盖 DAG、指挥中心、通知、工作流、实验、保护模式和成果归档；React 前端首批迁移登录、总览、项目/任务基础操作和 Agent 登记，FastAPI 提供 OpenAPI 与静态构建交付 | 将审批、目标依赖、记忆、工作流、实验、归档、设置和 Command Center 逐页迁移到 React，并完成全量回归 |
+| Web 管理台 | React 已覆盖登录、总览、项目/任务基础操作、Agent 登记、任务审批/决策审查、目标依赖/工作流、记忆/项目章程/跨项目共享、Portfolio/通知/实验、系统保护模式/项目状态/事件流；旧版管理台继续兜底尚未迁移的成果与高级运维页面 | 迁移 Skills 管理、TaskGrant、成果版本/归档/恢复/GC、运行时监控、完整 Command Center 对话与 A2UI/AG-UI 深度交互，并完成全量回归 |
 | 备份 / 安全运维 | `normal`/`degraded`/`readonly_protect` 保护模式、项目 JSON 与成果二进制归档工具 | 自动定时加密备份与生产恢复演练 |
 
 **注意**：本仓库早期代码可用于本地开发验证，尚未进行第三方平台接入、真实 PostgreSQL 并发压力测试或生产安全审计。不要把它部署到公网。
@@ -194,3 +194,14 @@ network restrictions, manual reconciliation and cancellation semantics.
 - 显式授权 `workspace-write` 时，比较源基线和结果工作区并输出 `changes.patch` 与 `otternest-provenance.json`，记录原始提交、补丁 SHA-256 和变更数量；**不会自动向 GitHub push、提交 PR、应用补丁或合并**。
 - 自动化测试基于临时真实 Git 源仓库、模拟 Codex CLI、Git 补丁校验和完整 Runner/API/人工验收流水线。真实公共 GitHub 网络拉取、个人 Codex 登录、WSL2/ARM 联调、私有仓库认证、完整代码安全隔离及人工审核后的 PR 创建仍未完成。
 - 边界与操作说明见 [30 · GitHub 固定提交快照与代码补丁](30-git-snapshot-patch.md)。
+
+
+## 本轮：React 领域页面迁移（前后端分离第二阶段）
+
+- 新增指挥中心：按项目读取待授权/待验收任务和决策；任务写操作使用 CommandPlan 先预览、再确认，服务端二次校验任务版本；决策审查显示独立 Agent 意见，第二轮讨论必须显式关闭，最终批准仍由所有者完成。
+- 新增目标与工作流：读取 Goal Board；创建目标、维护前置依赖、暂停/恢复/完成人工状态；规则按事件前缀匹配，可显式评估并查看 WorkflowRun。前置依赖环检测、完成门槛、链深度和冷却熔断仍由 FastAPI 强制执行。
+- 新增知识库：记忆提案、发布、修订、归档；项目章程与并发/任务总量预算；跨项目知识共享申请和所有者审批。共享批准在目标项目创建独立副本。
+- 新增 Portfolio：跨项目质量指标、每日简报、三级通知收件箱、公平调度入口、受控实验评估/采纳/回滚。实验采纳门槛仍由后端执行。
+- 新增系统与事件：全局 normal/degraded/readonly_protect 模式、项目 active/paused/archived 状态和项目持久事件流。
+- 前端页面只调用现有 /api/v1 路由，不新增数据库表，不将数据库访问移入浏览器。详细页面/API 对照见 [33 · React 领域页面迁移](33-react-domain-pages.md)。
+- 尚未迁移：Skills 完整管理、任务级临时授权、成果版本与二进制归档、运行时诊断、完整 Command Center 自然语言对话及深度 AG-UI/A2UI。若后端尚无可安全使用的列表/写入 API，不在前端伪造功能。
