@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  Activity, ArrowUpRight, Bot, BookOpen, Gauge, ChevronDown, CircleHelp,
+  Activity, ArrowUpRight, Bot, BookMarked, BookOpen, FileArchive, Gauge, ChevronDown, CircleHelp, KeyRound,
   FolderKanban, GitBranch, LayoutDashboard, LogOut, Settings2, ShieldCheck, Wifi
 } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
@@ -15,7 +15,10 @@ const navigation = [
   { to: "/governance", label: "指挥中心", icon: ShieldCheck },
   { to: "/goals-workflows", label: "目标与工作流", icon: GitBranch },
   { to: "/knowledge", label: "知识库", icon: BookOpen },
+  { to: "/skills", label: "Skills 管理", icon: BookMarked },
   { to: "/portfolio", label: "Portfolio", icon: Gauge },
+  { to: "/access", label: "任务授权", icon: KeyRound },
+  { to: "/artifacts", label: "成果中心", icon: FileArchive },
   { to: "/system", label: "系统与事件", icon: Settings2 }
 ];
 

@@ -75,6 +75,14 @@ class ArchiveReasonIn(BaseModel):
     reason: str = Field(min_length=5, max_length=2000)
 
 
+class SkillDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=120)
+    version: str = Field(min_length=1, max_length=40)
+    content: str = Field(min_length=1, max_length=20000)
+    source: str = Field(min_length=1, max_length=3000)
+
+
 class SkillEvaluationIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     verdict: Literal["pass", "fail", "concern"]
@@ -343,6 +351,84 @@ def archive_memory(
     )
     db.commit()
     return {"id": memory.id, "status": memory.status, "version": memory.version}
+
+
+
+def _skill_public(skill: Skill) -> dict:
+    return {
+        "id": skill.id,
+        "project_id": skill.project_id,
+        "name": skill.name,
+        "version": skill.version,
+        "content": skill.content,
+        "source": skill.source,
+        "status": skill.status,
+        "created_at": skill.created_at,
+    }
+
+
+@router.post("/projects/{project_id}/skills", status_code=201)
+def propose_skill(
+    project_id: str, body: SkillDraft, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)
+):
+    """Create an untrusted Skill proposal; only the owner can publish it."""
+    require_project(db, project_id, actor, roles=("worker", "manager", "reviewer"))
+    name = body.name.strip()
+    version = body.version.strip()
+    content = body.content.strip()
+    source = body.source.strip()
+    if not name or not version or not content or not source:
+        raise HTTPException(422, "Skill name, version, content, and source must be non-empty")
+    duplicate = db.scalar(
+        select(Skill.id).where(
+            Skill.project_id == project_id,
+            Skill.name == name,
+            Skill.version == version,
+        )
+    )
+    if duplicate is not None:
+        raise Conflict("Skill revision already exists in this project")
+    skill = Skill(
+        project_id=project_id,
+        name=name,
+        version=version,
+        content=content,
+        source=source,
+        status="proposed",
+    )
+    db.add(skill)
+    db.flush()
+    emit(db, actor, "skill.proposed", skill.id, project_id, {"name": skill.name, "version": skill.version})
+    db.commit()
+    return _skill_public(skill)
+
+
+@router.get("/projects/{project_id}/skills")
+def list_project_skills(
+    project_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)
+):
+    require_project(db, project_id, actor)
+    query = select(Skill).where(Skill.project_id == project_id)
+    if not actor.is_owner:
+        query = query.where(Skill.status == "published")
+    rows = db.scalars(query.order_by(Skill.name, Skill.version.desc(), Skill.created_at.desc())).all()
+    return [_skill_public(skill) for skill in rows]
+
+
+@router.post("/skills/{skill_id}/publish")
+def publish_skill(
+    skill_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)
+):
+    owner_only(actor)
+    skill = db.scalar(select(Skill).where(Skill.id == skill_id).with_for_update())
+    if skill is None:
+        raise HTTPException(404, "Skill not found")
+    if skill.status != "proposed":
+        raise Conflict("Only proposed Skills can be published")
+    skill.status = "published"
+    emit(db, actor, "skill.published", skill.id, skill.project_id, {"name": skill.name, "version": skill.version})
+    db.commit()
+    return {"id": skill.id, "status": skill.status, "version": skill.version}
 
 
 @router.post("/skills/{skill_id}/evaluations", status_code=201)

@@ -56,3 +56,35 @@ export async function request<T>(
   }
   return payload as T;
 }
+
+
+/** Authenticated raw-body request for binary uploads/downloads; unlike request(), it never assumes JSON. */
+export async function binaryRequest(
+  path: string,
+  init: RequestInit = {},
+  tokenOverride?: string | null
+): Promise<Response> {
+  const headers = new Headers(init.headers);
+  const token = tokenOverride === undefined ? accessToken : tokenOverride;
+  if (token) headers.set("Authorization", "Bearer " + token);
+  const response = await fetch(API_BASE_URL + "/api/v1" + path, {
+    ...init,
+    headers,
+    credentials: "omit"
+  });
+  if (!response.ok) {
+    const contentType = response.headers.get("content-type") || "";
+    const payload: unknown = contentType.includes("application/json")
+      ? await response.json()
+      : await response.text();
+    const detail =
+      typeof payload === "object" && payload !== null && "detail" in payload
+        ? (payload as { detail?: unknown }).detail
+        : payload;
+    const message = typeof detail === "string"
+      ? detail
+      : detail ? JSON.stringify(detail) : response.statusText;
+    throw new ApiError(message || "文件请求失败", response.status);
+  }
+  return response;
+}

@@ -10,6 +10,9 @@ import GoalsWorkflowPage from "./pages/GoalsWorkflowPage";
 import KnowledgePage from "./pages/KnowledgePage";
 import PortfolioPage from "./pages/PortfolioPage";
 import SystemPage from "./pages/SystemPage";
+import SkillsPage from "./pages/SkillsPage";
+import AccessPage from "./pages/AccessPage";
+import ArtifactsPage from "./pages/ArtifactsPage";
 
 function AuthGate() {
   const { checking, isAuthenticated } = useAuth();
@@ -29,6 +32,9 @@ function AuthGate() {
           <Route path="/knowledge" element={<KnowledgePage />} />
           <Route path="/portfolio" element={<PortfolioPage />} />
           <Route path="/system" element={<SystemPage />} />
+          <Route path="/skills" element={<SkillsPage />} />
+          <Route path="/access" element={<AccessPage />} />
+          <Route path="/artifacts" element={<ArtifactsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
