@@ -59,7 +59,7 @@ export default function TaskCenterPage(){
   <section className="panel task-center-panel"><div className="panel-heading"><div className="panel-title"><ClipboardCheck size={17}/><h3>任务列表</h3></div><span className="muted-inline">待授权、待验收和阻塞任务优先</span></div>
    {loading?<div className="panel-loading"><span className="spinner"/>正在汇总项目任务…</div>:rows.length?<div className="task-center-list">{rows.map(t=><article className="task-center-row" key={t.id}>
     <div className="task-center-main"><div className="task-center-title"><strong>{t.title}</strong><span className={"status-tag "+(tones[t.status]||"tag-neutral")}>{labels[t.status]||t.status}</span><span className="status-tag tag-neutral">{t.risk}</span></div>
-     <p>{t.project_name} · 优先级 {t.priority} · {t.sensitivity} · 版本 {t.version} · 租约代次 {t.lease_epoch}</p>
+     <p>{t.project_name} · 优先级 {t.priority} · {t.sensitivity}</p>
      <small>{t.result_summary||t.failure_reason||t.instruction}</small><small>任务 ID：{t.id}</small>
     </div><div className="task-center-actions">
      {t.status==="waiting_approval"&&<button className="secondary-button compact" disabled={saving} onClick={()=>void preview(t,"authorize_task")}><ShieldCheck size={14}/>预览授权</button>}
