@@ -20,7 +20,7 @@
 
 ## 环境变量
 
-- VITE_API_BASE_URL：FastAPI 的 HTTPS Origin，不含 /api/v1。
+- VITE_API_BASE_URL：FastAPI 的 HTTPS Origin，只填写协议、主机和可选端口；不要附加 `/api`、`/api/v1` 或具体接口路径，前端客户端会自行拼接业务路径。
 - 该变量会暴露在浏览器中，只能放公开地址等非秘密配置。
 - 不要创建 VITE_OWNER_TOKEN、VITE_DATABASE_URL 或任何包含秘密的 VITE_ 变量。
 
