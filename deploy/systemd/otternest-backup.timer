@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily OtterNest backup during the configured maintenance window
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 UTC
+Persistent=true
+RandomizedDelaySec=15m
+Unit=otternest-backup.service
+
+[Install]
+WantedBy=timers.target
