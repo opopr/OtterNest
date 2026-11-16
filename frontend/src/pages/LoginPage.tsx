@@ -76,6 +76,10 @@ export default function LoginPage() {
             {error && <div className="form-error">{error}</div>}
             <button className="primary-button" disabled={busy}>{busy ? "正在初始化…" : "创建所有者账户"}<ArrowRight size={16} /></button>
           </form>
+        ) : !canBootstrap ? (
+          <div className="form-error setup-warning">
+            后端未配置有效的 OTTERNEST_OWNER_TOKEN。所有者登录和初始化都依赖该服务端配置，请先在 FastAPI 服务端修复配置。
+          </div>
         ) : (
           <>
             <div className="login-tabs">
@@ -98,7 +102,6 @@ export default function LoginPage() {
             )}
           </>
         )}
-        {!configured && !canBootstrap && <div className="form-error setup-warning">后端尚未配置 OTTERNEST_OWNER_TOKEN。请先在 FastAPI 服务端完成安全配置，再初始化所有者账户。</div>}
         <div className="login-footnote"><ShieldCheck size={15} /><span>身份验证由 FastAPI 完成 · 会话令牌仅保存在当前页面内存中</span></div>
       </div>
     </div>
