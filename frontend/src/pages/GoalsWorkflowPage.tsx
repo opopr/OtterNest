@@ -6,6 +6,7 @@ import {
 import { request } from "../api/client";
 import type { Project } from "../api/types";
 import ProjectSelect from "../components/ProjectSelect";
+import GoalPlanComposer from "../components/GoalPlanComposer";
 
 interface GoalDependency {
   id: string;
@@ -223,6 +224,8 @@ export default function GoalsWorkflowPage() {
         <button className={tab === "rules" ? "selected" : ""} onClick={() => setTab("rules")}><Workflow size={16} />工作流规则 <span>{rules.length}</span></button>
       </div>
       {loading && !board ? <div className="panel-loading"><div className="spinner" />正在读取目标和工作流…</div> : tab === "goals" ? (
+        <div className="page-stack">
+        <GoalPlanComposer projectId={selectedId} onConfirmed={()=>void loadProjectData(selectedId)} />
         <section className="panel">
           <div className="panel-heading"><div className="panel-title"><GitBranch size={17} /><h3>目标与前置条件</h3></div><button className="primary-button compact" onClick={() => setShowGoalForm((value) => !value)} disabled={!selectedId}><Plus size={15} />新建目标</button></div>
           {showGoalForm && <form className="form-panel embedded-form" onSubmit={createGoal}>
@@ -249,6 +252,7 @@ export default function GoalsWorkflowPage() {
             {!board?.goals.length && <div className="empty-state"><GitBranch size={25} /><strong>尚未定义目标</strong><p>创建目标后，可以为目标添加前置依赖。系统会阻止循环依赖和不满足完成条件的目标被标记为完成。</p></div>}
           </div>
         </section>
+        </div>
       ) : (
         <div className="page-stack">
           <section className="panel">
