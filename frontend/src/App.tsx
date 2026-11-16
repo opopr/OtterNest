@@ -16,6 +16,7 @@ import SystemPage from "./pages/SystemPage";
 import SkillsPage from "./pages/SkillsPage";
 import AccessPage from "./pages/AccessPage";
 import ArtifactsPage from "./pages/ArtifactsPage";
+import ExternalInterfacesPage from "./pages/ExternalInterfacesPage";
 
 function AuthGate() {
   const { checking, isAuthenticated } = useAuth();
@@ -32,6 +33,7 @@ function AuthGate() {
           <Route path="/tasks" element={<TaskCenterPage />} />
           <Route path="/command" element={<CommandCenterPage />} />
           <Route path="/agents" element={<AgentsPage />} />
+          <Route path="/interfaces" element={<ExternalInterfacesPage />} />
           <Route path="/runtimes" element={<RuntimeMonitorPage />} />
           <Route path="/governance" element={<GovernancePage />} />
           <Route path="/goals-workflows" element={<GoalsWorkflowPage />} />
