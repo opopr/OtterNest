@@ -25,6 +25,7 @@ otternest-codex-worker = "otternest.codex_worker:main"
 otternest-webhooks = "otternest.webhooks:main"
 otternest-mcp = "otternest.mcp_bridge:main"
 otternest-scheduler = "otternest.scheduler:main"
+otternest-workflows = "otternest.workflow_worker:main"
 otternest-a2a-outbound = "otternest.a2a_outbound:main"
 
 [project.optional-dependencies]
