@@ -1,6 +1,6 @@
 [Unit]
 Description=OtterNest explicit database migration
-Wants=network-online.target
+Wants=network-online.target postgresql.service
 After=network-online.target postgresql.service
 
 [Service]
@@ -10,6 +10,7 @@ Group=otternest
 WorkingDirectory=/opt/otternest/app
 EnvironmentFile=/etc/otternest/otternest.env
 Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
 ExecStart=/opt/otternest/venv/bin/alembic upgrade head
 TimeoutStartSec=300
 UMask=0027
