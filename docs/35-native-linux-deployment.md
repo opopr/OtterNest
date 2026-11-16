@@ -216,7 +216,38 @@ Runner 使用独立 Runtime 凭据，并在单独执行节点运行。控制平�
 
 ## 12. 升级、备份与恢复
 
-升级前先备份 PostgreSQL 和成果目录，记录当前 Git commit。只部署已审核的 main commit：
+### 一致性备份
+
+安装脚本会安装本地备份服务和可选 timer。手工备份使用：
+
+```bash
+sudo systemctl start otternest-backup.service
+sudo journalctl -u otternest-backup.service --no-pager
+```
+
+备份服务会先停止 Webhook、工作流、调度器和 API，随后检查数据库中是否仍有 status 为 running 的任务；如果存在运行任务，会拒绝备份并恢复此前正在运行的服务。确认没有运行任务后，才会生成 PostgreSQL custom dump、成果目录归档、SHA-256 清单和版本清单。备份结束后，只重新启动备份前处于 active 状态的服务。
+
+归档保存在 /var/backups/otternest，文件权限为 root-only，默认保留 14 天。备份不包含 /etc/otternest/otternest.env 等秘密配置，也不会自动上传或加密异机副本；请单独安全保管配置秘密，并把备份加密复制到另一台主机或受控对象存储。
+
+otternest-backup.timer 已安装但默认不启用。它的示例时间为每日 02:30 UTC，并带随机延迟；只有确认这个维护窗口可接受短暂控制平面停机后，才启用：
+
+```bash
+sudo systemctl enable --now otternest-backup.timer
+systemctl list-timers otternest-backup.timer
+```
+
+恢复前先在隔离目录校验归档，不要直接覆盖正在使用的数据库或成果目录：
+
+```bash
+sudo install -d -m 0700 /var/tmp/otternest-restore
+sudo tar -xzf /var/backups/otternest/otternest-backup-YYYYMMDDTHHMMSSZ-PID.tar.gz \
+  -C /var/tmp/otternest-restore
+sudo bash -c 'cd /var/tmp/otternest-restore && sha256sum -c SHA256SUMS && pg_restore --list database.dump && tar -tzf artifacts.tar.gz'
+```
+
+完整恢复应先还原到隔离数据库和暂存成果目录，核对 Alembic revision、成果 SHA-256 和应用版本，再安排停机窗口切换。当前仅提供备份和归档完整性验证，不提供自动覆盖式恢复命令。
+
+记录当前 Git commit，并且只部署已经审核的 main commit：
 
 ```bash
 cd /opt/otternest/app
@@ -232,7 +263,7 @@ sudo systemctl restart otternest-api otternest-scheduler otternest-workflows
 
 数据库迁移不是普通代码回滚。不要在未检查 Alembic downgrade 语义的情况下直接降级数据库。回滚代码前确认旧版本兼容当前 Schema；必要时从迁移前备份恢复到隔离环境验证。
 
-备份必须同时覆盖 PostgreSQL 与 /var/lib/otternest/artifacts，并加密存放到另一台主机或受控对象存储。数据库记录与成果文件要作为一个恢复单元处理。当前仓库尚未提供自动定时备份服务；第一次接收真实任务前，应完成手工备份、隔离恢复和成果 SHA-256 校验演练。
+升级前先确认最近一次一致性备份已成功，并完成至少一次隔离恢复演练。数据库记录与成果文件必须作为一个恢复单元处理；不要只恢复 PostgreSQL 而遗漏 artifacts。当前备份服务只生成本机 root-only 归档，异机加密复制、定期恢复演练和生产级 RPO/RTO 仍需运维侧落实。
 
 ## 13. 上线前验收清单
 

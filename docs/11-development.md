@@ -23,7 +23,7 @@ OtterNest 已进入**完整产品开发**。此文件是工程状态登记，而
 | 多 Agent 协商 / 动态团队 | 第一/二轮独立决策复核、异议记录、显式受邀自动推进名单 | 自动辩论调度与动态成本预算组队 |
 | 自主改进 / 质量评估 | Skill 结构化评估、质量指标与失败归因统计、受控优化实验与回归门禁（`promote`/`rollback`） | 自动化沙箱回归数据集与灰度发布 |
 | Web 管理台 | React 已覆盖登录、总览、项目/任务基础操作、Agent 登记与 Runtime、任务审批/决策审查、多轮 Command Center（规则模板/可选模型建议/A2UI 预览）、目标依赖/工作流、知识库、Skills、TaskGrant、成果版本/验收/归档/恢复/GC、Portfolio/通知/实验、系统保护模式/项目状态/事件流、API/数据库/身份连接诊断；旧版管理台继续兜底低频运维页面 | 对话持久化、A2UI/AG-UI 深度交互、真实远端 Runner 唤醒与恢复演练、生产级安全审计，并完成全量回归 |
-| 备份 / 安全运维 | `normal`/`degraded`/`readonly_protect` 保护模式、项目 JSON 与成果二进制归档工具 | 自动定时加密备份与生产恢复演练 |
+| 备份 / 安全运维 | `normal`/`degraded`/`readonly_protect` 保护模式、项目 JSON 与成果二进制归档工具、本机 PostgreSQL+成果一致性备份服务与可选 timer | 异机加密复制、自动恢复验证与生产 RPO/RTO 演练 |
 
 **注意**：本仓库早期代码可用于本地开发验证，尚未进行第三方平台接入、真实 PostgreSQL 并发压力测试或生产安全审计。不要把它部署到公网。
 
@@ -233,3 +233,13 @@ network restrictions, manual reconciliation and cancellation semantics.
 - 部署指南覆盖本机 PostgreSQL peer 认证、Owner Token 与 TOTP 初始化、AI Studio 精确 Origin/CORS、独立 Runner 执行节点、升级和配对备份/恢复验收。
 - **尚未完成/未声称**：没有连接或修改用户的 Oracle 服务器；没有实机验证目标发行版、ARM64 systemd/Nginx 配置、TLS/VPN、资源占用、备份恢复或第三方平台接入。该部署包仅作为私有试运行基线，不能视为公网生产就绪。
 - 详细步骤见 [35 · 私有 Linux 原生部署基线](35-native-linux-deployment.md)。
+
+
+## 本轮：本机一致性备份与可选定时器
+
+- 新增 root-only 一次性备份服务，先停止 Webhook、工作流、调度器和 API，再检查是否存在 running 任务；发现运行任务时拒绝备份并恢复原有服务状态。
+- 无运行任务时生成 PostgreSQL custom dump、成果目录归档、SHA-256 清单及 Git/Alembic 版本清单；归档默认保留 14 天，且不包含环境文件或其他秘密配置。
+- 新增每日 02:30 UTC 的可选 systemd timer，但安装时不自动启用；只有运维人员确认维护窗口后才启用，避免在运行任务期间制造非预期中断。
+- 新增备份归档校验步骤；完整恢复仍要求先在隔离数据库和暂存目录验证，不提供自动覆盖式恢复。
+- **尚未完成/未声称**：异机加密复制、自动灾难恢复、RPO/RTO 保证及真实 Oracle ARM 主机上的备份恢复演练。
+- 操作边界见 [35 · 私有 Linux 原生部署基线](35-native-linux-deployment.md)。

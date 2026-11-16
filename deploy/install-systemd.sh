@@ -10,12 +10,15 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 UNIT_DIR="${SYSTEMD_UNIT_DIR:-/etc/systemd/system}"
 
 install -d -m 0755 "${UNIT_DIR}"
+install -d -o root -g root -m 0700 /var/backups/otternest
 for unit in \
   otternest-api.service \
   otternest-migrate.service \
   otternest-scheduler.service \
   otternest-workflows.service \
-  otternest-webhooks.service
+  otternest-webhooks.service \
+  otternest-backup.service \
+  otternest-backup.timer
 do
   install -o root -g root -m 0644 "${SCRIPT_DIR}/systemd/${unit}" "${UNIT_DIR}/${unit}"
 done
@@ -27,3 +30,4 @@ echo "OtterNest units installed."
 echo "API, scheduler and workflows are enabled but not started."
 echo "Run otternest-migrate.service manually after configuring the environment."
 echo "Webhook delivery remains disabled until its signing key and host allowlist are configured."
+echo "The backup timer is installed but disabled; review the maintenance window before enabling it."
