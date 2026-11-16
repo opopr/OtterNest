@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Activity, AlertCircle, ArrowRight, CheckCircle2, Clock3, GitBranch,
+  Activity, AlertCircle, ArrowRight, Clock3, GitBranch, Info,
   Plus, RefreshCw, ShieldCheck, Trash2, X
 } from "lucide-react";
 import { request } from "../api/client";
