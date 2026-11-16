@@ -44,6 +44,7 @@ OtterNest 不是某一个 AI 模型，也不负责“把多个订阅额度合并
 | [21 · 项目包导入与恢复](docs/21-project-import-restore.md) | 无密文可携带包校验、预览、恢复与安全语义 |
 | [22 · 成果版本与验收](docs/22-artifact-lifecycle.md) | 不可变文件版本、校验下载与所有者审查 |
 | [24 · Runner 成果与多 Agent 交接](docs/24-runner-artifact-handoff.md) | 工作空间成果上传、已核验检查点与 DAG 后继交接 |
+| [31 · 目标生命周期与依赖](docs/31-goal-lifecycle.md) | 目标状态、完成门槛、依赖关系和人工验收 |
 
 ## 三大平面（逻辑）
 

@@ -7,8 +7,8 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .models import A2ADelegation, Agent, AgentRuntime, Audit, Event, Goal, Membership, Outbox, Project, ProjectCharter, Task, TaskDependency, TaskSideEffect, now
-from .security import Actor
+from .models import A2ADelegation, Agent, AgentRuntime, Audit, Event, Goal, Membership, Outbox, Project, ProjectCharter, SystemState, Task, TaskDependency, TaskGrant, TaskSideEffect, now
+from .security import Actor, SENSITIVITY_ORDER, as_utc, sensitivity_allowed
 
 
 UNRECONCILED_SIDE_EFFECT_STATES = ("pending", "unknown")
@@ -72,6 +72,20 @@ def enforce_project_concurrency_budget(
         raise Conflict("Project concurrent running task budget reached")
 
 
+def get_system_mode(db: Session) -> str:
+    state = db.get(SystemState, "default")
+    return state.mode if state else "normal"
+
+
+def require_writable_system(db: Session, *, allow_degraded: bool = True) -> str:
+    mode = get_system_mode(db)
+    if mode == "readonly_protect":
+        raise HTTPException(503, "System is in readonly_protect mode")
+    if not allow_degraded and mode == "degraded":
+        raise HTTPException(503, "System is in degraded mode; new dispatch is paused")
+    return mode
+
+
 def require_project(db: Session, project_id: str, actor: Actor, *, roles: tuple[str, ...] | None = None) -> Project:
     project = db.get(Project, project_id)
     if not project:
@@ -79,10 +93,36 @@ def require_project(db: Session, project_id: str, actor: Actor, *, roles: tuple[
     if actor.is_owner:
         return project
     membership = db.scalar(select(Membership).where(Membership.agent_id == actor.id, Membership.project_id == project_id))
-    if not membership or (roles is not None and membership.role not in roles):
+    exp = as_utc(membership.expires_at) if membership else None
+    if not membership or (exp is not None and exp <= now()) or (roles is not None and membership.role not in roles):
         # Do not disclose which other projects exist.
         raise HTTPException(404, "Project not found")
     return project
+
+
+def effective_sensitivity(db: Session, project_id: str, actor: Actor, task_id: str | None = None) -> str:
+    if actor.is_owner:
+        return "restricted"
+    membership = db.scalar(select(Membership).where(Membership.agent_id == actor.id, Membership.project_id == project_id))
+    exp = as_utc(membership.expires_at) if membership else None
+    if not membership or (exp is not None and exp <= now()):
+        return "public"
+    best = membership.max_sensitivity
+    if task_id is not None:
+        grants = db.scalars(
+            select(TaskGrant).where(
+                TaskGrant.task_id == task_id,
+                TaskGrant.agent_id == actor.id,
+                TaskGrant.revoked.is_(False),
+            )
+        ).all()
+        cur_now = now()
+        for g in grants:
+            g_exp = as_utc(g.expires_at)
+            if g_exp is not None and g_exp > cur_now:
+                if SENSITIVITY_ORDER.get(g.max_sensitivity, -1) > SENSITIVITY_ORDER.get(best, -1):
+                    best = g.max_sensitivity
+    return best
 
 
 def require_task(db: Session, task_id: str, actor: Actor, *, lock: bool = False) -> Task:
@@ -113,12 +153,20 @@ def ensure_lease(task: Task, actor: Actor, epoch: int) -> None:
 def claim(db: Session, task_id: str, actor: Actor, lease_seconds: int) -> Task:
     if actor.is_owner:
         raise HTTPException(403, "Only agent credentials can claim")
+    require_writable_system(db, allow_degraded=True)
     # Lock the project row before the task row to stay consistent with scheduler lock ordering.
     project_id = db.scalar(select(Task.project_id).where(Task.id == task_id))
     if project_id is not None:
         db.scalar(select(Project).where(Project.id == project_id).with_for_update())
     task = require_task(db, task_id, actor, lock=True)
     require_project(db, task.project_id, actor, roles=("worker", "manager", "reviewer"))
+    allowed_sens = effective_sensitivity(db, task.project_id, actor, task.id)
+    if not sensitivity_allowed(task.sensitivity, allowed_sens):
+        raise HTTPException(403, "Agent lacks sensitivity clearance for this task")
+    if task.goal_id:
+        goal = db.get(Goal, task.goal_id)
+        if goal is None or goal.status != "active":
+            raise Conflict("Task cannot be claimed because its goal is paused or completed")
     project = db.get(Project, task.project_id)
     if not project or project.status != "active":
         raise Conflict("Project is not active")
@@ -162,8 +210,13 @@ def claim(db: Session, task_id: str, actor: Actor, lease_seconds: int) -> Task:
 
 
 def validate_goal(db: Session, project_id: str, goal_id: str | None) -> None:
-    if goal_id and not db.scalar(select(Goal.id).where(Goal.id == goal_id, Goal.project_id == project_id)):
+    if not goal_id:
+        return
+    goal = db.scalar(select(Goal).where(Goal.id == goal_id, Goal.project_id == project_id))
+    if goal is None:
         raise HTTPException(422, "Goal does not belong to project")
+    if goal.status != "active":
+        raise Conflict("New tasks can only be linked to active goals")
 
 
 MAX_DEPENDENCIES = 64
@@ -254,12 +307,14 @@ def choose_dispatch_targets(db: Session, project_id: str, actor: Actor, limit: i
     Routing != accepting/starting remote execution; the worker must still claim.
     """
     from datetime import timedelta
+    require_writable_system(db, allow_degraded=False)
     project = db.scalar(select(Project).where(Project.id == project_id).with_for_update())
     if project is None:
         raise HTTPException(404, "Project not found")
     if project.status != "active":
         raise Conflict("Project is not active")
     cutoff = now() - timedelta(seconds=heartbeat_ttl_seconds)
+    cur_now = now()
     members = db.execute(
         select(Membership, Agent)
         .join(Agent, Membership.agent_id == Agent.id)
@@ -269,13 +324,18 @@ def choose_dispatch_targets(db: Session, project_id: str, actor: Actor, limit: i
         .order_by(Agent.id)
     ).all()
     candidates: dict[str, Agent] = {}
+    member_sens: dict[str, str] = {}
     for member, agent in members:
+        m_exp = as_utc(member.expires_at)
+        if m_exp is not None and m_exp <= cur_now:
+            continue
         alive = db.scalars(select(AgentRuntime).where(
             AgentRuntime.agent_id == agent.id, AgentRuntime.enabled.is_(True),
             AgentRuntime.status == "idle", AgentRuntime.last_seen >= cutoff
         )).first()
         if alive is not None:
             candidates[agent.id] = agent
+            member_sens[agent.id] = member.max_sensitivity
     if not candidates:
         return []
     # Bound outstanding work per agent: running leases and previously reserved ready tasks.
@@ -295,15 +355,25 @@ def choose_dispatch_targets(db: Session, project_id: str, actor: Actor, limit: i
         max_routes = min(limit, max(0, charter.max_concurrent_tasks - current_active_or_routed))
     if max_routes <= 0:
         return []
-    tasks = db.scalars(select(Task).where(
+    tasks = db.scalars(select(Task).outerjoin(Goal, Task.goal_id == Goal.id).where(
         Task.project_id == project_id, Task.status == "ready", Task.target_agent_id.is_(None)
+    ).where(
+        (Task.goal_id.is_(None)) | (Goal.status == "active")
     ).order_by(Task.priority.desc(), Task.created_at, Task.id).with_for_update().limit(limit * 10)).all()
     routes = []
     for task in tasks:
         if len(routes) >= max_routes:
             break
-        eligible = [agent for aid, agent in candidates.items()
-                    if loads[aid] == 0 and set(task.required_capabilities).issubset(set(agent.verified_capabilities))]
+        eligible = [
+            agent
+            for aid, agent in candidates.items()
+            if loads[aid] == 0
+            and set(task.required_capabilities).issubset(set(agent.verified_capabilities))
+            and sensitivity_allowed(
+                task.sensitivity,
+                effective_sensitivity(db, project_id, Actor("agent", aid), task.id),
+            )
+        ]
         if not eligible:
             continue
         chosen = min(eligible, key=lambda agent: (loads[agent.id], agent.id))

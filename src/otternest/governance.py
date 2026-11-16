@@ -16,10 +16,10 @@ from sqlalchemy.orm import Session
 
 from .db import get_session
 from .models import (A2ADelegation, Agent, CommandPlan, Decision, DecisionReview, DecisionDeliberation, DecisionRebuttal, DecisionAutoPolicy,
-                     Membership, Project, Task, now)
+                     Membership, Notification, Project, Task, now)
 from .security import Actor, authenticate, owner_only
 from .services import (Conflict, emit, release_dependents, require_project,
-                       require_task, task_ready_status)
+                       require_task, require_writable_system, task_ready_status)
 
 router = APIRouter(prefix="/api/v1", tags=["governance"])
 
@@ -134,6 +134,7 @@ def get_command_plan(plan_id: str, actor: Actor = Depends(authenticate),
 def confirm_command_plan(plan_id: str, actor: Actor = Depends(authenticate),
                          db: Session = Depends(get_session)):
     owner_only(actor)
+    require_writable_system(db)
     plan = db.scalar(select(CommandPlan).where(CommandPlan.id == plan_id).with_for_update())
     if plan is None:
         raise HTTPException(404, "Command plan not found")
@@ -166,6 +167,18 @@ def confirm_command_plan(plan_id: str, actor: Actor = Depends(authenticate),
             delegation.status = "changes_requested"
             delegation.updated_at = now()
         task.status = "completed" if accepted else ("blocked" if delegation else task_ready_status(db, task))
+        if accepted:
+            task.completed_at = now()
+        else:
+            task.rework_count += 1
+            db.add(Notification(
+                project_id=task.project_id,
+                level="important",
+                title=f"任务退回返工：{task.title}",
+                body=str(plan.parameters.get("reason", ""))[:200] or "所有者要求修改后重新提交",
+                source_kind="task",
+                source_id=task.id,
+            ))
         task.assigned_agent_id = None
         event = "task.accepted" if accepted else "task.changes_requested"
     else:  # cancel_task

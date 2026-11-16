@@ -26,6 +26,7 @@ from .models import (
     DecisionReview,
     Event,
     Goal,
+    GoalDependency,
     Membership,
     Memory,
     Project,
@@ -47,6 +48,7 @@ MAX_BUNDLE_BYTES = 10 * 1024 * 1024
 COLLECTIONS = (
     "agents",
     "goals",
+    "goal_dependencies",
     "memberships",
     "tasks",
     "task_dependencies",
@@ -81,6 +83,9 @@ ID_COLLECTIONS = {
 }
 TASK_STATES = {"ready", "waiting_dependencies", "waiting_approval", "running", "submitted", "blocked", "completed", "cancelled"}
 SIDE_EFFECT_STATES = {"pending", "reported_executed", "unknown", "verified_executed", "verified_not_executed"}
+GOAL_STATES = {"active", "paused", "completed"}
+SENSITIVITY_LEVELS = {"public", "internal", "confidential", "restricted"}
+FAILURE_REASONS = {"context_stale", "dependency_missing", "model_error", "external_service_failure", "acceptance_issue", "policy_blocked", "unknown"}
 
 
 class BundleIn(BaseModel):
@@ -196,6 +201,39 @@ def validate_bundle(data: Any) -> dict[str, Any]:
     memory_ids = ids["memories"]
     artifact_ids = ids["artifacts"]
     review_ids = ids["decision_reviews"]
+    for row in normalized["goals"]:
+        status = row.get("status", "active")
+        if not isinstance(status, str) or status not in GOAL_STATES:
+            _fail("Goal bundle contains an unsupported status")
+
+    goal_edge_set: set[tuple[str, str]] = set()
+    goal_indegree = {goal_id: 0 for goal_id in goal_ids}
+    goal_successors: dict[str, list[str]] = {goal_id: [] for goal_id in goal_ids}
+    goal_prerequisite_count: dict[str, int] = {goal_id: 0 for goal_id in goal_ids}
+    for row in normalized["goal_dependencies"]:
+        goal_id = _plain_id(row.get("goal_id"), "goal_dependencies.goal_id")
+        predecessor_id = _plain_id(row.get("depends_on_id"), "goal_dependencies.depends_on_id")
+        edge = (goal_id, predecessor_id)
+        if goal_id not in goal_ids or predecessor_id not in goal_ids or goal_id == predecessor_id or edge in goal_edge_set:
+            _fail("Goal dependency contains an invalid, duplicate, or self-referencing edge")
+        goal_edge_set.add(edge)
+        goal_indegree[goal_id] += 1
+        goal_prerequisite_count[goal_id] += 1
+        goal_successors[predecessor_id].append(goal_id)
+    if any(count > 64 for count in goal_prerequisite_count.values()):
+        _fail("A goal has more than 64 prerequisites")
+    ready_goals = deque(goal_id for goal_id, count in goal_indegree.items() if count == 0)
+    acyclic_goal_count = 0
+    while ready_goals:
+        completed_goal = ready_goals.popleft()
+        acyclic_goal_count += 1
+        for successor in goal_successors[completed_goal]:
+            goal_indegree[successor] -= 1
+            if goal_indegree[successor] == 0:
+                ready_goals.append(successor)
+    if acyclic_goal_count != len(goal_ids):
+        _fail("Goal dependency graph contains a cycle")
+
     artifact_family_versions: set[tuple[str, int]] = set()
     for row in normalized["tasks"]:
         goal_id = row.get("goal_id")
@@ -205,6 +243,19 @@ def validate_bundle(data: Any) -> dict[str, Any]:
             _fail("Task bundle contains an unsupported status")
         if not isinstance(row.get("risk"), str) or row["risk"] not in {"R0", "R1", "R2", "R3"}:
             _fail("Task bundle contains an unsupported risk level")
+        task_sensitivity = row.get("sensitivity", "restricted")
+        if not isinstance(task_sensitivity, str) or task_sensitivity not in SENSITIVITY_LEVELS:
+            _fail("Task bundle contains an unsupported sensitivity level")
+        failure_reason = row.get("failure_reason")
+        if failure_reason is not None and (not isinstance(failure_reason, str) or failure_reason not in FAILURE_REASONS):
+            _fail("Task bundle contains an unsupported failure reason")
+        rework_count = row.get("rework_count", 0)
+        if not isinstance(rework_count, int) or isinstance(rework_count, bool) or rework_count < 0:
+            _fail("Task rework_count must be a non-negative integer")
+        if row.get("correlation_id") is not None:
+            _plain_id(row["correlation_id"], "tasks.correlation_id")
+        if row.get("completed_at") is not None:
+            _parse_time(row["completed_at"], "task completed_at")
     edge_set: set[tuple[str, str]] = set()
     indegree = {task_id: 0 for task_id in task_ids}
     successors: dict[str, list[str]] = {task_id: [] for task_id in task_ids}
@@ -249,6 +300,12 @@ def validate_bundle(data: Any) -> dict[str, Any]:
         if (_plain_id(row.get("task_id"), "artifacts.task_id") not in task_ids or not isinstance(row.get("checksum"), str)
                 or not re.fullmatch(r"[a-f0-9]{64}", row["checksum"])):
             _fail("Artifact references a task outside the project bundle or has an invalid checksum")
+        artifact_sensitivity = row.get("sensitivity", "restricted")
+        if not isinstance(artifact_sensitivity, str) or artifact_sensitivity not in SENSITIVITY_LEVELS:
+            _fail("Artifact bundle contains an unsupported sensitivity level")
+        size_bytes = row.get("size_bytes", 0)
+        if not isinstance(size_bytes, int) or isinstance(size_bytes, bool) or not 0 <= size_bytes <= 5 * 1024 * 1024:
+            _fail("Artifact size_bytes must be between 0 and 5 MiB")
         family_id = _plain_id(row.get("family_id", row.get("id")), "artifacts.family_id")
         version = row.get("version", 1)
         if not isinstance(version, int) or isinstance(version, bool) or version < 1:
@@ -256,6 +313,10 @@ def validate_bundle(data: Any) -> dict[str, Any]:
         if (family_id, version) in artifact_family_versions:
             _fail("Artifact version is duplicated within its immutable family")
         artifact_family_versions.add((family_id, version))
+    for row in normalized["memories"]:
+        memory_sensitivity = row.get("sensitivity", "restricted")
+        if not isinstance(memory_sensitivity, str) or memory_sensitivity not in SENSITIVITY_LEVELS:
+            _fail("Memory bundle contains an unsupported sensitivity level")
     for row in normalized["decision_reviews"]:
         if _plain_id(row.get("decision_id"), "decision_reviews.decision_id") not in decision_ids:
             _fail("Decision review references a decision outside the project bundle")
@@ -298,6 +359,7 @@ def _summary(bundle: dict[str, Any]) -> dict[str, Any]:
         "counts": {key: len(bundle[key]) for key in COLLECTIONS},
         "restore_boundaries": {
             "project_status": "paused",
+            "goal_dependencies": "dependency edges and priority are preserved; goal status resets to active for local re-confirmation",
             "nonterminal_tasks": "blocked; owner must review and unblock; R3 tasks require fresh authorization",
             "agent_identities": "recreated disabled without credentials; capabilities are not trusted",
             "memories_and_skills": "non-archived entries restored as proposed",
@@ -363,6 +425,7 @@ def import_project_bundle(body: ImportIn, actor: Actor = Depends(authenticate), 
             name=name[:160],
             description=source_project.get("description", "")[:3000],
             status="paused",
+            priority=max(0, min(100, int(source_project.get("priority", 50)))),
             created_at=_parse_time(source_project.get("created_at"), "project", fallback=now()),
         )
         db.add(restored_project)
@@ -413,9 +476,17 @@ def import_project_bundle(body: ImportIn, actor: Actor = Depends(authenticate), 
             db.add(Goal(id=id_maps["goals"][row["id"]], project_id=project_id,
                         title=str(row.get("title", ""))[:240],
                         success_criteria=str(row.get("success_criteria", ""))[:5000],
-                        status=row.get("status", "active")))
+                        status="active",
+                        priority=max(0, min(100, int(row.get("priority", 50))))))
             created_counts["goals"] += 1
         db.flush()
+
+        for row in bundle["goal_dependencies"]:
+            db.add(GoalDependency(
+                goal_id=id_maps["goals"][row["goal_id"]],
+                depends_on_id=id_maps["goals"][row["depends_on_id"]],
+            ))
+            created_counts["goal_dependencies"] += 1
 
         for row in bundle["memberships"]:
             db.add(Membership(id=id_maps["memberships"][row["id"]], project_id=project_id,
@@ -432,11 +503,16 @@ def import_project_bundle(body: ImportIn, actor: Actor = Depends(authenticate), 
                 instruction=str(row.get("instruction", ""))[:12000],
                 acceptance=str(row.get("acceptance", ""))[:6000],
                 status=old_status, risk=row.get("risk", "R1"),
+                sensitivity=row.get("sensitivity", "restricted"),
                 assigned_agent_id=None, target_agent_id=None,
                 priority=max(0, min(100, int(row.get("priority", 50)))),
                 required_capabilities=list(row.get("required_capabilities") or [])[:32],
                 approval_granted=False, lease_epoch=max(0, int(row.get("lease_epoch", 0))) + (1 if old_status != "completed" else 0),
                 lease_until=None, result_summary=row.get("result_summary"),
+                correlation_id=row.get("correlation_id") or str(uuid.uuid4()),
+                failure_reason=row.get("failure_reason"),
+                rework_count=row.get("rework_count", 0),
+                completed_at=_parse_time(row["completed_at"], "task completed_at") if row.get("completed_at") else None,
                 version=max(1, int(row.get("version", 1))) + 1,
                 created_at=_parse_time(row.get("created_at"), "task", fallback=now()),
             ))
@@ -456,7 +532,9 @@ def import_project_bundle(body: ImportIn, actor: Actor = Depends(authenticate), 
                             version=max(1, int(row.get("version", 1))),
                             task_id=id_maps["tasks"][row["task_id"]],
                             name=str(row.get("name", ""))[:240], checksum=checksum[:64],
+                            size_bytes=row.get("size_bytes", 0),
                             uri=f"unavailable://sha256/{checksum}",
+                            sensitivity=row.get("sensitivity", "restricted"),
                             review_status="pending",
                             review_note=("Imported metadata; local owner review is required. Original review note: "
                                          + str(row.get("review_note", ""))[:2800]),
@@ -497,6 +575,7 @@ def import_project_bundle(body: ImportIn, actor: Actor = Depends(authenticate), 
                 id=id_maps["memories"][row["id"]], project_id=project_id,
                 kind=row.get("kind", "fact"), title=str(row.get("title", ""))[:240],
                 content=str(row.get("content", ""))[:20000], source=str(row.get("source", ""))[:3000],
+                sensitivity=row.get("sensitivity", "restricted"),
                 status="archived" if row.get("status") == "archived" else "proposed",
                 version=max(1, int(row.get("version", 1))),
                 created_at=_parse_time(row.get("created_at"), "memory", fallback=now()),

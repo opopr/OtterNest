@@ -16,9 +16,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .db import get_session
-from .models import A2ADelegation, Agent, AgentRuntime, Artifact, Decision, DecisionReview, DecisionDeliberation, DecisionRebuttal, Event, Goal, Membership, Memory, Project, Task, TaskDependency, new_id, now
-from .security import Actor, authenticate, hash_token, new_agent_token, owner_only
-from .services import Conflict, claim, dependency_ids, dependencies_completed, emit, enforce_project_task_total_budget, ensure_lease, has_unreconciled_side_effects, release_dependents, require_project, require_task, task_ready_status, update_dependencies, validate_goal, choose_dispatch_targets
+from .models import A2ADelegation, Agent, AgentRuntime, Artifact, Decision, DecisionReview, DecisionDeliberation, DecisionRebuttal, Event, Goal, Membership, Memory, Notification, Project, Task, TaskDependency, new_id, now
+from .security import Actor, SENSITIVITY_ORDER, authenticate, hash_token, new_agent_token, new_runtime_token, owner_only, sensitivity_allowed
+from .services import Conflict, claim, dependency_ids, dependencies_completed, effective_sensitivity, emit, enforce_project_task_total_budget, ensure_lease, has_unreconciled_side_effects, release_dependents, require_project, require_task, require_writable_system, task_ready_status, update_dependencies, validate_goal, choose_dispatch_targets
 
 router = APIRouter(prefix="/api/v1")
 
@@ -26,11 +26,13 @@ router = APIRouter(prefix="/api/v1")
 class ProjectIn(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     description: str = Field(default="", max_length=3000)
+    priority: int = Field(default=50, ge=0, le=100)
 
 
 class GoalIn(BaseModel):
     title: str = Field(min_length=1, max_length=240)
     success_criteria: str = Field(min_length=1, max_length=5000)
+    priority: int = Field(default=50, ge=0, le=100)
 
 
 def valid_capabilities(values: list[str]) -> list[str]:
@@ -59,6 +61,7 @@ class RuntimeIn(BaseModel):
 
 class RuntimeHeartbeat(BaseModel):
     status: Literal["idle", "busy", "stopped"] = "idle"
+    health: dict = Field(default_factory=dict)
 
 
 class ScheduleIn(BaseModel):
@@ -69,6 +72,8 @@ class ScheduleIn(BaseModel):
 class MemberIn(BaseModel):
     agent_id: str
     role: Literal["worker", "manager", "reviewer", "advisor"] = "worker"
+    max_sensitivity: Literal["public", "internal", "confidential", "restricted"] = "confidential"
+    expires_in_hours: int | None = Field(default=None, ge=1, le=8760)
 
 
 class TaskIn(BaseModel):
@@ -78,6 +83,7 @@ class TaskIn(BaseModel):
     goal_id: str | None = None
     risk: Literal["R0", "R1", "R2", "R3"] = "R1"
     priority: int = Field(default=50, ge=0, le=100)
+    sensitivity: Literal["public", "internal", "confidential", "restricted"] = "internal"
     dependency_ids: list[str] = Field(default_factory=list, max_length=64)
     required_capabilities: list[str] = Field(default_factory=list, max_length=32)
 
@@ -104,6 +110,18 @@ class ResultIn(EpochIn):
     summary: str = Field(min_length=1, max_length=20000)
 
 
+class FailIn(ResultIn):
+    failure_reason: Literal[
+        "context_stale",
+        "dependency_missing",
+        "model_error",
+        "external_service_failure",
+        "acceptance_issue",
+        "policy_blocked",
+        "unknown",
+    ] = "unknown"
+
+
 class ReviewIn(BaseModel):
     accepted: bool
     reason: str = Field(default="", max_length=3000)
@@ -119,6 +137,7 @@ class MemoryIn(BaseModel):
     title: str = Field(min_length=1, max_length=240)
     content: str = Field(min_length=1, max_length=20000)
     source: str = Field(min_length=1, max_length=3000)
+    sensitivity: Literal["public", "internal", "confidential", "restricted"] = "internal"
 
 
 class DecisionIn(BaseModel):
@@ -139,39 +158,40 @@ def me(actor: Actor = Depends(authenticate)):
 @router.post("/projects", status_code=201)
 def create_project(body: ProjectIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     owner_only(actor)
-    project = Project(name=body.name, description=body.description)
+    project = Project(name=body.name, description=body.description, priority=body.priority)
     db.add(project)
     db.flush()
     emit(db, actor, "project.created", project.id, project.id)
     db.commit()
-    return as_dict(project, "id", "name", "description", "status")
+    return as_dict(project, "id", "name", "description", "status", "priority")
 
 
 @router.get("/projects")
 def projects(actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     if actor.is_owner:
-        rows = db.scalars(select(Project).order_by(Project.created_at.desc())).all()
+        rows = db.scalars(select(Project).order_by(Project.priority.desc(), Project.created_at.desc())).all()
     else:
         rows = db.scalars(select(Project).join(Membership, Project.id == Membership.project_id).where(Membership.agent_id == actor.id)).all()
-    return [as_dict(p, "id", "name", "description", "status") for p in rows]
+    return [as_dict(p, "id", "name", "description", "status", "priority") for p in rows]
 
 
 @router.post("/projects/{project_id}/goals", status_code=201)
 def create_goal(project_id: str, body: GoalIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     owner_only(actor)
+    require_writable_system(db)
     require_project(db, project_id, actor)
-    goal = Goal(project_id=project_id, title=body.title, success_criteria=body.success_criteria)
+    goal = Goal(project_id=project_id, title=body.title, success_criteria=body.success_criteria, priority=body.priority)
     db.add(goal)
     db.flush()
     emit(db, actor, "goal.created", goal.id, project_id)
     db.commit()
-    return as_dict(goal, "id", "project_id", "title", "status", "success_criteria")
+    return as_dict(goal, "id", "project_id", "title", "status", "priority", "success_criteria")
 
 
 @router.get("/projects/{project_id}/goals")
 def goals(project_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     require_project(db, project_id, actor)
-    return [as_dict(g, "id", "title", "success_criteria", "status") for g in db.scalars(select(Goal).where(Goal.project_id == project_id))]
+    return [as_dict(g, "id", "title", "success_criteria", "priority", "status") for g in db.scalars(select(Goal).where(Goal.project_id == project_id).order_by(Goal.priority.desc()))]
 
 
 @router.post("/agents", status_code=201)
@@ -237,24 +257,43 @@ def list_runtimes(agent_id: str, actor: Actor = Depends(authenticate), db: Sessi
         last_seen = r.last_seen
         if last_seen is not None and last_seen.tzinfo is None:
             last_seen = last_seen.replace(tzinfo=timezone.utc)
-        record = as_dict(r, "id", "agent_id", "label", "environment", "enabled", "status", "last_seen")
+        record = as_dict(r, "id", "agent_id", "label", "environment", "enabled", "status", "last_health", "last_seen")
+        record["has_token"] = bool(r.token_hash)
         record["online"] = bool(r.enabled and last_seen and last_seen >= cutoff and r.status in {"idle", "busy"})
         result.append(record)
     return result
 
 
+@router.post("/agents/{agent_id}/runtimes/{runtime_id}/token")
+def issue_runtime_token(agent_id: str, runtime_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    """Issue or rotate an independent credential dedicated to one AgentRuntime instance."""
+    owner_only(actor)
+    runtime = db.scalar(select(AgentRuntime).where(AgentRuntime.id == runtime_id, AgentRuntime.agent_id == agent_id).with_for_update())
+    if runtime is None or not runtime.enabled:
+        raise HTTPException(404, "Runtime not found")
+    token = new_runtime_token()
+    runtime.token_hash = hash_token(token)
+    emit(db, actor, "agent.runtime_token_issued", runtime.id, payload={"agent_id": agent_id})
+    db.commit()
+    return {"id": runtime.id, "agent_id": agent_id, "token": token}
+
+
 @router.post("/agent/runtimes/{runtime_id}/heartbeat")
 def runtime_heartbeat(runtime_id: str, body: RuntimeHeartbeat, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     if actor.is_owner:
-        raise HTTPException(403, "Agent credential required")
+        raise HTTPException(403, "Agent or runtime credential required")
+    if actor.runtime_id is not None and actor.runtime_id != runtime_id:
+        raise HTTPException(403, "Runtime credential does not match target runtime")
     runtime = db.scalar(select(AgentRuntime).where(AgentRuntime.id == runtime_id, AgentRuntime.agent_id == actor.id).with_for_update())
     if runtime is None or not runtime.enabled:
         raise HTTPException(404, "Runtime not found")
     runtime.status = body.status
+    if body.health:
+        runtime.last_health = {str(k)[:64]: str(v)[:240] for k, v in list(body.health.items())[:16]}
     runtime.last_seen = now()
     # Frequent self-reported status updates are deliberately not entered into the durable outbox.
     db.commit()
-    return {"id": runtime.id, "status": runtime.status, "last_seen": runtime.last_seen}
+    return {"id": runtime.id, "status": runtime.status, "last_seen": runtime.last_seen, "last_health": runtime.last_health}
 
 
 @router.post("/agents/{agent_id}/runtimes/{runtime_id}/disable")
@@ -300,24 +339,32 @@ def add_member(project_id: str, body: MemberIn, actor: Actor = Depends(authentic
     existing = db.scalar(select(Membership).where(Membership.project_id == project_id, Membership.agent_id == body.agent_id))
     if existing:
         raise Conflict("Agent is already in the project")
-    member = Membership(project_id=project_id, agent_id=body.agent_id, role=body.role)
+    expires_at = now() + timedelta(hours=body.expires_in_hours) if body.expires_in_hours else None
+    member = Membership(
+        project_id=project_id,
+        agent_id=body.agent_id,
+        role=body.role,
+        max_sensitivity=body.max_sensitivity,
+        expires_at=expires_at,
+    )
     db.add(member)
     db.flush()
-    emit(db, actor, "project.member_added", member.id, project_id, {"agent_id": body.agent_id, "role": body.role})
+    emit(db, actor, "project.member_added", member.id, project_id, {"agent_id": body.agent_id, "role": body.role, "max_sensitivity": body.max_sensitivity})
     db.commit()
-    return as_dict(member, "id", "project_id", "agent_id", "role")
+    return as_dict(member, "id", "project_id", "agent_id", "role", "max_sensitivity", "expires_at")
 
 
 @router.get("/projects/{project_id}/members")
 def members(project_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     require_project(db, project_id, actor)
     query = select(Membership, Agent).join(Agent, Membership.agent_id == Agent.id).where(Membership.project_id == project_id)
-    return [{"id": m.id, "agent_id": a.id, "agent_name": a.name, "role": m.role, "enabled": a.enabled} for m, a in db.execute(query)]
+    return [{"id": m.id, "agent_id": a.id, "agent_name": a.name, "role": m.role, "enabled": a.enabled, "max_sensitivity": m.max_sensitivity, "expires_at": m.expires_at} for m, a in db.execute(query)]
 
 
 @router.post("/projects/{project_id}/tasks", status_code=201)
 def create_task(project_id: str, body: TaskIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     owner_only(actor)
+    require_writable_system(db)
     project = require_project(db, project_id, actor)
     if project.status != "active":
         raise Conflict("Project is not active")
@@ -334,24 +381,37 @@ def create_task(project_id: str, body: TaskIn, actor: Actor = Depends(authentica
             raise HTTPException(422, "All dependencies must belong to this project")
     task = Task(project_id=project_id, goal_id=body.goal_id, title=body.title,
                 instruction=body.instruction, acceptance=body.acceptance,
-                priority=body.priority, risk=body.risk, required_capabilities=body.required_capabilities)
+                priority=body.priority, risk=body.risk, sensitivity=body.sensitivity,
+                required_capabilities=body.required_capabilities)
     db.add(task)
     db.flush()
     for predecessor_id in predecessor_ids:
         db.add(TaskDependency(task_id=task.id, depends_on_id=predecessor_id))
     db.flush()
     task.status = task_ready_status(db, task)
+    if task.risk == "R3" and not task.approval_granted:
+        db.add(Notification(
+            project_id=project_id,
+            level="urgent",
+            title=f"R3 高风险任务待审批：{task.title}",
+            body=f"任务 {task.id} 需要系统所有者明确审批后才可领取。",
+            source_kind="task",
+            source_id=task.id,
+        ))
     emit(db, actor, "task.created", task.id, project_id,
-         {"risk": task.risk, "dependency_ids": predecessor_ids, "priority": task.priority, "required_capabilities": task.required_capabilities})
+         {"risk": task.risk, "dependency_ids": predecessor_ids, "priority": task.priority,
+          "sensitivity": task.sensitivity, "correlation_id": task.correlation_id, "required_capabilities": task.required_capabilities})
     db.commit()
     return task_public(task)
 
 
 def task_public(t: Task) -> dict:
-    return as_dict(t, "id", "project_id", "goal_id", "title", "instruction", "acceptance", "risk", "status", "assigned_agent_id", "lease_epoch", "lease_until", "version", "result_summary", "priority", "target_agent_id", "approval_granted", "required_capabilities")
+    return as_dict(t, "id", "project_id", "goal_id", "title", "instruction", "acceptance", "risk", "status", "assigned_agent_id", "lease_epoch", "lease_until", "version", "result_summary", "priority", "sensitivity", "correlation_id", "failure_reason", "rework_count", "completed_at", "target_agent_id", "approval_granted", "required_capabilities")
 
 
 def _read_artifact_content(artifact: Artifact) -> bytes:
+    if artifact.deleted_at is not None:
+        raise HTTPException(410, "Artifact content was garbage-collected")
     base = Path(os.environ.get("OTTERNEST_ARTIFACT_DIR", "./var/artifacts")).resolve()
     project_root = (base / artifact.project_id).resolve()
     try:
@@ -474,6 +534,7 @@ def heartbeat(task_id: str, body: EpochIn, actor: Actor = Depends(authenticate),
 
 @router.post("/tasks/{task_id}/submit")
 def submit(task_id: str, body: ResultIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    require_writable_system(db)
     row = require_task(db, task_id, actor, lock=True)
     ensure_lease(row, actor, body.epoch)
     row.result_summary = body.summary
@@ -486,15 +547,24 @@ def submit(task_id: str, body: ResultIn, actor: Actor = Depends(authenticate), d
 
 
 @router.post("/tasks/{task_id}/fail")
-def fail_task(task_id: str, body: ResultIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+def fail_task(task_id: str, body: FailIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     """A failed worker blocks the task; it is never silently re-run."""
     row = require_task(db, task_id, actor, lock=True)
     ensure_lease(row, actor, body.epoch)
     row.result_summary = body.summary
+    row.failure_reason = body.failure_reason
     row.status = "blocked"
     row.lease_until = None
     row.version += 1
-    emit(db, actor, "task.blocked", task_id, row.project_id)
+    db.add(Notification(
+        project_id=row.project_id,
+        level="important",
+        title=f"任务已阻塞：{row.title}",
+        body=f"失败原因：{body.failure_reason} · {body.summary[:160]}",
+        source_kind="task",
+        source_id=row.id,
+    ))
+    emit(db, actor, "task.blocked", task_id, row.project_id, {"failure_reason": body.failure_reason, "correlation_id": row.correlation_id})
     db.commit()
     return task_public(row)
 
@@ -536,9 +606,21 @@ def review(task_id: str, body: ReviewIn, actor: Actor = Depends(authenticate), d
         delegation.status = "changes_requested"
         delegation.updated_at = now()
     row.status = "completed" if body.accepted else ("blocked" if delegation else task_ready_status(db, row))
+    if body.accepted:
+        row.completed_at = now()
+    else:
+        row.rework_count += 1
+        db.add(Notification(
+            project_id=row.project_id,
+            level="important",
+            title=f"任务退回返工：{row.title}",
+            body=body.reason[:200] or "所有者要求修改后重新提交",
+            source_kind="task",
+            source_id=row.id,
+        ))
     row.assigned_agent_id = None
     row.version += 1
-    emit(db, actor, "task.accepted" if body.accepted else "task.changes_requested", task_id, row.project_id, {"reason": body.reason})
+    emit(db, actor, "task.accepted" if body.accepted else "task.changes_requested", task_id, row.project_id, {"reason": body.reason, "rework_count": row.rework_count, "correlation_id": row.correlation_id})
     if body.accepted:
         db.flush()
         release_dependents(db, row, actor)
@@ -566,13 +648,14 @@ def cancel_task(task_id: str, actor: Actor = Depends(authenticate), db: Session 
 
 @router.post("/projects/{project_id}/memories", status_code=201)
 def add_memory(project_id: str, body: MemoryIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    require_writable_system(db)
     require_project(db, project_id, actor)
-    record = Memory(project_id=project_id, kind=body.kind, title=body.title, content=body.content, source=body.source)
+    record = Memory(project_id=project_id, kind=body.kind, title=body.title, content=body.content, source=body.source, sensitivity=body.sensitivity)
     db.add(record)
     db.flush()
     emit(db, actor, "memory.proposed", record.id, project_id)
     db.commit()
-    return as_dict(record, "id", "kind", "title", "content", "source", "status", "version")
+    return as_dict(record, "id", "kind", "title", "content", "source", "sensitivity", "status", "version")
 
 
 @router.get("/projects/{project_id}/memories")
@@ -581,7 +664,9 @@ def memories(project_id: str, actor: Actor = Depends(authenticate), db: Session 
     query = select(Memory).where(Memory.project_id == project_id)
     if not actor.is_owner:
         query = query.where(Memory.status == "published")
-    return [as_dict(m, "id", "kind", "title", "content", "source", "status", "version") for m in db.scalars(query)]
+    allowed = effective_sensitivity(db, project_id, actor)
+    rows = [m for m in db.scalars(query) if sensitivity_allowed(m.sensitivity, allowed)]
+    return [as_dict(m, "id", "kind", "title", "content", "source", "sensitivity", "status", "version") for m in rows]
 
 
 @router.post("/memories/{memory_id}/publish")
@@ -656,7 +741,18 @@ def events(project_id: str, after: int = 0, limit: int = 100, actor: Actor = Dep
 
 
 @router.post("/tasks/{task_id}/artifacts", status_code=201)
-async def upload_artifact(task_id: str, request: Request, epoch: int | None = None, filename: str = Header(default="artifact.bin", alias="X-Artifact-Name"), actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+async def upload_artifact(
+    task_id: str,
+    request: Request,
+    epoch: int | None = None,
+    filename: str = Header(default="artifact.bin", alias="X-Artifact-Name"),
+    sensitivity: str = Header(default="internal", alias="X-Artifact-Sensitivity"),
+    actor: Actor = Depends(authenticate),
+    db: Session = Depends(get_session),
+):
+    require_writable_system(db)
+    if sensitivity not in SENSITIVITY_ORDER:
+        raise HTTPException(422, "Invalid artifact sensitivity")
     row = require_task(db, task_id, actor, lock=True)
     if not actor.is_owner:
         if epoch is None:
@@ -688,7 +784,9 @@ async def upload_artifact(task_id: str, request: Request, epoch: int | None = No
         task_id=task_id,
         name=filename,
         checksum=checksum,
+        size_bytes=len(content),
         uri="",
+        sensitivity=sensitivity,
         review_status="pending",
     )
     db.add(record)
@@ -701,18 +799,20 @@ async def upload_artifact(task_id: str, request: Request, epoch: int | None = No
     record.uri = str(dest)
     emit(db, actor, "artifact.submitted", record.id, row.project_id, {"task_id": task_id, "sha256": checksum})
     db.commit()
-    return as_dict(record, "id", "family_id", "version", "project_id", "task_id", "name", "checksum", "review_status", "review_note", "reviewed_at", "created_at")
+    return as_dict(record, "id", "family_id", "version", "project_id", "task_id", "name", "checksum", "size_bytes", "sensitivity", "review_status", "review_note", "reviewed_at", "deleted_at", "created_at")
 
 
 @router.get("/tasks/{task_id}/artifacts")
 def artifacts(task_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
-    require_task(db, task_id, actor)
+    task_row = require_task(db, task_id, actor)
+    allowed = effective_sensitivity(db, task_row.project_id, actor, task_id)
     rows = db.scalars(
         select(Artifact)
         .where(Artifact.task_id == task_id)
         .order_by(Artifact.name, Artifact.version, Artifact.created_at, Artifact.id)
     ).all()
-    return [as_dict(a, "id", "family_id", "version", "name", "checksum", "review_status", "review_note", "reviewed_at", "created_at") for a in rows]
+    filtered = [a for a in rows if sensitivity_allowed(a.sensitivity, allowed)]
+    return [as_dict(a, "id", "family_id", "version", "name", "checksum", "size_bytes", "sensitivity", "review_status", "review_note", "reviewed_at", "deleted_at", "created_at") for a in filtered]
 
 
 @router.get("/artifacts/{artifact_id}/content")
@@ -721,6 +821,9 @@ def download_artifact(artifact_id: str, actor: Actor = Depends(authenticate), db
     if artifact is None:
         raise HTTPException(404, "Artifact not found")
     require_task(db, artifact.task_id, actor)
+    allowed = effective_sensitivity(db, artifact.project_id, actor, artifact.task_id)
+    if not sensitivity_allowed(artifact.sensitivity, allowed):
+        raise HTTPException(403, "Agent lacks sensitivity clearance for this artifact")
     content = _read_artifact_content(artifact)
     disposition_name = quote(artifact.name, safe="")
     return Response(
@@ -755,4 +858,4 @@ def review_artifact(artifact_id: str, body: ArtifactReviewIn, actor: Actor = Dep
         {"task_id": artifact.task_id, "family_id": artifact.family_id, "version": artifact.version},
     )
     db.commit()
-    return as_dict(artifact, "id", "family_id", "version", "project_id", "task_id", "name", "checksum", "review_status", "review_note", "reviewed_at", "created_at")
+    return as_dict(artifact, "id", "family_id", "version", "project_id", "task_id", "name", "checksum", "size_bytes", "sensitivity", "review_status", "review_note", "reviewed_at", "deleted_at", "created_at")

@@ -12,10 +12,10 @@ import time
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .analytics import fair_active_projects
 from .db import get_engine
-from .models import Project
 from .security import Actor
-from .services import choose_dispatch_targets
+from .services import choose_dispatch_targets, get_system_mode
 
 log = logging.getLogger("otternest.scheduler")
 
@@ -25,8 +25,9 @@ def schedule_once(limit_per_project: int = 20, heartbeat_ttl_seconds: int = 180)
         raise ValueError("Invalid scheduling limits")
     total = 0
     with Session(get_engine()) as db:
-        project_ids = db.scalars(select(Project.id).where(Project.status == "active")
-                                 .order_by(Project.id)).all()
+        if get_system_mode(db) != "normal":
+            return 0
+        project_ids = [p.id for p in fair_active_projects(db)]
     for project_id in project_ids:
         with Session(get_engine()) as db:
             routes = choose_dispatch_targets(db, project_id, Actor("owner", "scheduler"),

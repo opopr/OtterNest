@@ -68,3 +68,9 @@ c) 启动 `otternest-runner --server https://CONTROL_HOST --once -- /absolute/pa
 ## Workspace 成果自动回传与多 Agent 交接
 
 在可信执行主机上，通用 Runner 可选 `--workspace-root /absolute/private/workspaces`。每项任务创建独立临时目录作为可执行程序 cwd；可信 Worker 可返回 `{"summary":"...","artifacts":[{"path":"result.txt"}],"checkpoint":{"summary":"..."}}`。Runner 将使用本身的 Agent Token 上传校验后的成果，在同一租约 epoch 记录自述检查点并提交任务。后继 Agent 只能从**已完成并验收**的 DAG 依赖中取得有界交接元数据。此功能**不是**不可信代码安全沙箱，不应将任意任务文本转为 shell。详见 [24 · Runner 成果与交接](docs/24-runner-artifact-handoff.md)。
+
+## 目标与依赖
+
+管理台「项目与任务 → 目标管理」可以创建目标、设置前置目标、暂停/恢复目标并提交完成确认，也可以在创建任务时将任务关联到活动目标。暂停目标会阻止其关联任务的新调度和领取，但不会远端停止已运行任务。完成目标必须提供至少 5 个字符的完成依据；系统要求其前置目标已完成、关联任务均已由所有者验收为 `completed`。没有关联任务的目标可以由所有者依据成功标准直接确认完成。完成状态是终态，后续调整应新建目标。
+
+对应接口：`GET /api/v1/projects/{project_id}/goal-board`、`POST /api/v1/goals/{goal_id}/dependencies`、`DELETE /api/v1/goals/{goal_id}/dependencies/{predecessor_id}`、`POST /api/v1/goals/{goal_id}/status`。目标状态变更写入项目事件；完成依据对可读取该项目事件的成员可见，不要在其中放入密钥或其他敏感内容。手工验收步骤和限制见 [docs/31-goal-lifecycle.md](docs/31-goal-lifecycle.md)。

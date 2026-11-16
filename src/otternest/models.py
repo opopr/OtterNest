@@ -24,6 +24,7 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)
     status: Mapped[str] = mapped_column(String(24), default="active", nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, default=50, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
 
 
@@ -33,7 +34,16 @@ class Goal(Base):
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(240), nullable=False)
     success_criteria: Mapped[str] = mapped_column(Text, nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, default=50, nullable=False)
     status: Mapped[str] = mapped_column(String(24), default="active", nullable=False)
+
+
+class GoalDependency(Base):
+    """Cross-goal prerequisite within the same project."""
+    __tablename__ = "goal_dependencies"
+    goal_id: Mapped[str] = mapped_column(ForeignKey("goals.id", ondelete="CASCADE"), primary_key=True)
+    depends_on_id: Mapped[str] = mapped_column(ForeignKey("goals.id", ondelete="CASCADE"), primary_key=True)
+    __table_args__ = (Index("ix_goal_dependencies_predecessor", "depends_on_id"),)
 
 
 class Agent(Base):
@@ -56,8 +66,10 @@ class AgentRuntime(Base):
     agent_id: Mapped[str] = mapped_column(ForeignKey("agents.id"), nullable=False, index=True)
     label: Mapped[str] = mapped_column(String(120), nullable=False)
     environment: Mapped[str] = mapped_column(String(160), nullable=False)
+    token_hash: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     status: Mapped[str] = mapped_column(String(24), default="unknown", nullable=False)
+    last_health: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
     __table_args__ = (UniqueConstraint("agent_id", "label", name="uq_runtime_label"),)
@@ -69,6 +81,8 @@ class Membership(Base):
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
     agent_id: Mapped[str] = mapped_column(ForeignKey("agents.id"), nullable=False, index=True)
     role: Mapped[str] = mapped_column(String(32), default="worker", nullable=False)
+    max_sensitivity: Mapped[str] = mapped_column(String(24), default="confidential", nullable=False)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     __table_args__ = (UniqueConstraint("project_id", "agent_id", name="uq_membership"),)
 
 
@@ -85,11 +99,16 @@ class Task(Base):
     assigned_agent_id: Mapped[str | None] = mapped_column(ForeignKey("agents.id"), nullable=True)
     target_agent_id: Mapped[str | None] = mapped_column(ForeignKey("agents.id"), nullable=True)
     priority: Mapped[int] = mapped_column(Integer, default=50, nullable=False)
+    sensitivity: Mapped[str] = mapped_column(String(24), default="internal", nullable=False)
     required_capabilities: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     approval_granted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     lease_epoch: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     result_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    correlation_id: Mapped[str] = mapped_column(String(36), default=new_id, nullable=False)
+    failure_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    rework_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
     __table_args__ = (Index("ix_tasks_project_status", "project_id", "status"),)
@@ -163,6 +182,7 @@ class Memory(Base):
     title: Mapped[str] = mapped_column(String(240), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     source: Mapped[str] = mapped_column(Text, nullable=False)
+    sensitivity: Mapped[str] = mapped_column(String(24), default="internal", nullable=False)
     status: Mapped[str] = mapped_column(String(24), default="proposed", nullable=False)
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
@@ -215,10 +235,13 @@ class Artifact(Base):
     task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(240), nullable=False)
     checksum: Mapped[str] = mapped_column(String(64), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     uri: Mapped[str] = mapped_column(Text, nullable=False)
+    sensitivity: Mapped[str] = mapped_column(String(24), default="internal", nullable=False)
     review_status: Mapped[str] = mapped_column(String(24), default="pending", nullable=False)
     review_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
     __table_args__ = (UniqueConstraint("family_id", "version", name="uq_artifact_family_version"),)
 
@@ -435,3 +458,92 @@ class OwnerSession(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class TaskGrant(Base):
+    """Explicit, revocable, time-bounded task-level authorization grant for ABAC."""
+    __tablename__ = "task_grants"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), nullable=False, index=True)
+    agent_id: Mapped[str] = mapped_column(ForeignKey("agents.id"), nullable=False, index=True)
+    granted_scopes: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    max_sensitivity: Mapped[str] = mapped_column(String(24), default="confidential", nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+
+
+class SystemState(Base):
+    """Control-plane operational mode (normal, degraded, readonly_protect)."""
+    __tablename__ = "system_states"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default="default")
+    mode: Mapped[str] = mapped_column(String(32), default="normal", nullable=False)
+    reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+
+
+class WorkflowRule(Base):
+    """Bounded event-driven workflow rule with loop & chain-depth circuit breakers."""
+    __tablename__ = "workflow_rules"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    event_prefix: Mapped[str] = mapped_column(String(100), nullable=False)
+    condition_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    action_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    action_config: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    max_chain_depth: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
+    cooldown_seconds: Mapped[int] = mapped_column(Integer, default=60, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    triggered_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+
+
+class WorkflowRun(Base):
+    """Audit trail of one workflow rule evaluation/execution or circuit-breaker skip."""
+    __tablename__ = "workflow_runs"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    rule_id: Mapped[str] = mapped_column(ForeignKey("workflow_rules.id"), nullable=False, index=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"), nullable=False, index=True)
+    correlation_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    chain_depth: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_task_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    detail: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+    __table_args__ = (UniqueConstraint("rule_id", "event_id", name="uq_workflow_rule_event"),)
+
+
+class Experiment(Base):
+    """Controlled optimization experiment (excludes E4 root governance rules)."""
+    __tablename__ = "experiments"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    target_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    target_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    hypothesis: Mapped[str] = mapped_column(Text, nullable=False)
+    baseline_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    candidate_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    sample_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="proposed", nullable=False)
+    results: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    owner_note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Notification(Base):
+    """Tiered owner inbox notifications (urgent, important, digest)."""
+    __tablename__ = "notifications"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str | None] = mapped_column(ForeignKey("projects.id"), nullable=True, index=True)
+    level: Mapped[str] = mapped_column(String(16), default="important", nullable=False)
+    title: Mapped[str] = mapped_column(String(240), nullable=False)
+    body: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    source_kind: Mapped[str] = mapped_column(String(48), default="system", nullable=False)
+    source_id: Mapped[str] = mapped_column(String(36), default="", nullable=False)
+    read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)

@@ -23,6 +23,10 @@ from .continuity import router as continuity_router
 from .lifecycle import router as lifecycle_router
 from .auth import router as auth_router
 from .portability import router as portability_router
+from .ops import router as ops_router
+from .workflow_engine import router as workflow_router
+from .analytics import router as analytics_router
+from .realtime import router as realtime_router
 from .db import get_engine
 
 app = FastAPI(
@@ -46,6 +50,10 @@ app.include_router(continuity_router)
 app.include_router(lifecycle_router)
 app.include_router(auth_router)
 app.include_router(portability_router)
+app.include_router(ops_router)
+app.include_router(workflow_router)
+app.include_router(analytics_router)
+app.include_router(realtime_router)
 
 
 @app.get("/health/live")

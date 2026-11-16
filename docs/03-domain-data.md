@@ -11,7 +11,7 @@
 | Runtime / Instance | 环境、宿主、工具、是否可连接/已启动、心跳、支持的协议 |
 | Team Membership | 项目、Agent、角色、有效期、责任范围 |
 | Project / Charter | 目标、自治等级、预算、敏感级别、决策边界、停止条件 |
-| Goal | 可衡量结果、优先级、检查周期、完成条件 |
+| Goal | 可衡量结果、优先级、完成条件与前置目标；状态为 active/paused/completed，由所有者显式完成人工确认 |
 | Task | 项目/目标、责任人/执行人、依赖、状态、验收、风险、授权上下文 |
 | Task Attempt / Lease | 执行代次、租约、fencing token、checkpoint、确认状态 |
 | Event / Delivery | 事件与因果 ID、版本、发件箱、订阅、重试、投递/确认状态 |

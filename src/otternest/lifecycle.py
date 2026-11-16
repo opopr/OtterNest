@@ -22,6 +22,7 @@ from .models import (
     DecisionReview,
     Event,
     Goal,
+    GoalDependency,
     Membership,
     Memory,
     Project,
@@ -563,6 +564,16 @@ def export_project_bundle(project_id: str, actor: Actor = Depends(authenticate),
     project = require_project(db, project_id, actor)
     charter = db.get(ProjectCharter, project_id)
     goals = db.scalars(select(Goal).where(Goal.project_id == project_id).order_by(Goal.id)).all()
+    goal_ids = [goal.id for goal in goals]
+    goal_deps = (
+        db.scalars(
+            select(GoalDependency)
+            .where(GoalDependency.goal_id.in_(goal_ids))
+            .order_by(GoalDependency.goal_id, GoalDependency.depends_on_id)
+        ).all()
+        if goal_ids
+        else []
+    )
     memberships = db.scalars(select(Membership).where(Membership.project_id == project_id).order_by(Membership.id)).all()
     tasks = db.scalars(select(Task).where(Task.project_id == project_id).order_by(Task.created_at, Task.id)).all()
     task_ids = [t.id for t in tasks]
@@ -640,6 +651,7 @@ def export_project_bundle(project_id: str, actor: Actor = Depends(authenticate),
             "name": project.name,
             "description": project.description,
             "status": project.status,
+            "priority": project.priority,
             "created_at": project.created_at,
         },
         "charter": None
@@ -652,9 +664,10 @@ def export_project_bundle(project_id: str, actor: Actor = Depends(authenticate),
             "updated_at": charter.updated_at,
         },
         "goals": [
-            {"id": g.id, "title": g.title, "success_criteria": g.success_criteria, "status": g.status}
+            {"id": g.id, "title": g.title, "success_criteria": g.success_criteria, "status": g.status, "priority": g.priority}
             for g in goals
         ],
+        "goal_dependencies": [{"goal_id": d.goal_id, "depends_on_id": d.depends_on_id} for d in goal_deps],
         "memberships": [{"id": m.id, "agent_id": m.agent_id, "role": m.role} for m in memberships],
         "tasks": [
             {
@@ -665,9 +678,14 @@ def export_project_bundle(project_id: str, actor: Actor = Depends(authenticate),
                 "acceptance": t.acceptance,
                 "status": t.status,
                 "risk": t.risk,
+                "sensitivity": t.sensitivity,
                 "assigned_agent_id": t.assigned_agent_id,
                 "target_agent_id": t.target_agent_id,
                 "priority": t.priority,
+                "correlation_id": t.correlation_id,
+                "failure_reason": t.failure_reason,
+                "rework_count": t.rework_count,
+                "completed_at": t.completed_at,
                 "required_capabilities": t.required_capabilities,
                 "approval_granted": t.approval_granted,
                 "lease_epoch": t.lease_epoch,
@@ -703,6 +721,7 @@ def export_project_bundle(project_id: str, actor: Actor = Depends(authenticate),
                 "title": m.title,
                 "content": m.content,
                 "source": m.source,
+                "sensitivity": m.sensitivity,
                 "status": m.status,
                 "version": m.version,
                 "created_at": m.created_at,
@@ -777,6 +796,8 @@ def export_project_bundle(project_id: str, actor: Actor = Depends(authenticate),
                 "task_id": a.task_id,
                 "name": a.name,
                 "checksum": a.checksum,
+                "size_bytes": a.size_bytes,
+                "sensitivity": a.sensitivity,
                 "review_status": a.review_status,
                 "review_note": a.review_note,
                 "reviewed_at": a.reviewed_at,
