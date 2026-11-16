@@ -359,7 +359,7 @@ def choose_dispatch_targets(db: Session, project_id: str, actor: Actor, limit: i
         Task.project_id == project_id, Task.status == "ready", Task.target_agent_id.is_(None)
     ).where(
         (Task.goal_id.is_(None)) | (Goal.status == "active")
-    ).order_by(Task.priority.desc(), Task.created_at, Task.id).with_for_update().limit(limit * 10)).all()
+    ).order_by(Task.priority.desc(), Task.created_at, Task.id).with_for_update(of=Task).limit(limit * 10)).all()
     routes = []
     for task in tasks:
         if len(routes) >= max_routes:

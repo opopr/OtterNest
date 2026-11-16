@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from tests.conftest import OWNER
-
 
 def test_websocket_and_ag_ui_projection(env, owner_headers):
     p = env.post("/api/v1/projects", headers=owner_headers, json={"name": "WSProj"}).json()
@@ -19,7 +17,7 @@ def test_websocket_and_ag_ui_projection(env, owner_headers):
     assert any(e["subject_id"] == t["id"] for e in body["events"])
 
     with env.websocket_connect(f"/api/v1/projects/{p['id']}/events/ws") as ws:
-        ws.send_json({"type": "auth", "token": OWNER, "after": 0})
+        ws.send_json({"type": "auth", "token": owner_headers["Authorization"].split(" ", 1)[1], "after": 0})
         conn = ws.receive_json()
         assert conn["type"] == "connected"
         ev1 = ws.receive_json()

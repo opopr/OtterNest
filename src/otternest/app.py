@@ -35,7 +35,6 @@ _LEGACY_HTML = Path(__file__).with_name("index.html")
 _DEFAULT_WEB_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 _WEB_DIST = Path(os.environ.get("OTTERNEST_WEB_DIST", str(_DEFAULT_WEB_DIST))).resolve()
 _WEB_INDEX = _WEB_DIST / "index.html"
-_WEB_ASSETS = _WEB_DIST / "assets"
 
 app = FastAPI(
     title="OtterNest AI Team OS",
@@ -112,8 +111,9 @@ def legacy_console():
     return FileResponse(_LEGACY_HTML, media_type="text/html")
 
 
-if _WEB_ASSETS.is_dir():
-    app.mount("/ui-assets", StaticFiles(directory=_WEB_ASSETS), name="ui-assets")
+if _WEB_DIST.is_dir():
+    # Vite emits files under dist/assets; mount the dist root so /ui-assets/assets/* resolves.
+    app.mount("/ui-assets", StaticFiles(directory=_WEB_DIST), name="ui-assets")
 
 _assets_dir = Path(__file__).with_name("assets")
 if _assets_dir.is_dir():
