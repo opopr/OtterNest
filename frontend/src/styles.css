@@ -754,3 +754,37 @@ button:disabled { opacity: .58; cursor: wait; }
   .task-detail-grid { grid-template-columns: 1fr; }
   .dependency-editor-controls { align-items: stretch; flex-direction: column; }
 }
+
+
+.runtime-monitor-panel { padding: 17px 19px; }
+.runtime-monitor-filters { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; }
+.runtime-search { display: flex; align-items: center; flex: 1; gap: 8px; min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; color: #9ba1b3; }
+.runtime-search input { width: 100%; border: 0; outline: 0; color: #59617a; font-size: 10px; }
+.runtime-monitor-filters select { min-width: 130px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; color: #59617a; background: white; font-size: 10px; }
+.runtime-monitor-list { display: grid; gap: 10px; }
+.runtime-monitor-card { display: grid; gap: 12px; padding: 14px; border: 1px solid #eff0f6; border-radius: 11px; background: #fff; }
+.runtime-monitor-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.runtime-monitor-identity { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.runtime-monitor-avatar { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 auto; border-radius: 10px; background: #f0efff; color: #7771d7; }
+.runtime-monitor-identity > div:last-child { display: grid; gap: 4px; min-width: 0; }
+.runtime-monitor-identity strong { color: #4f5771; font-size: 11px; }
+.runtime-monitor-identity small { color: #9299ad; font-size: 9px; }
+.runtime-monitor-identity code { color: #a0a5b5; font-size: 8px; overflow-wrap: anywhere; }
+.runtime-monitor-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.runtime-monitor-meta { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 9px; }
+.runtime-monitor-meta > div { display: grid; gap: 5px; min-width: 0; padding: 9px 10px; border-radius: 8px; background: #fafaff; }
+.runtime-monitor-meta small { color: #9ba1b3; font-size: 8px; }
+.runtime-monitor-meta strong { color: #66708a; font-size: 9px; overflow-wrap: anywhere; }
+.runtime-health-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.runtime-health-label { margin-right: 3px; color: #9299ad; font-size: 9px; }
+.runtime-health-chip { padding: 4px 7px; border-radius: 6px; background: #f3f4f9; color: #737b94; font-size: 8px; }
+.runtime-monitor-actions { display: flex; align-items: center; gap: 12px; padding-top: 9px; border-top: 1px solid #f0f1f6; }
+.runtime-monitor-footnote { display: flex; align-items: flex-start; gap: 6px; margin: 0; color: #999fb1; font-size: 9px; line-height: 1.6; }
+.runtime-token-panel { margin-bottom: 2px; }
+@media (max-width: 640px) {
+ .runtime-monitor-card-head { flex-direction: column; }
+ .runtime-monitor-badges { justify-content: flex-start; }
+ .runtime-monitor-meta { grid-template-columns: 1fr; }
+ .runtime-monitor-filters { align-items: stretch; flex-direction: column; }
+ .runtime-monitor-filters select { width: 100%; }
+}
