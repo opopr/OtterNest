@@ -48,6 +48,7 @@ OtterNest 不是某一个 AI 模型，也不负责“把多个订阅额度合并
 | [32 · React 前后端分离](docs/32-react-frontend-separation.md) | React、FastAPI、OpenAPI、CORS 与 Google AI Studio 工作流 |
 | [33 · React 领域页面迁移](docs/33-react-domain-pages.md) | 指挥中心、目标工作流、知识库、Portfolio 与系统运维页面 |
 | [34 · React 运行与成果管理](docs/34-react-operations-pages.md) | Skills、临时授权、成果生命周期、Agent Runtime 与受限命令 |
+| [35 · 私有 Linux 原生部署](docs/35-native-linux-deployment.md) | ARM64 私有服务器、PostgreSQL、systemd、Nginx、AI Studio 接入与运维验收 |
 
 ## 三大平面（逻辑）
 
