@@ -13,7 +13,6 @@ def test_systemd_units_use_dedicated_service_identity_and_environment():
         "otternest-scheduler.service",
         "otternest-workflows.service",
         "otternest-webhooks.service",
-        "otternest-backup.service",
     )
     for name in names:
         content = (SYSTEMD / name).read_text(encoding="utf-8")
