@@ -13,6 +13,7 @@ def test_systemd_units_use_dedicated_service_identity_and_environment():
         "otternest-scheduler.service",
         "otternest-workflows.service",
         "otternest-webhooks.service",
+        "otternest-backup.service",
     )
     for name in names:
         content = (SYSTEMD / name).read_text(encoding="utf-8")
@@ -54,4 +55,38 @@ def test_systemd_installer_has_valid_shell_syntax():
     if bash is None:
         return
     script = ROOT / "deploy" / "install-systemd.sh"
+    subprocess.run([bash, "-n", str(script)], check=True)
+
+
+
+def test_backup_service_does_not_receive_owner_secrets_and_timer_is_optional():
+    service = (SYSTEMD / "otternest-backup.service").read_text(encoding="utf-8")
+    timer = (SYSTEMD / "otternest-backup.timer").read_text(encoding="utf-8")
+    installer = (ROOT / "deploy" / "install-systemd.sh").read_text(encoding="utf-8")
+    assert "User=root" in service
+    assert "ReadWritePaths=/var/backups/otternest" in service
+    assert "EnvironmentFile=" not in service
+    assert "OTTERNEST_OWNER_TOKEN" not in service
+    assert "OnCalendar=*-*-* 02:30:00 UTC" in timer
+    assert "Persistent=true" in timer
+    assert "otternest-backup.timer" not in next(
+        line for line in installer.splitlines() if "systemctl enable " in line
+    )
+
+
+def test_backup_script_checks_running_tasks_and_archive_integrity():
+    script = (ROOT / "deploy" / "scripts" / "backup.sh").read_text(encoding="utf-8")
+    assert "status = 'running'" in script
+    assert "pg_restore --list" in script
+    assert "tar -tzf" in script
+    assert "sha256sum database.dump artifacts.tar.gz" in script
+    assert "systemctl stop otternest-api.service" in script
+    assert "runuser -u \"$SERVICE_USER\" -- pg_dump" in script
+
+
+def test_backup_script_has_valid_shell_syntax():
+    bash = shutil.which("bash")
+    if bash is None:
+        return
+    script = ROOT / "deploy" / "scripts" / "backup.sh"
     subprocess.run([bash, "-n", str(script)], check=True)
