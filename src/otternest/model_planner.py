@@ -32,7 +32,7 @@ class ModelHistoryTurn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     role: Literal["user", "assistant"]
     text: str = Field(min_length=1, max_length=3500)
-    task_id: str | None = None
+    task_id: str | None = Field(default=None, max_length=64)
 
 
 class ModelUtterance(BaseModel):
@@ -134,11 +134,16 @@ def interpret_model(body: ModelUtterance, actor: Actor = Depends(authenticate),
     task_ids = {t["id"] for t in tasks}
     if body.focus_task_id is not None and body.focus_task_id not in task_ids:
         raise HTTPException(404, "Focused task not found in selected project")
-    proposal = _request_proposal(
-        url, key, model, body.text, tasks, agents,
-        history=[turn.model_dump(exclude_none=True) for turn in body.history],
-        focus_task_id=body.focus_task_id,
-    )
+    if body.history or body.focus_task_id is not None:
+        proposal = _request_proposal(
+            url, key, model, body.text, tasks, agents,
+            history=[turn.model_dump(exclude_none=True) for turn in body.history],
+            focus_task_id=body.focus_task_id,
+        )
+    else:
+        # Keep the original six-argument call compatible with existing adapters
+        # and integrations that wrap _request_proposal.
+        proposal = _request_proposal(url, key, model, body.text, tasks, agents)
     if proposal.task_id not in {t["id"] for t in tasks}:
         raise HTTPException(422, "Model proposed a task outside the allowed candidate set")
     if proposal.target_agent_id is not None and proposal.target_agent_id not in {a["id"] for a in agents}:
