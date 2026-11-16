@@ -120,6 +120,6 @@ Agent 页面同时管理 AgentRuntime 注册、独立 token 签发/轮换、心�
 
 - 新增 `/runtimes` 运行监控页，通过现有 `GET /agents` 和 `GET /agents/{agent_id}/runtimes` 聚合 Runtime 快照，不新增重复后端状态。
 - 汇总在线、离线、禁用和缺少独立凭据的运行实例；支持按状态筛选和按 Agent、实例、环境及 ID 搜索。
-- 在线状态直接采用 FastAPI 的计算结果：最近 180 秒心跳、Runtime 启用状态以及 idle/busy 状态；前端不自行推断在线。
+- 单实例列表与全局列表共用后端 \`runtime_public\` 序列化规则：最近 180 秒心跳、Runtime 启用状态以及 idle/busy 状态；前端不自行推断在线。
 - 所有者可以签发或轮换独立 Runtime 凭据、禁用 Runtime。凭据仅在签发后短暂展示，轮换会使旧凭据立即失效。
 - 健康信息按 Runtime 最近一次心跳快照展示；本页手动刷新，不假装提供后台自动轮询。
