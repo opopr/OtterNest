@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, ClipboardCheck, Eye, Filter, RefreshCw, ShieldCheck, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, ClipboardCheck, Eye, Filter, GitBranch, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { request } from "../api/client";
-import type { Project, Task } from "../api/types";
+import type { Agent, Project, Task } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import TaskDetailPanel, { type TaskDetailSelection } from "../components/TaskDetailPanel";
 
 interface Row extends Task { project_name: string; }
 interface Plan { id:string; task_id:string; action:string; status:string; expires_at:string; expected_version:number; task_title?:string; }
+interface DispatchRoute { task_id:string; agent_id:string; }
+interface DispatchResponse { project_id:string; routes:DispatchRoute[]; count:number; }
+interface DispatchNotice {
+ routes:Array<DispatchRoute & {project_name:string;task_title:string;agent_name:string}>;
+ errors:string[];
+ project_count:number;
+}
 const labels:Record<string,string>={ready:"待执行",waiting_dependencies:"等待依赖",waiting_approval:"等待授权",running:"执行中",submitted:"等待验收",blocked:"已阻塞",completed:"已完成",cancelled:"已取消",failed:"执行失败"};
 const tones:Record<string,string>={ready:"tag-blue",waiting_dependencies:"tag-neutral",waiting_approval:"tag-red",running:"tag-blue",submitted:"tag-amber",blocked:"tag-red",completed:"tag-green",cancelled:"tag-neutral",failed:"tag-red"};
 const risks:Record<string,string>={R0:"低风险",R1:"一般风险",R2:"较高风险",R3:"高风险"};
@@ -15,13 +22,14 @@ const time=(v:string)=>new Date(v).toLocaleString("zh-CN",{hour12:false});
 export default function TaskCenterPage(){
  const {user}=useAuth();
  const [detailSelection,setDetailSelection]=useState<TaskDetailSelection|null>(null);
- const [projects,setProjects]=useState<Project[]>([]),[tasks,setTasks]=useState<Row[]>([]);
+ const [projects,setProjects]=useState<Project[]>([]),[tasks,setTasks]=useState<Row[]>([]),[agents,setAgents]=useState<Agent[]>([]);
  const [project,setProject]=useState("all"),[status,setStatus]=useState("all"),[risk,setRisk]=useState("all"),[query,setQuery]=useState("");
- const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[plan,setPlan]=useState<Plan|null>(null);
+ const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[dispatching,setDispatching]=useState(false),[error,setError]=useState(""),[plan,setPlan]=useState<Plan|null>(null),[dispatchNotice,setDispatchNotice]=useState<DispatchNotice|null>(null);
  const load=useCallback(async()=>{
   setLoading(true);setError("");
   try{
-   const ps=await request<Project[]>("/projects");setProjects(ps);
+   const [ps,agentRows]=await Promise.all([request<Project[]>("/projects"),request<Agent[]>("/agents")]);
+   setProjects(ps);setAgents(agentRows);
    const groups=await Promise.all(ps.map(async p=>({p,rows:await request<Task[]>("/projects/"+encodeURIComponent(p.id)+"/tasks")})));
    setTasks(groups.flatMap(g=>g.rows.map(t=>({...t,project_name:g.p.name}))));
   }catch(e){setError(e instanceof Error?e.message:"任务加载失败");}finally{setLoading(false);}
@@ -43,8 +51,46 @@ export default function TaskCenterPage(){
   try{await request<Plan>("/command/plans/"+encodeURIComponent(plan.id)+"/confirm",{method:"POST",body:"{}"});setPlan(null);await load();}
   catch(e){setError(e instanceof Error?e.message:"确认失败");}finally{setSaving(false);}
  };
+ const dispatchNow=async()=>{
+  const targets=projects.filter(p=>p.status==="active"&&(project==="all"||p.id===project));
+  if(!targets.length){setError("当前筛选范围内没有处于活动状态的项目。");return;}
+  const scope=project==="all"?"全部活动项目":"当前项目";
+  if(!window.confirm("确认对"+scope+"执行一次任务调度？\n\n只会路由到最近 180 秒内心跳且处于 idle 的 Runtime。调度只设置目标 Agent，不会远程启动进程；Runner 仍需自行轮询并领取任务。"))return;
+  setDispatching(true);setError("");setDispatchNotice(null);
+  try{
+   const settled=await Promise.allSettled(targets.map(p=>request<DispatchResponse>("/projects/"+encodeURIComponent(p.id)+"/schedule",{
+    method:"POST",body:JSON.stringify({limit:20,heartbeat_ttl_seconds:180})
+   })));
+   const routes:Array<DispatchRoute & {project_name:string;task_title:string;agent_name:string}>=[];
+   const errors:string[]=[];
+   settled.forEach((result,index)=>{
+    if(result.status==="rejected"){
+     const reason=result.reason;
+     errors.push(targets[index].name+"："+(reason instanceof Error?reason.message:"调度失败"));
+     return;
+    }
+    result.value.routes.forEach(route=>{
+     routes.push({
+      ...route,
+      project_name:targets[index].name,
+      task_title:tasks.find(task=>task.id===route.task_id)?.title||route.task_id,
+      agent_name:agents.find(agent=>agent.id===route.agent_id)?.name||route.agent_id
+     });
+    });
+   });
+   setDispatchNotice({routes,errors,project_count:targets.length});
+   await load();
+  }finally{setDispatching(false);}
+ };
  return <div className="page-stack">
-  <div className="page-heading"><div><div className="eyebrow">TASK OPERATIONS</div><h1>任务中心</h1><p>跨项目汇总任务状态；授权与验收均通过服务端命令预览执行。</p></div><button className="secondary-button" onClick={()=>void load()} disabled={loading}><RefreshCw size={15} className={loading?"spin":""}/>刷新</button></div>
+  <div className="page-heading"><div><div className="eyebrow">TASK OPERATIONS</div><h1>任务中心</h1><p>跨项目汇总任务状态；授权、验收和任务调度均由服务端治理。</p></div><div className="heading-actions"><button className="secondary-button" onClick={()=>void load()} disabled={loading||dispatching}><RefreshCw size={15} className={loading?"spin":""}/>刷新</button><button className="primary-button compact" onClick={()=>void dispatchNow()} disabled={loading||dispatching||saving}><GitBranch size={15}/>{dispatching?"正在调度…":"立即调度"}</button></div></div>
+  {dispatchNotice&&<section className="panel dispatch-notice">
+   <div className="dispatch-notice-head"><div><strong>本轮调度结果</strong><p>扫描 {dispatchNotice.project_count} 个活动项目，成功路由 {dispatchNotice.routes.length} 个任务。</p></div><button className="icon-button" onClick={()=>setDispatchNotice(null)} aria-label="关闭调度结果"><X size={15}/></button></div>
+   {dispatchNotice.routes.length>0?<div className="dispatch-route-list">{dispatchNotice.routes.slice(0,12).map((route,index)=><div className="dispatch-route-row" key={route.task_id}><span className="dispatch-route-index">{index+1}</span><div><strong>{route.task_title}</strong><small>{route.project_name}</small></div><span className="dispatch-route-arrow">→</span><div><strong>{route.agent_name}</strong><small>{route.agent_id.slice(0,8)}</small></div><span className="status-tag tag-green">已路由</span></div>)}</div>:<div className="dispatch-empty">本轮没有任务被路由。请检查 Runner 是否在线且处于 idle、Agent 能力是否已核验，以及任务是否处于待执行状态。</div>}
+   {dispatchNotice.routes.length>12&&<p className="form-hint">另有 {dispatchNotice.routes.length-12} 个路由结果未在此处展开，可在任务列表查看。</p>}
+   {dispatchNotice.errors.length>0&&<div className="dispatch-errors">{dispatchNotice.errors.map((item,index)=><p key={index}><AlertCircle size={13}/>{item}</p>)}</div>}
+   <p className="dispatch-disclaimer">调度只写入目标 Agent 和审计事件，不会启动远程进程。Runner 通过自己的 Runtime 凭据轮询队列并领取任务。</p>
+  </section>}
   {error&&<div className="inline-error"><AlertCircle size={16}/>{error}<button onClick={()=>setError("")}><X size={14}/></button></div>}
   <div className="stat-grid task-center-stats">
    <div className="stat-card"><div className="stat-icon tone-violet"><ClipboardCheck size={18}/></div><div className="stat-copy"><span>全部任务</span><strong>{counts.all}</strong><small>所有可访问项目</small></div></div>
