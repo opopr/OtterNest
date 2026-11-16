@@ -17,7 +17,7 @@ d) 本地启动：`uvicorn otternest.app:app --host 127.0.0.1 --port 8000`。
 
 e) 管理界面：`http://127.0.0.1:8000/`，API 文档：`/api/docs`。
 
-f) 运行测试：`pytest -q`。早期单元/接口测试使用 SQLite；真实 PostgreSQL 和并发的验证仍需补充。
+f) 运行测试：`pytest -q`。GitHub Actions 分别运行 Python 单元/接口测试、Alembic SQLite 迁移、PostgreSQL 16 迁移与并发领取测试，以及 React 类型检查和生产构建。目标服务器上的压力与故障恢复仍需单独验收。
 
 ## React 前端开发
 
@@ -36,16 +36,16 @@ React + TypeScript + Vite 工程位于 `frontend/`，仓库根目录提供 npm w
 
 ## 安全限制
 
-- 初期使用单所有者 Bearer 令牌，UI 仅在当前页面内存保存令牌。尚未达到生产级会话、反滥用、审计保留和远程访问控制标准。
+- Web 登录使用所有者初始化令牌完成首次账号创建，后续使用有时效的会话令牌，并支持 TOTP 2FA；会话令牌仅保存在当前页面内存。Owner Token 仍是高权限服务器秘密，必须妥善保管。系统尚未完成生产级反滥用、审计保留和公网安全审计。
 - 仅绑定本机地址，不直接暴露公网。尤其不得公开数据库、管理 API 或未经安全审核的 Agent 接口。
-- 目前提供 Agent 通用轮询队列和任务上下文接口；**仍没有**真实第三方模型自动调用或云端唤醒能力，Agent 注册本身只代表身份登记。
+- 已提供可选 OpenAI-compatible 文本模型 Worker 与 Codex CLI Worker，但它们需要操作者在可信执行节点显式配置 API 或本机 CLI 登录；不代表自动接通个人订阅，也没有对 Muse、Codex Cloud 或 Google AI 提供通用云端唤醒能力。Agent 注册本身只代表身份登记。
 - 当前 artifacts 上传上限 5 MiB，超大文件需要后续对象存储/分段上传设计。
 
 ## 通用 Agent Runner（隔离执行环境使用）
 
 Agent 通过所有者创建的受限令牌加入一个项目后，可以在**外部独立环境**上配置 
 
-a) `OTTERNEST_AGENT_TOKEN`（只交给 Runner，本机秘密）。
+a) 优先配置 `OTTERNEST_RUNTIME_TOKEN` 与匹配的 `OTTERNEST_RUNTIME_ID`；旧版 `OTTERNEST_AGENT_TOKEN` 仍兼容。凭据只交给对应 Runner，作为本机秘密保管。
 
 b) 一个可信的可执行文件，**标准输入读取 JSON 上下文包**，标准输出返回文本或 `{"summary":"..."}`。
 
@@ -82,7 +82,11 @@ c) 启动 `otternest-runner --server https://CONTROL_HOST --once -- /absolute/pa
 
 ## Workspace 成果自动回传与多 Agent 交接
 
-在可信执行主机上，通用 Runner 可选 `--workspace-root /absolute/private/workspaces`。每项任务创建独立临时目录作为可执行程序 cwd；可信 Worker 可返回 `{"summary":"...","artifacts":[{"path":"result.txt"}],"checkpoint":{"summary":"..."}}`。Runner 将使用本身的 Agent Token 上传校验后的成果，在同一租约 epoch 记录自述检查点并提交任务。后继 Agent 只能从**已完成并验收**的 DAG 依赖中取得有界交接元数据。此功能**不是**不可信代码安全沙箱，不应将任意任务文本转为 shell。详见 [24 · Runner 成果与交接](docs/24-runner-artifact-handoff.md)。
+在可信执行主机上，通用 Runner 可选 `--workspace-root /absolute/private/workspaces`。每项任务创建独立临时目录作为可执行程序 cwd；可信 Worker 可返回 `{"summary":"...","artifacts":[{"path":"result.txt"}],"checkpoint":{"summary":"..."}}`。Runner 将使用绑定的 Runtime Token（兼容 Agent Token）上传校验后的成果，在同一租约 epoch 记录自述检查点并提交任务。后继 Agent 只能从**已完成并验收**的 DAG 依赖中取得有界交接元数据。此功能**不是**不可信代码安全沙箱，不应将任意任务文本转为 shell。详见 [24 · Runner 成果与交接](docs/24-runner-artifact-handoff.md)。
+
+## 私有 Linux 服务器部署
+
+原生 systemd、Nginx、PostgreSQL 和私有 HTTPS 部署模板见 [docs/35-native-linux-deployment.md](docs/35-native-linux-deployment.md)。该指南面向 ARM64 私有试运行环境，尚未在实际服务器上验收，不代表生产就绪。
 
 ## 目标与依赖
 
