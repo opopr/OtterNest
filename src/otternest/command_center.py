@@ -158,7 +158,11 @@ def _is_contextual_followup(text: str) -> bool:
     ))
 
 
-def _is_project_status_query(def _is_blocked_query(text: str) -> bool:
+def _is_project_status_query(text: str) -> bool:
+    return text.strip().rstrip("。.!！?？") in {"查看项目状态和指标", "查看项目状态", "查看指标", "项目概况", "项目状态"}
+
+
+def _is_blocked_query(text: str) -> bool:
     return text.strip().rstrip("。.!！?？") in {"为什么任务被阻塞", "为什么阻塞", "查看阻塞任务", "解释阻塞原因"}
 
 
