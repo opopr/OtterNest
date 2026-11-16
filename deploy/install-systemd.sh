@@ -16,8 +16,8 @@ for unit in \
   otternest-migrate.service \
   otternest-scheduler.service \
   otternest-workflows.service \
-  otternest-webhooks.service \\
-  otternest-backup.service \\
+  otternest-webhooks.service \
+  otternest-backup.service \
   otternest-backup.timer
 do
   install -o root -g root -m 0644 "${SCRIPT_DIR}/systemd/${unit}" "${UNIT_DIR}/${unit}"
