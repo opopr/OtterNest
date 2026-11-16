@@ -250,7 +250,7 @@ sudo tar -tzf artifacts.tar.gz
 
 完整恢复应先还原到隔离数据库和暂存成果目录，核对 Alembic revision、成果 SHA-256 和应用版本，再安排停机窗口切换。当前仅提供备份和归档完整性验证，不提供自动覆盖式恢复命令。
 
-升级前先备份 PostgreSQL 和成果目录，记录当前 Git commit。只部署已审核的 main commit：
+记录当前 Git commit，并且只部署已经审核的 main commit：
 
 ```bash
 cd /opt/otternest/app
