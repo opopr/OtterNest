@@ -32,12 +32,12 @@
 - Runtime 使用独立凭据签发/轮换；令牌只在签发响应中返回一次。
 - 支持禁用 Runtime 与 Agent。禁用只影响控制平面接入和调度，不宣称会终止外部机器上的进程。
 
-### 5. 受限中文命令 /governance
+### 5. 多轮 Command Center 与 A2UI /governance
 
-- 新增自然语言命令输入区，只调用 POST /command/interpret。
-- 当前只支持后端白名单模板：批准任务、取消任务、验收通过、验收驳回并说明原因、指派任务给 Agent。
-- 模板解析失败时不创建计划；解析成功后创建版本化 CommandPlan。
-- 此功能不是 LLM，不连接外部模型，不执行即时动作。所有操作仍需检查预览并显式确认。
+- 新增多轮会话入口，只调用 POST /command/chat，保留最近 20 轮上下文并可显式指定任务焦点。
+- 支持从权威项目状态生成简报、解释任务等待/阻塞原因、对模糊对象返回候选列表，以及把批准/验收/取消等操作转换为 CommandPlan。
+- 服务端返回的 A2UI 结构先经过组件白名单、节点数量和深度限制；前端只渲染 card/text/badge/metric/list/table/action_preview，不执行 HTML 或任意脚本。
+- CommandPlan 仍需在所有者预览弹窗中二次确认；当前 mode 固定为 template，不连接外部 LLM。受限中文模板入口 /command/interpret 仍保留。
 
 ## 新增 API 测试
 
@@ -55,3 +55,12 @@ tests/test_stage4_react_api.py 覆盖：
 ## 安全边界
 
 React 仅是控制面客户端。所有权威数据、授权判定、任务状态转换、文件路径检查、版本锁定和哈希校验仍由 FastAPI/PostgreSQL 负责；前端不得绕过后端写库。
+
+
+## 多轮对话与 A2UI 客户端
+
+React 指挥中心新增 /command/chat 多轮对话面板：
+- 发送最近 20 轮对话历史、当前项目与可选 focus_task_id。
+- 对象不明确时渲染候选任务，用户选择后可继续输入“继续”等上下文命令。
+- 项目简报和任务解释响应可包含服务端已清洗的 A2UI 组件；前端只负责安全渲染白名单。
+- plan_ready 响应复用现有命令预览弹窗，不在聊天消息到达时自动执行。

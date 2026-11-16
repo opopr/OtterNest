@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  AlertCircle, Check, CheckCircle2, ClipboardCheck, FileSearch, MessageSquare,
+  AlertCircle, Bot, Check, CheckCircle2, ClipboardCheck, FileSearch, MessageSquare,
   RefreshCw, ShieldCheck, X, XCircle
 } from "lucide-react";
 import { request } from "../api/client";
 import type { Project, Task } from "../api/types";
 import ProjectSelect from "../components/ProjectSelect";
+import CommandChatPanel from "../components/CommandChatPanel";
 
 interface Decision {
   id: string;
@@ -70,7 +71,7 @@ export default function GovernancePage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"tasks" | "decisions" | "command">("tasks");
+  const [tab, setTab] = useState<"tasks" | "decisions" | "command" | "chat">("tasks");
   const [commandText, setCommandText] = useState("");
 
   const selectedProject = useMemo(() => projects.find((item) => item.id === selectedId) || null, [projects, selectedId]);
@@ -238,7 +239,8 @@ export default function GovernancePage() {
       <div className="governance-tabs">
         <button className={tab === "tasks" ? "selected" : ""} onClick={() => setTab("tasks")}><ClipboardCheck size={16} />任务审批 <span>{pendingTasks.length}</span></button>
         <button className={tab === "decisions" ? "selected" : ""} onClick={() => setTab("decisions")}><ShieldCheck size={16} />决策审查 <span>{decisions.filter((item) => item.status === "proposed").length}</span></button>
-        <button className={tab === "command" ? "selected" : ""} onClick={() => setTab("command")}><MessageSquare size={16} />自然语言命令</button>
+        <button className={tab === "command" ? "selected" : ""} onClick={() => setTab("command")}><MessageSquare size={16} />受限命令</button>
+        <button className={tab === "chat" ? "selected" : ""} onClick={() => setTab("chat")}><Bot size={16} />多轮指挥</button>
       </div>
 
       {tab === "tasks" ? (
@@ -295,7 +297,7 @@ export default function GovernancePage() {
             </>}
           </section>
         </div>
-      ) : (
+      ) : tab === "command" ? (
         <section className="panel command-input-panel">
           <div className="panel-heading"><div className="panel-title"><MessageSquare size={17} /><h3>受限自然语言命令</h3></div><span className="status-tag tag-blue">模板解析 · 非 LLM</span></div>
           <p className="form-hint">该入口只支持后端白名单中的中文命令模板，不会调用外部模型，也不会直接执行操作。解析成功后会创建与任务审批相同的版本化命令预览。</p>
@@ -312,6 +314,8 @@ export default function GovernancePage() {
           </form>
           <div className="command-safety-note"><ShieldCheck size={16} /><span>命令只会生成预览。你仍需在预览弹窗中检查任务、操作、版本和风险，再点击确认执行。</span></div>
         </section>
+      ) : (
+        <CommandChatPanel projectId={selectedId} tasks={tasks} onPlan={setPlan} />
       )}
 
       {plan && <div className="modal-backdrop"><section className="panel command-preview">
