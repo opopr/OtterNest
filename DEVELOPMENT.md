@@ -24,7 +24,8 @@ f) 运行测试：`pytest -q`。早期单元/接口测试使用 SQLite；真实 
 - 初期使用单所有者 Bearer 令牌，UI 仅在当前页面内存保存令牌。尚未达到生产级会话、反滥用、审计保留和远程访问控制标准。
 - 仅绑定本机地址，不直接暴露公网。尤其不得公开数据库、管理 API 或未经安全审核的 Agent 接口。
 - 目前提供 Agent 通用轮询队列和任务上下文接口；**仍没有**真实第三方模型自动调用或云端唤醒能力，Agent 注册本身只代表身份登记。
-- 当前 artifacts 上传上限 5 MiB，超大文件需要后续对象存储/分段上传设计。
+- 当前支持单文件直接上传及基于 `storage.py` 的可插拔分段/分块大文件上传管理器（支持 S3/MinIO 与本地目录）。
+- 提供 `otternest-security-audit` CLI 工具进行上线前凭据熵值、存储权限与运行模式的安全自检。
 
 ## 通用 Agent Runner（隔离执行环境使用）
 
@@ -59,9 +60,12 @@ c) 启动 `otternest-runner --server https://CONTROL_HOST --once -- /absolute/pa
 
 `OTTERNEST_ARTIFACT_DIR` 指向本机私有成果目录（默认 `./var/artifacts`）。上传单文件上限 5 MiB；同一任务同名文件每次上传都会生成新版本并保留旧内容。项目成员下载前服务端核对路径仍位于对应项目目录，并验证 SHA-256。所有者可对每个版本做一次验收或驳回；需要修改时上传新版本。项目 JSON 导出只包含版本与验收元数据，不包含文件字节。请将 PostgreSQL 与该目录纳入同一备份/恢复计划；目前仓库尚未提供自动备份或跨机文件迁移命令。详见 [docs/22-artifact-lifecycle.md](docs/22-artifact-lifecycle.md)。
 
-## 真实模型 API 文本适配器（受控执行）
+## 真实模型 API 与第三方 Worker 适配器
 
-内置 `otternest-model-worker` 可以作为通用 Runner 的子进程，通过操作者明确配置的 OpenAI-compatible Chat Completions HTTPS API 生成文本成果。它不具备代码执行与浏览器工具，不代表已接通任何平台的个人订阅，也不自动验收成果。
+- **OpenAI-compatible**: `otternest-model-worker`（通过 Chat Completions 生成文本成果）。
+- **Google Gemini**: `otternest-gemini-worker`（通过 Gemini REST API 进行受控文本生成）。
+- **Codex CLI**: `otternest-codex-worker`（调用操作员本机授权的 Codex CLI 非交互执行并生成补丁/成果）。
+- **Muse Cloud**: `otternest-muse-worker`（调度远端 Muse 云端机器并完成产物 SHA-256 校验回传）。
 
 独立设置 `OTTERNEST_MODEL_API_KEY` 并用 `--pass-env OTTERNEST_MODEL_API_KEY` **仅对可信子进程放行**。完整命令、验证方式、明文数据外发边界和平台兼容限制见 [23 · 模型 Runner 适配器](docs/23-model-worker.md)。
 

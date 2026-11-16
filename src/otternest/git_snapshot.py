@@ -116,25 +116,16 @@ def _bounded_archive(command: list[str]) -> io.BufferedRandom:
             env=_git_env(), start_new_session=True,
         )
         assert proc.stdout is not None
-        selector = selectors.DefaultSelector()
-        try:
-            selector.register(proc.stdout, selectors.EVENT_READ)
-            deadline = time.monotonic() + 120
-            total = 0
-            while True:
-                remaining = deadline - time.monotonic()
-                if remaining <= 0 or not selector.select(remaining):
-                    raise SnapshotError("Git archive timed out")
-                chunk = os.read(proc.stdout.fileno(), 65536)
-                if not chunk:
-                    break
-                total += len(chunk)
-                if total > MAX_ARCHIVE_BYTES:
-                    raise SnapshotError("Git archive exceeds bounded size")
-                archive.write(chunk)
-        finally:
-            selector.close()
-        if proc.wait(timeout=5) != 0:
+        total = 0
+        while True:
+            chunk = proc.stdout.read(65536)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_ARCHIVE_BYTES:
+                raise SnapshotError("Git archive exceeds bounded size")
+            archive.write(chunk)
+        if proc.wait(timeout=10) != 0:
             raise SnapshotError("Git archive failed")
         archive.seek(0)
         return archive
@@ -147,13 +138,17 @@ def _bounded_archive(command: list[str]) -> io.BufferedRandom:
     finally:
         if proc is not None:
             try:
-                import signal
-                os.killpg(proc.pid, signal.SIGKILL)
-            except ProcessLookupError:
+                if hasattr(os, "killpg"):
+                    import signal
+                    os.killpg(proc.pid, signal.SIGKILL)
+            except (ProcessLookupError, OSError):
                 pass
             if proc.poll() is None:
                 proc.kill()
-            proc.wait()
+            try:
+                proc.wait(timeout=2)
+            except Exception:
+                pass
 
 
 def _check_path(name: str) -> str:

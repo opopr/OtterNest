@@ -162,12 +162,24 @@ def parse_worker_output(output: str, workspace: Path | None = None) -> WorkerRes
 
 def worker_environment(pass_env: tuple[str, ...] = ()) -> dict[str, str]:
     """No owner/Agent control-plane secrets are inherited by child by default."""
-    allowed = {"PATH", "HOME", "LANG", "LC_ALL", "TERM", "TMPDIR", "SYSTEMROOT", "WINDIR"}
+    allowed = {
+        "PATH", "HOME", "LANG", "LC_ALL", "TERM", "TMPDIR",
+        "SYSTEMROOT", "WINDIR", "PYTHONPATH", "PYTHONHOME",
+        "APPDATA", "LOCALAPPDATA", "PYTHONIOENCODING", "PYTHONUTF8",
+    }
     allowed.update(pass_env)
     forbidden = {"OTTERNEST_OWNER_TOKEN", "OTTERNEST_AGENT_TOKEN", "OTTERNEST_DATABASE_URL"}
     if forbidden.intersection(pass_env):
         raise RunnerFailure("Refusing to expose OtterNest control-plane credentials to child")
-    return {k: v for k, v in os.environ.items() if k in allowed and k not in forbidden}
+    env = {k: v for k, v in os.environ.items() if k in allowed and k not in forbidden}
+    env.setdefault("PYTHONIOENCODING", "utf-8")
+    env.setdefault("PYTHONUTF8", "1")
+    src_dir = str(Path(__file__).resolve().parent.parent)
+    if "PYTHONPATH" in env:
+        env["PYTHONPATH"] = f"{src_dir}{os.pathsep}{env['PYTHONPATH']}"
+    else:
+        env["PYTHONPATH"] = src_dir
+    return env
 
 
 def execute_command(command: list[str], packet: dict, timeout_seconds: int,
@@ -226,7 +238,9 @@ def execute_command(command: list[str], packet: dict, timeout_seconds: int,
                     stdout.seek(0)
                     data = stdout.read(20001)
                     if proc.returncode:
-                        raise RunnerFailure(f"Configured executable exited with status {proc.returncode}")
+                        stderr.seek(0)
+                        err_msg = stderr.read(1000).decode("utf-8", "replace").strip()
+                        raise RunnerFailure(f"Configured executable exited with status {proc.returncode}" + (f": {err_msg}" if err_msg else ""))
                     if len(data) > 20000:
                         raise RunnerFailure("Executable output exceeded 20000 bytes")
                     output = data.decode("utf-8", errors="replace").strip()

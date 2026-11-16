@@ -13,6 +13,8 @@ from otternest.cgroup_recovery import CgroupOwnerLock, TaskScope, clean_scopes, 
 from otternest.cgroups import CgroupError, CgroupPolicy
 from otternest.runner import Runner, RunnerFailure
 
+pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="cgroup recovery requires Linux")
+
 
 def _make_scope(parent: Path, name: str, populated: bool) -> Path:
     scope = parent / name

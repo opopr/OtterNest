@@ -15,6 +15,8 @@ from otternest import runner, sandbox
 from otternest.runner import Runner, RunnerFailure, execute_command
 from otternest.sandbox import SandboxError, apply_linux_resource_limits
 
+pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="Linux process resource limits require Linux")
+
 
 def test_limits_require_sandbox_before_subprocess_or_task_claim(tmp_path):
     with pytest.raises(RunnerFailure, match="Resource limits require"):

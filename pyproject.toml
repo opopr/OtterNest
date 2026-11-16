@@ -22,10 +22,13 @@ otternest-runner = "otternest.runner:main"
 otternest-cgroup-recover = "otternest.cgroup_recovery:main"
 otternest-model-worker = "otternest.model_worker:main"
 otternest-codex-worker = "otternest.codex_worker:main"
+otternest-gemini-worker = "otternest.gemini_worker:main"
+otternest-muse-worker = "otternest.muse_adapter:main"
 otternest-webhooks = "otternest.webhooks:main"
 otternest-mcp = "otternest.mcp_bridge:main"
 otternest-scheduler = "otternest.scheduler:main"
 otternest-a2a-outbound = "otternest.a2a_outbound:main"
+otternest-security-audit = "otternest.security_audit:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "httpx>=0.27,<1"]
