@@ -6,14 +6,13 @@ import {
 import { Link } from "react-router-dom";
 import { request } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
-import type { Agent } from "../api/types";
 
-interface Runtime {
-  id:string; agent_id:string; label:string; environment:string; enabled:boolean;
-  status:"idle"|"busy"|"stopped"|string; last_health:Record<string,string>;
-  last_seen:string|null; has_token:boolean; online:boolean;
+interface RuntimeRow {
+ id:string; agent_id:string; label:string; environment:string; enabled:boolean;
+ status:"idle"|"busy"|"stopped"|string; last_health:Record<string,string>;
+ last_seen:string|null; has_token:boolean; online:boolean;
+ agent_name:string; agent_platform:string; agent_enabled:boolean;
 }
-interface RuntimeRow extends Runtime { agent_name:string; agent_platform:string; agent_enabled:boolean; }
 interface RuntimeToken { id:string; agent_id:string; token:string; }
 type Filter = "all"|"online"|"offline"|"disabled"|"missing_token";
 
@@ -35,14 +34,7 @@ export default function RuntimeMonitorPage(){
   if(!isOwner){setLoading(false);return;}
   setLoading(true);setError("");
   try{
-   const agents=await request<Agent[]>("/agents");
-   const groups=await Promise.all(agents.map(async agent=>({
-    agent,
-    runtimes:await request<Runtime[]>("/agents/"+encodeURIComponent(agent.id)+"/runtimes")
-   })));
-   setRows(groups.flatMap(group=>group.runtimes.map(runtime=>({
-    ...runtime,agent_name:group.agent.name,agent_platform:group.agent.platform,agent_enabled:group.agent.enabled
-   }))));
+   setRows(await request<RuntimeRow[]>("/runtimes"));
   }catch(reason){setError(reason instanceof Error?reason.message:"Runtime 状态读取失败");}
   finally{setLoading(false);}
  },[isOwner]);

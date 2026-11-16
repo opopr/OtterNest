@@ -150,6 +150,24 @@ def as_dict(item, *names: str) -> dict:
     return {name: getattr(item, name) for name in names}
 
 
+def runtime_public(runtime: AgentRuntime, agent: Agent | None = None, *, cutoff=None) -> dict:
+    """Serialize a Runtime snapshot using the same server-side heartbeat rule everywhere."""
+    cutoff = cutoff or (now() - timedelta(seconds=180))
+    last_seen = runtime.last_seen
+    if last_seen is not None and last_seen.tzinfo is None:
+        last_seen = last_seen.replace(tzinfo=timezone.utc)
+    record = as_dict(runtime, "id", "agent_id", "label", "environment", "enabled", "status", "last_health", "last_seen")
+    record["has_token"] = bool(runtime.token_hash)
+    record["online"] = bool(runtime.enabled and last_seen and last_seen >= cutoff and runtime.status in {"idle", "busy"})
+    if agent is not None:
+        record.update({
+            "agent_name": agent.name,
+            "agent_platform": agent.platform,
+            "agent_enabled": agent.enabled,
+        })
+    return record
+
+
 @router.get("/me")
 def me(actor: Actor = Depends(authenticate)):
     return as_dict(actor, "kind", "id")
@@ -252,16 +270,23 @@ def list_runtimes(agent_id: str, actor: Actor = Depends(authenticate), db: Sessi
     if db.get(Agent, agent_id) is None:
         raise HTTPException(404, "Agent not found")
     cutoff = now() - timedelta(seconds=180)
-    result = []
-    for r in db.scalars(select(AgentRuntime).where(AgentRuntime.agent_id == agent_id)):
-        last_seen = r.last_seen
-        if last_seen is not None and last_seen.tzinfo is None:
-            last_seen = last_seen.replace(tzinfo=timezone.utc)
-        record = as_dict(r, "id", "agent_id", "label", "environment", "enabled", "status", "last_health", "last_seen")
-        record["has_token"] = bool(r.token_hash)
-        record["online"] = bool(r.enabled and last_seen and last_seen >= cutoff and r.status in {"idle", "busy"})
-        result.append(record)
-    return result
+    return [
+        runtime_public(runtime, cutoff=cutoff)
+        for runtime in db.scalars(select(AgentRuntime).where(AgentRuntime.agent_id == agent_id))
+    ]
+
+
+@router.get("/runtimes")
+def list_all_runtimes(actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    """Return one owner-scoped snapshot for the global Runtime monitor."""
+    owner_only(actor)
+    cutoff = now() - timedelta(seconds=180)
+    rows = db.execute(
+        select(AgentRuntime, Agent)
+        .join(Agent, Agent.id == AgentRuntime.agent_id)
+        .order_by(Agent.name, AgentRuntime.label)
+    ).all()
+    return [runtime_public(runtime, agent, cutoff=cutoff) for runtime, agent in rows]
 
 
 @router.post("/agents/{agent_id}/runtimes/{runtime_id}/token")
