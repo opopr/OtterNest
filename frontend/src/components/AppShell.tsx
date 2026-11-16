@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Activity, ArrowUpRight, Bot, BookMarked, BookOpen, FileArchive, Gauge, ChevronDown, CircleHelp, KeyRound, ClipboardCheck, MessageSquare,
-  FolderKanban, GitBranch, LayoutDashboard, LogOut, Monitor, Settings2, ShieldCheck, Wifi
+  FolderKanban, GitBranch, LayoutDashboard, LogOut, Monitor, PlugZap, Settings2, ShieldCheck, Wifi
 } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { request } from "../api/client";
@@ -15,6 +15,7 @@ const navigation = [
   { to: "/command", label: "AI 指挥中心", icon: MessageSquare },
   { to: "/agents", label: "Agent 管理", icon: Bot },
   { to: "/runtimes", label: "Runtime 监控", icon: Monitor },
+  { to: "/interfaces", label: "外部接口", icon: PlugZap },
   { to: "/governance", label: "审批与治理", icon: ShieldCheck },
   { to: "/goals-workflows", label: "目标与工作流", icon: GitBranch },
   { to: "/knowledge", label: "知识库", icon: BookOpen },
