@@ -1,6 +1,6 @@
 [Unit]
 Description=OtterNest task routing scheduler
-Wants=network-online.target
+Wants=network-online.target postgresql.service
 After=network-online.target postgresql.service
 
 [Service]
