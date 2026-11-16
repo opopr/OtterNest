@@ -29,7 +29,10 @@ PACKET = {
 
 
 MOCK_CODEX = r'''#!/usr/bin/env python3
-import json, os, pathlib, sys
+import io, json, os, pathlib, sys
+
+if hasattr(sys.stdin, "buffer"):
+    sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8")
 
 args = sys.argv[1:]
 assert args[0] == "exec"
@@ -78,7 +81,7 @@ else:
 
 @pytest.fixture
 def fake_codex(tmp_path):
-    executable = tmp_path / "fake-codex"
+    executable = tmp_path / ("fake-codex.py" if sys.platform == "win32" else "fake-codex")
     executable.write_text(MOCK_CODEX, encoding="utf-8")
     executable.chmod(0o755)
     return executable

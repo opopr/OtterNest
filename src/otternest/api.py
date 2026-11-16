@@ -675,7 +675,16 @@ def cancel_task(task_id: str, actor: Actor = Depends(authenticate), db: Session 
 def add_memory(project_id: str, body: MemoryIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     require_writable_system(db)
     require_project(db, project_id, actor)
-    record = Memory(project_id=project_id, kind=body.kind, title=body.title, content=body.content, source=body.source, sensitivity=body.sensitivity)
+    from .vector import dumps_embedding, embed_text
+    record = Memory(
+        project_id=project_id,
+        kind=body.kind,
+        title=body.title,
+        content=body.content,
+        source=body.source,
+        sensitivity=body.sensitivity,
+        embedding=dumps_embedding(embed_text(f"{body.title}\n{body.content}")),
+    )
     db.add(record)
     db.flush()
     emit(db, actor, "memory.proposed", record.id, project_id)

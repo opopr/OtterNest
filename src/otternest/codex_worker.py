@@ -31,7 +31,7 @@ MAX_MESSAGE_BYTES = 20_000
 
 ALLOWED_CHILD_ENV = {
     "PATH", "HOME", "LANG", "LC_ALL", "TERM", "TMPDIR",
-    "CODEX_HOME", "CODEX_API_KEY",
+    "CODEX_HOME", "CODEX_API_KEY", "PYTHONIOENCODING", "PYTHONUTF8",
 }
 
 
@@ -103,7 +103,11 @@ def resolve_cli(name: str) -> str:
     """An executable configured by the operator, never obtained from task text."""
     if not name or name.startswith("-"):
         raise CodexWorkerError("Codex CLI executable is required")
-    executable = shutil.which(name)
+    path_cand = Path(name)
+    if path_cand.is_file():
+        executable = str(path_cand.resolve())
+    else:
+        executable = shutil.which(name)
     if executable is None:
         raise CodexWorkerError("Configured Codex CLI executable not found")
     try:
@@ -111,7 +115,8 @@ def resolve_cli(name: str) -> str:
         details = target.stat()
     except (OSError, RuntimeError):
         raise CodexWorkerError("Codex executable is inaccessible") from None
-    if not stat.S_ISREG(details.st_mode) or not os.access(target, os.X_OK):
+    is_exec = os.access(target, os.X_OK) or (sys.platform == "win32" and (target.suffix.lower() in {".exe", ".bat", ".cmd", ".py"} or target.is_file()))
+    if not stat.S_ISREG(details.st_mode) or not is_exec:
         raise CodexWorkerError("Codex executable is not an executable file")
     return str(target)
 
@@ -124,7 +129,10 @@ def codex_environment(mode: str) -> dict[str, str]:
         raise CodexWorkerError(
             "Workspace-write must use a dedicated CLI login, not CODEX_API_KEY environment credentials"
         )
-    return {key: value for key, value in os.environ.items() if key in ALLOWED_CHILD_ENV}
+    out = {key: value for key, value in os.environ.items() if key in ALLOWED_CHILD_ENV}
+    out.setdefault("PYTHONIOENCODING", "utf-8")
+    out.setdefault("PYTHONUTF8", "1")
+    return out
 
 
 def validate_events(raw: bytes) -> None:
@@ -246,8 +254,11 @@ def run_codex(
     # Output path is not in the model-writable workspace and has a private parent.
     with tempfile.TemporaryDirectory(prefix="otternest-codex-") as output_dir:
         final_path = Path(output_dir) / "last_message.txt"
-        args = [
-            command, "exec", "--json", "--ephemeral",
+        cmd_prefix = [command]
+        if sys.platform == "win32" and (command.endswith(".py") or not command.lower().endswith((".exe", ".bat", ".cmd"))):
+            cmd_prefix = [sys.executable, command]
+        args = cmd_prefix + [
+            "exec", "--json", "--ephemeral",
             "--ignore-user-config", "--ignore-rules", "--skip-git-repo-check",
             "--sandbox", mode,
             "--output-last-message", str(final_path),
@@ -270,7 +281,9 @@ def run_codex(
             except OSError:
                 raise CodexWorkerError("Unable to start configured Codex CLI") from None
             if finished.returncode != 0:
-                raise CodexWorkerError("Codex CLI exited unsuccessfully")
+                err_file.seek(0)
+                err_text = err_file.read(1000).decode("utf-8", "replace")
+                raise CodexWorkerError(f"Codex CLI exited unsuccessfully ({finished.returncode}): {err_text}")
             event_file.seek(0)
             events = event_file.read(MAX_EVENTS_BYTES + 1)
         validate_events(events)

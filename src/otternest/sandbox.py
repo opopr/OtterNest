@@ -63,7 +63,8 @@ def build_bwrap_command(command: list[str], workspace: Path | None) -> list[str]
         info = root.stat()
     except (OSError, RuntimeError):
         raise SandboxError("Sandbox workspace is missing") from None
-    if not root.is_dir() or info.st_uid != os.getuid() or (info.st_mode & 0o077):
+    uid = os.getuid() if hasattr(os, "getuid") else info.st_uid
+    if not root.is_dir() or info.st_uid != uid or (hasattr(os, "getuid") and (info.st_mode & 0o077)):
         raise SandboxError("Sandbox workspace must be a private directory owned by the runner")
 
     bwrap = _bubblewrap_binary()

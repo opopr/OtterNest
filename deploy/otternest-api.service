@@ -1,0 +1,19 @@
+[Unit]
+Description=OtterNest Control Plane API
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=otternest
+Group=otternest
+WorkingDirectory=/opt/OtterNest
+EnvironmentFile=/opt/OtterNest/.env
+ExecStart=/opt/OtterNest/.venv/bin/uvicorn otternest.app:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

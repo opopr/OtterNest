@@ -1,0 +1,19 @@
+[Unit]
+Description=OtterNest Trusted Project Scheduler
+After=otternest-api.service postgresql.service
+Requires=otternest-api.service
+
+[Service]
+Type=simple
+User=otternest
+Group=otternest
+WorkingDirectory=/opt/OtterNest
+EnvironmentFile=/opt/OtterNest/.env
+ExecStart=/opt/OtterNest/.venv/bin/otternest-scheduler --interval 15
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

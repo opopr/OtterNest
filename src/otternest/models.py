@@ -200,6 +200,7 @@ class Memory(Base):
     sensitivity: Mapped[str] = mapped_column(String(24), default="internal", nullable=False)
     status: Mapped[str] = mapped_column(String(24), default="proposed", nullable=False)
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    embedding: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
 
 

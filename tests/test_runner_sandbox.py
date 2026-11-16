@@ -15,6 +15,8 @@ from otternest import runner, sandbox
 from otternest.runner import Runner, RunnerFailure, execute_command
 from otternest.sandbox import SandboxError, build_bwrap_command
 
+pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="bubblewrap sandbox requires Linux")
+
 
 def test_builder_requires_private_workspace(monkeypatch, tmp_path):
     monkeypatch.setattr(sandbox, "_bubblewrap_binary", lambda: "/usr/bin/bwrap")

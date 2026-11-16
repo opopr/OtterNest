@@ -24,7 +24,9 @@ PACKET = {
 
 
 FAKE_CODEX = '''#!/usr/bin/env python3
-import json, pathlib, sys, os
+import io, json, pathlib, sys, os
+if hasattr(sys.stdin, "buffer"):
+    sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8")
 args = sys.argv[1:]
 assert args[0] == "exec"
 assert "--json" in args
@@ -70,7 +72,7 @@ def make_repo(tmp_path):
 
 
 def make_cli(tmp_path):
-    cli = tmp_path / "fake-codex"
+    cli = tmp_path / ("fake-codex.py" if sys.platform == "win32" else "fake-codex")
     cli.write_text(FAKE_CODEX)
     cli.chmod(0o755)
     return cli

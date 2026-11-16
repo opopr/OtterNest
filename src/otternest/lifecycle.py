@@ -300,11 +300,13 @@ def revise_memory(
         raise HTTPException(404, "Memory not found")
     if memory.status == "archived":
         raise Conflict("Archived memory cannot be revised")
+    from .vector import dumps_embedding, embed_text
     memory.title = title
     memory.content = content
     memory.source = source
     memory.status = "published"
     memory.version += 1
+    memory.embedding = dumps_embedding(embed_text(f"{title}\n{content}"))
     emit(
         db,
         actor,

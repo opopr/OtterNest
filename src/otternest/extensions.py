@@ -109,29 +109,12 @@ def search_memories(
     if not actor.is_owner:
         query = query.where(Memory.status == "published")
     allowed = effective_sensitivity(db, project_id, actor)
-    terms = _tokenize_terms(q)
-    candidates = [m for m in db.scalars(query.order_by(Memory.created_at.desc(), Memory.id)).all() if sensitivity_allowed(m.sensitivity, allowed)]
-    scored = []
-    for m in candidates:
-        score = _score_memory(m, terms)
-        if terms and score <= min(m.version, 5):
-            continue
-        scored.append((score, m))
-    scored.sort(key=lambda pair: (-pair[0], -pair[1].version, pair[1].id))
-    return [
-        {
-            "id": m.id,
-            "kind": m.kind,
-            "title": m.title,
-            "content": m.content,
-            "source": m.source,
-            "sensitivity": m.sensitivity,
-            "status": m.status,
-            "version": m.version,
-            "relevance_score": score,
-        }
-        for score, m in scored[:limit]
-    ]
+    candidates = db.scalars(query.order_by(Memory.created_at.desc(), Memory.id)).all()
+    from .vector import search_hybrid
+    results = search_hybrid(candidates, q, allowed, limit=limit)
+    for r in results:
+        r["relevance_score"] = r["score"]
+    return results
 
 
 @router.get("/tasks/{task_id}/context")

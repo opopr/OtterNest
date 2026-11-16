@@ -1,6 +1,9 @@
 from pathlib import Path
 import shutil
 import subprocess
+import sys
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SYSTEMD = ROOT / "deploy" / "systemd"
@@ -50,6 +53,8 @@ def test_server_environment_template_does_not_put_secrets_in_frontend_variables(
 
 
 def test_systemd_installer_has_valid_shell_syntax():
+    if sys.platform == "win32":
+        pytest.skip("Bash syntax check not supported on native Windows without POSIX path mapping")
     bash = shutil.which("bash")
     if bash is None:
         return
@@ -84,6 +89,8 @@ def test_backup_script_checks_running_tasks_and_archive_integrity():
 
 
 def test_backup_script_has_valid_shell_syntax():
+    if sys.platform == "win32":
+        pytest.skip("Bash syntax check not supported on native Windows without POSIX path mapping")
     bash = shutil.which("bash")
     if bash is None:
         return

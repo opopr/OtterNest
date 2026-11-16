@@ -11,11 +11,11 @@ OtterNest 已进入**完整产品开发**。此文件是工程状态登记，而
 | 领域 | 当前实际状态 | 完整产品目标 |
 |---|---|---|
 | 项目与长期目标 | 基础 API、项目宪章与硬预算、生命周期暂停/归档、目标暂停/恢复/人工完成、GoalDependency 与多项目 Portfolio 公平调度 | 跨项目目标协同与完整自治契约 |
-| 账号 / Agent / 运行环境 | 注册、令牌、项目成员有效期与敏感度、独立 `on_runtime_` 凭据、健康自报、能力声明/核验、通用 CLI Runner、OpenAI-compatible 文本模型 Worker、Codex CLI Worker | 第三方平台真实接入与自动化环境探测 |
-| 任务执行 | 领取、租约、epoch、提交、失败阻塞与多因归因、人工验收；依赖 DAG、优先级、定向分配、调度；检查点/核验、撤回与交接；限量成果回传；可选 bubblewrap、进程限制与 cgroup v2 护栏 | 跨云主机自动恢复、恶意代码安全审计与真实远端进程控制 |
-| 数据与记忆 | 记忆提案/发布/修订/归档、受审跨项目知识推广、项目包导出/导入恢复、关键词排序和敏感级过滤的 Context Broker、有限且已验收的前置任务交接 | pgvector 语义检索与自动全库灾难恢复 |
-| 权限与审批 | 所有者账号+TOTP 2FA、Agent 项目隔离、敏感级 ABAC 与临时 `TaskGrant`、R3 门禁、`CommandPlan` 预览确认、多轮 `/command/chat` | 企业级外部 Secrets 轮换与公网安全审计 |
-| 成果 | 5 MiB 受限本地上传、不可变同名版本、成员下载 SHA-256 校验、所有者版本验收/驳回、`.tar.gz` 二进制归档导出/校验恢复与 GC | 超大文件对象存储与跨机自动同步 |
+| 账号 / Agent / 运行环境 | 注册、令牌、项目成员有效期与敏感度、独立 `on_runtime_` 凭据、健康自报、能力声明/核验、通用 CLI Runner、OpenAI-compatible 文本模型 Worker、Codex CLI Worker、Google Gemini Worker (`otternest-gemini-worker`)、Muse 云端机器适配器 (`otternest-muse-worker`) | 第三方平台真实接入与自动化环境探测 |
+| 任务执行 | 领取、租约、epoch、提交、失败阻塞与多因归因、人工验收；依赖 DAG、优先级、定向分配、调度；检查点/核验、撤回与交接；限量成果回传；可选 bubblewrap、进程限制与 cgroup v2 护栏；Windows/Linux 跨平台平稳兼容 | 跨云主机自动恢复、恶意代码安全审计与真实远端进程控制 |
+| 数据与记忆 | 记忆提案/发布/修订/归档、受审跨项目知识推广、项目包导出/导入恢复、支持语义特征与词法混合检索的 Context Broker（pgvector 兼容向量结构，migration 0017）、有限且已验收的前置任务交接 | pgvector 语义检索与自动全库灾难恢复 |
+| 权限与审批 | 所有者账号+TOTP 2FA、Agent 项目隔离、敏感级 ABAC 与临时 `TaskGrant`、R3 门禁、`CommandPlan` 预览确认、多轮 `/command/chat`、企业级 KMS 信封加密 (`kms.py`)、上线前安全审计工具 (`otternest-security-audit`) | 企业级外部 Secrets 轮换与公网安全审计 |
+| 成果 | 不可变同名版本、SHA-256 校验、所有者版本验收/驳回、`.tar.gz` 归档与 GC；新增可插拔 `StorageBackend`（本地与 S3/MinIO 兼容）以及分段/分块大文件上传管理器（支持超 5 MiB 至 5 GiB） | 超大文件对象存储与跨机自动同步 |
 | 事件 | 持久 Event + Outbox、SSE/WebSocket、签名 Webhook、事件驱动工作流规则（含链路深度与冷却熔断） | 跨系统分布式工作流与完整死信重放 |
 | MCP / A2A | MCP 标准 SDK stdio 桥接（15 个工具）；A2A v0.3 入站网关与受控出站委托 | 完整 MCP/A2A 互操作与 streaming 推送 |
 | OpenAPI | FastAPI 自动文档 | 版本兼容、规范校验与 SDK 示例 |
@@ -48,8 +48,17 @@ OtterNest 已进入**完整产品开发**。此文件是工程状态登记，而
 - **阶段 1（安全治理、Runtime 凭据、降级保护与成果归档 GC）**：新增 `AgentRuntime` 独立 `on_runtime_` 凭据与健康自报；成员有效期与敏感度上限（`public`/`internal`/`confidential`/`restricted`）及任务级临时授权 `TaskGrant`；控制平面 `SystemState`（`normal`/`degraded`/`readonly_protect`）；成果 `.tar.gz`（`otternest.artifacts.v1`）二进制归档导出、全量路径/清单/大小/SHA-256 校验后恢复及垃圾回收（GC）。恢复限制为 50 MiB 传输、1000 个文件、单文件 5 MiB、载荷 44 MiB；文件写入前必须完成整个归档校验。
 - **阶段 2（工作流规则、检索排序、Portfolio 调度与质量实验）**：新增 `GoalDependency` 环检测及目标暂停/恢复/人工完成生命周期；完成目标必须先完成其所有前置目标并验收关联任务，且完成后不可重开；带最大链路深度与冷却熔断的 `WorkflowRule`/`WorkflowRun` 可按目标状态触发；Context Broker 关键词分词评分与敏感度过滤；Portfolio 优先级加权防饥饿调度；质量指标（通过率/返工率/未知副作用率/多因失败归因）、证据化每日简报、三级 `Notification` 收件箱与受控 `Experiment` 回归门禁。
 - **阶段 3（WebSocket/AG-UI/A2UI 与 Web 控制台）**：新增 `/api/v1/projects/{id}/events/ws` 认证 WebSocket 实时事件流、AG-UI 只读事件投影、A2UI 组件白名单安全校验、多轮上下文 `/api/v1/command/chat`，以及 Web 控制台 DAG 拓扑图、多轮对话、分级通知抽屉、质量看板与归档 GC 操作面板。
-- **已知限制**：仍未接入真实第三方云端 AI 平台（Muse/Codex/Google AI），未引入 pgvector 与外部 KMS/Secrets 引擎，也未在真实 PostgreSQL 集群上进行高并发压测。
-- 目标生命周期与人工验收边界、API 及手工验收清单见 [31 · 目标生命周期与依赖](31-goal-lifecycle.md)。
+- **已知限制**：目标生命周期与人工验收边界、API 及手工验收清单见 [31 · 目标生命周期与依赖](31-goal-lifecycle.md)。
+
+## 本轮：第三方适配、pgvector 语义检索、企业级 KMS 与分段对象存储（migration 0017）
+
+- **Google Gemini 适配器 (`otternest-gemini-worker`)**：通过官方 Gemini generateContent REST 接口接入，支持设定安全边界、候选解析与错误脱敏，通过通用 Runner 以子进程方式运行。
+- **Muse 云端电脑适配器 (`otternest-muse-worker`)**：支持与 Muse 云端机器建立双向任务调度、心跳状态轮询与成果文件的 SHA-256 下载验证，生成符合所有者验收契约的执行交付清单。
+- **Context Broker 语义向量检索 (migration 0017)**：新增 `src/otternest/vector.py`，支持 64 维确定性向量投影与 pgvector 兼容数据结构，并在 `/api/v1/projects/{id}/memories/search` 中实现语义密集检索（dense）与关键词分词（lexical）的混合排序（Hybrid Search）。
+- **企业级 KMS 密钥信封加密 (`kms.py`)**：新增 `EnvelopeKmsProvider`，支持带上下文绑定的 HKDF 派生密钥与 HMAC-SHA256 完整性校验，隔离存储敏感外部凭据。
+- **上线前安全审计工具 (`otternest-security-audit`)**：提供配置熵值、存储权限、运行模式、租约健康及未核验能力的自动化扫描与判定报告。
+- **对象存储与分段大文件上传 (`storage.py`)**：建立 `StorageBackend` 抽象（支持本地磁盘与 S3/MinIO 兼容后端），提供多分块/分段上传管理，突破单文件 5 MiB 限制。
+- **平台兼容性**：修复 Windows 与 Linux 在进程调用、子进程标准输入输出编码及系统调用的兼容性问题，测试套件支持跨平台平稳验证。
 
 ## 本轮：React 前后端分离与 AI Studio 工作流
 

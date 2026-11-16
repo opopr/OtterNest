@@ -48,7 +48,7 @@ class CgroupOwnerLock:
         if fcntl is None:
             raise CgroupError("cgroup recovery requires Linux flock")
         fingerprint = hashlib.sha256(os.fsencode(parent)).hexdigest()[:32]
-        self.path = LOCK_ROOT / f"otternest-cgroup-{os.getuid()}-{fingerprint}.lock"
+        self.path = LOCK_ROOT / f"otternest-cgroup-{os.getuid() if hasattr(os, 'getuid') else 0}-{fingerprint}.lock"
         self._fd: int | None = None
 
     def acquire(self) -> "CgroupOwnerLock":
@@ -59,8 +59,9 @@ class CgroupOwnerLock:
             flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
             fd = os.open(self.path, flags, 0o600)
             info = os.fstat(fd)
-            if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or
-                    info.st_nlink != 1 or (info.st_mode & 0o077)):
+            uid = os.getuid() if hasattr(os, "getuid") else info.st_uid
+            if (not stat.S_ISREG(info.st_mode) or info.st_uid != uid or
+                    info.st_nlink != 1 or (hasattr(os, "getuid") and (info.st_mode & 0o077))):
                 raise CgroupError("Insecure cgroup ownership lock file")
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             self._fd = fd
@@ -97,7 +98,8 @@ def scan_scopes(parent: Path) -> tuple[TaskScope, ...]:
             if not SCOPE_PATTERN.fullmatch(child.name):
                 raise CgroupError("Unexpected OtterNest scope name; refusing recovery")
             details = child.lstat()
-            if not stat.S_ISDIR(details.st_mode) or details.st_uid != os.getuid():
+            uid = os.getuid() if hasattr(os, "getuid") else details.st_uid
+            if not stat.S_ISDIR(details.st_mode) or details.st_uid != uid:
                 raise CgroupError("Orphan scope is not an owned real cgroup directory")
             event_lines = (child / "cgroup.events").read_text().splitlines()
             populated = [line.split()[1] for line in event_lines
