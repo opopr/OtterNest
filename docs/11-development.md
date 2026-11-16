@@ -243,3 +243,11 @@ network restrictions, manual reconciliation and cancellation semantics.
 - 新增备份归档校验步骤；完整恢复仍要求先在隔离数据库和暂存目录验证，不提供自动覆盖式恢复。
 - **尚未完成/未声称**：异机加密复制、自动灾难恢复、RPO/RTO 保证及真实 Oracle ARM 主机上的备份恢复演练。
 - 操作边界见 [35 · 私有 Linux 原生部署基线](35-native-linux-deployment.md)。
+
+
+## 本轮：外部接口管理台入口
+
+- React 新增「外部接口」导航和 `/interfaces` 页面，统一显示 REST/OpenAPI、MCP stdio、A2A 入站和外部 AI Worker 的真实实现边界。
+- 按项目读取、创建和禁用已存在后端 API 支持的签名 Webhook 与 A2A Remote Endpoint；Webhook 签名密钥仅在创建响应中短暂显示，A2A 远端令牌仅通过服务端环境变量配置。
+- 后台不会把静态登记状态误报成连通或模型可调用；OpenAI-compatible、Codex CLI 仍需实际执行节点配置和端到端验证，Google AI/Muse 无直接订阅连接器。
+- 目前没有数据库保存的通用第三方模型密钥管理器、实时连通性探测或开放式第三方 OAuth 授权；这些不应被误认为已经完成。
