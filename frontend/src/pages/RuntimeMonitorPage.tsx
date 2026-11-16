@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Activity, AlertCircle, Bot, CheckCircle2, Copy, Cpu, KeyRound,
+  Activity, AlertCircle, Bot, Copy, Cpu, KeyRound,
   Monitor, RefreshCw, Search, ShieldCheck, Wifi, WifiOff, X, XCircle
 } from "lucide-react";
 import { Link } from "react-router-dom";
