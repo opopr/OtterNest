@@ -224,3 +224,12 @@ network restrictions, manual reconciliation and cancellation semantics.
 - `/health/live` 与 `/health/ready` 使用不携带 Bearer 令牌的公开健康请求；`/api/v1/me` 仅使用当前页面内存中的会话令牌。
 - 页面显示浏览器前端 Origin 和配置的 API Origin，并在失败时提示检查 `VITE_API_BASE_URL` 与 `OTTERNEST_CORS_ORIGINS`。
 - 诊断仅验证连通性，不等于公网部署、生产安全审计或真实 Codex/Muse/Google AI 平台联调。
+
+
+## 本轮：私有 Linux 原生部署基线
+
+- 新增 ARM64 私有服务器部署模板：FastAPI、PostgreSQL、任务调度器和持久工作流 Worker 使用独立 systemd 单元；Alembic 迁移由运维人员显式触发。
+- 新增可选签名 Webhook 投递单元、Nginx 私有 HTTPS 反向代理模板、受限 systemd 安装脚本和服务器环境变量示例。
+- 部署指南覆盖本机 PostgreSQL peer 认证、Owner Token 与 TOTP 初始化、AI Studio 精确 Origin/CORS、独立 Runner 执行节点、升级和配对备份/恢复验收。
+- **尚未完成/未声称**：没有连接或修改用户的 Oracle 服务器；没有实机验证目标发行版、ARM64 systemd/Nginx 配置、TLS/VPN、资源占用、备份恢复或第三方平台接入。该部署包仅作为私有试运行基线，不能视为公网生产就绪。
+- 详细步骤见 [35 · 私有 Linux 原生部署基线](35-native-linux-deployment.md)。
