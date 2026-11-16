@@ -1,0 +1,29 @@
+[Unit]
+Description=OtterNest consistent PostgreSQL and artifact backup
+Wants=postgresql.service
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/otternest/app
+Environment=OTTERNEST_BACKUP_DIR=/var/backups/otternest
+Environment=OTTERNEST_BACKUP_RETENTION_DAYS=14
+Environment=OTTERNEST_ARTIFACT_DIR=/var/lib/otternest/artifacts
+ExecStart=/usr/bin/bash /opt/otternest/app/deploy/scripts/backup.sh
+TimeoutStartSec=1800
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX
+SystemCallArchitectures=native
+ReadWritePaths=/var/backups/otternest
