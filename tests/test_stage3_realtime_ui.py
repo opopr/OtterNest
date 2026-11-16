@@ -107,7 +107,7 @@ def test_command_chat_multiturn_clarification_and_plan(env, owner_headers):
 
 
 def test_web_console_renders_new_capabilities(env):
-    html = env.get("/").text
+    html = env.get("/legacy").text
     assert "renderTaskDagSvg" in html
     assert "connectProjectWs" in html
     assert "renderNotifDrawer" in html

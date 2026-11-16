@@ -19,6 +19,21 @@ e) 管理界面：`http://127.0.0.1:8000/`，API 文档：`/api/docs`。
 
 f) 运行测试：`pytest -q`。早期单元/接口测试使用 SQLite；真实 PostgreSQL 和并发的验证仍需补充。
 
+## React 前端开发
+
+React + TypeScript + Vite 工程位于 `frontend/`，仓库根目录提供 npm workspace 命令。
+
+- 安装前端依赖：`npm install`
+- 启动开发前端：`npm run dev`，默认访问 `http://127.0.0.1:5173`
+- Vite 将 `/api` 和 `/assets` 代理到本地 FastAPI（默认 `http://127.0.0.1:8000`）
+- 类型检查：`npm run typecheck`
+- 构建：`npm run build`，输出到 `frontend/dist`
+- OpenAPI 类型生成：后端运行后执行 `npm run api:types`
+
+构建完成后，FastAPI 自动在 `/` 提供 React 页面，旧版完整管理台保留在 `/legacy`。若前端构建目录不在仓库默认位置，可设置 `OTTERNEST_WEB_DIST`。
+
+跨域预览（例如 Google AI Studio）时，前端设置 `VITE_API_BASE_URL` 为 FastAPI 的 HTTPS Origin；后端设置 `OTTERNEST_CORS_ORIGINS` 为预览页面的精确 Origin，多个值用英文逗号分隔。不要使用通配符，不要开放 PostgreSQL 端口。VITE_ 变量会进入浏览器构建产物，不能放置任何令牌或数据库密码。详细步骤见 [docs/32-react-frontend-separation.md](docs/32-react-frontend-separation.md) 与 [AI_STUDIO_GUIDE.md](AI_STUDIO_GUIDE.md)。
+
 ## 安全限制
 
 - 初期使用单所有者 Bearer 令牌，UI 仅在当前页面内存保存令牌。尚未达到生产级会话、反滥用、审计保留和远程访问控制标准。

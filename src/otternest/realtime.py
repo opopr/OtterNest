@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -226,6 +227,15 @@ async def stream_ag_ui(project_id: str, request: Request, after: int = 0, actor:
 @router.websocket("/projects/{project_id}/events/ws")
 async def websocket_events(websocket: WebSocket, project_id: str, after: int = 0):
     """Authenticated WebSocket stream backed by durable PostgreSQL/SQLite Event rows."""
+    origin = websocket.headers.get("origin", "")
+    allowed_origins = {
+        item.strip().rstrip("/")
+        for item in os.environ.get("OTTERNEST_CORS_ORIGINS", "").split(",")
+        if item.strip()
+    }
+    if origin and allowed_origins and origin.rstrip("/") not in allowed_origins:
+        await websocket.close(code=4403)
+        return
     await websocket.accept()
     token = ""
     auth_header = websocket.headers.get("authorization", "")
