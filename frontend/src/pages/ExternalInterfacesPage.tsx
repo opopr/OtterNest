@@ -81,6 +81,9 @@ export default function ExternalInterfacesPage() {
     }
     setLoading(true);
     setError("");
+    setWebhooks([]);
+    setRemotes([]);
+    setMembers([]);
     try {
       const [hooks, peers, memberships] = await Promise.all([
         request<WebhookEndpoint[]>("/projects/" + encodeURIComponent(id) + "/webhooks"),
