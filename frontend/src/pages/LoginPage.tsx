@@ -45,6 +45,7 @@ export default function LoginPage() {
   };
 
   const configured = Boolean(authStatus?.account_configured);
+  // The FastAPI auth routes require the owner token to be configured for both login and bootstrap.
   const canBootstrap = Boolean(authStatus?.token_configured);
 
   return (
