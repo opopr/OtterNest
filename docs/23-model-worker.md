@@ -14,13 +14,16 @@
 
 - Python 3.11+，正常安装 OtterNest（`pip install -e '.[dev]'`）。
 - 后端已通过 PostgreSQL 迁移，服务仅在受信任网络中运行；独立执行主机可访问该控制平面。
-- 管理员创建 Agent Token、项目成员和（若指定）运行实例。设置两个**互不相同**的凭据：`OTTERNEST_AGENT_TOKEN` 供 Runner 请求 OtterNest；`OTTERNEST_MODEL_API_KEY` 仅供子进程调用模型供应商。不要向子进程转发 Owner Token。
+- 管理员创建 Agent、项目成员和 Runtime，并为该 Runtime 签发独立凭据。优先设置 `OTTERNEST_RUNTIME_TOKEN` 与 `OTTERNEST_RUNTIME_ID`；未使用 Runtime 时仍可设置兼容的 `OTTERNEST_AGENT_TOKEN`。另设置 `OTTERNEST_MODEL_API_KEY` 供子进程调用模型供应商。控制平面 Token 仅由 Runner 持有，不会传递给子进程。
 - 配置一个**确实开放给用户的** OpenAI-compatible `/chat/completions` HTTPS 接口和模型 ID。许多用户订阅不包含独立 API 访问额度，不能假设这些订阅可用。
 
 示例（在隔离执行机的 shell 中，由操作者自行设置有效凭据）：
 
 ```bash
-export OTTERNEST_AGENT_TOKEN='<your-independent-agent-token>'
+export OTTERNEST_RUNTIME_TOKEN='<your-runtime-token>'
+export OTTERNEST_RUNTIME_ID='<your-runtime-id>'
+# 兼容模式（未使用 Runtime 身份时）：
+# export OTTERNEST_AGENT_TOKEN='<your-independent-agent-token>'
 export OTTERNEST_MODEL_API_KEY='<your-independent-model-api-key>'
 
 otternest-runner \

@@ -10,13 +10,17 @@ from otternest.runner import Runner, RunnerFailure, execute_command, worker_envi
 def test_runner_credentials_not_inherited(monkeypatch):
     monkeypatch.setenv("OTTERNEST_AGENT_TOKEN", "on_agent_secret")
     monkeypatch.setenv("OTTERNEST_OWNER_TOKEN", "top-secret-owner")
+    monkeypatch.setenv("OTTERNEST_RUNTIME_TOKEN", "on_runtime_secret")
     monkeypatch.setenv("OTTERNEST_DATABASE_URL", "postgresql://secret")
     env = worker_environment()
     assert "OTTERNEST_AGENT_TOKEN" not in env
     assert "OTTERNEST_OWNER_TOKEN" not in env
+    assert "OTTERNEST_RUNTIME_TOKEN" not in env
     assert "OTTERNEST_DATABASE_URL" not in env
     with pytest.raises(RunnerFailure):
         worker_environment(("OTTERNEST_AGENT_TOKEN",))
+    with pytest.raises(RunnerFailure):
+        worker_environment(("OTTERNEST_RUNTIME_TOKEN",))
 
 
 def test_local_command_receives_task_context_but_no_agent_token(monkeypatch):
@@ -59,3 +63,19 @@ def test_runner_end_to_end_with_generic_command(monkeypatch):
     finally:
         runner.close()
     assert events == ["/api/v1/agent/queue", "/api/v1/tasks/t1/claim", "/api/v1/tasks/t1/context", "/api/v1/tasks/t1/submit"]
+
+
+def test_runner_accepts_runtime_token_only_with_bound_runtime_id():
+    with pytest.raises(RunnerFailure, match="requires --runtime-id"):
+        Runner("http://127.0.0.1:8000", "on_runtime_secret", ["echo", "hello"])
+
+    runner = Runner(
+        "http://127.0.0.1:8000",
+        "on_runtime_secret",
+        ["echo", "hello"],
+        runtime_id="runtime-123",
+    )
+    try:
+        assert runner.runtime_id == "runtime-123"
+    finally:
+        runner.close()

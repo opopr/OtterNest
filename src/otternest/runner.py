@@ -164,7 +164,7 @@ def worker_environment(pass_env: tuple[str, ...] = ()) -> dict[str, str]:
     """No owner/Agent control-plane secrets are inherited by child by default."""
     allowed = {"PATH", "HOME", "LANG", "LC_ALL", "TERM", "TMPDIR", "SYSTEMROOT", "WINDIR"}
     allowed.update(pass_env)
-    forbidden = {"OTTERNEST_OWNER_TOKEN", "OTTERNEST_AGENT_TOKEN", "OTTERNEST_DATABASE_URL"}
+    forbidden = {"OTTERNEST_OWNER_TOKEN", "OTTERNEST_AGENT_TOKEN", "OTTERNEST_RUNTIME_TOKEN", "OTTERNEST_DATABASE_URL"}
     if forbidden.intersection(pass_env):
         raise RunnerFailure("Refusing to expose OtterNest control-plane credentials to child")
     return {k: v for k, v in os.environ.items() if k in allowed and k not in forbidden}
@@ -246,8 +246,12 @@ class Runner:
                  address_space_mib: int | None = None,
                  cgroup_parent: str | None = None, memory_max_mib: int | None = None,
                  cpu_max_percent: int | None = None, pids_max: int | None = None):
-        if not token.startswith("on_agent_"):
-            raise RunnerFailure("OTTERNEST_AGENT_TOKEN required (not the owner token)")
+        is_agent_token = token.startswith("on_agent_")
+        is_runtime_token = token.startswith("on_runtime_")
+        if not (is_agent_token or is_runtime_token):
+            raise RunnerFailure("OTTERNEST_AGENT_TOKEN or OTTERNEST_RUNTIME_TOKEN required (not the owner token)")
+        if is_runtime_token and not (runtime_id and runtime_id.strip()):
+            raise RunnerFailure("OTTERNEST_RUNTIME_TOKEN requires --runtime-id or OTTERNEST_RUNTIME_ID")
         if not server.startswith("https://") and not (server.startswith("http://127.0.0.1:") or server.startswith("http://localhost:")):
             raise RunnerFailure("HTTPS required except explicit localhost development")
         if timeout < 30 or timeout > 3600:
@@ -471,7 +475,7 @@ def main():
     parser.add_argument("--once", action="store_true", help="Process at most one task and exit")
     parser.add_argument("--interval", type=int, default=15)
     parser.add_argument("--runtime-id", default=os.environ.get("OTTERNEST_RUNTIME_ID", ""),
-                        help="Pre-registered Agent runtime ID for periodic heartbeat")
+                        help="Pre-registered Runtime ID; required when using OTTERNEST_RUNTIME_TOKEN")
     parser.add_argument("--timeout", type=int, default=600)
     parser.add_argument("--workspace-root", default=None,
                         help="Existing absolute private directory for opt-in artifact manifests")
@@ -497,7 +501,11 @@ def main():
     if args.interval < 1:
         parser.error("--interval must be positive")
     try:
-        runner = Runner(args.server, os.environ.get("OTTERNEST_AGENT_TOKEN", ""), command,
+        runtime_token = os.environ.get("OTTERNEST_RUNTIME_TOKEN", "")
+        agent_token = os.environ.get("OTTERNEST_AGENT_TOKEN", "")
+        if runtime_token and not args.runtime_id:
+            parser.error("OTTERNEST_RUNTIME_TOKEN requires --runtime-id or OTTERNEST_RUNTIME_ID")
+        runner = Runner(args.server, runtime_token or agent_token, command,
                         timeout=args.timeout, allow_r3=args.allow_r3, pass_env=tuple(args.pass_env),
                         runtime_id=args.runtime_id or None,
                         workspace_root=args.workspace_root, sandbox=args.sandbox,
