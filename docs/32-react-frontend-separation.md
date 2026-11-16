@@ -81,5 +81,19 @@ FastAPI 运行时暴露 /openapi.json。启动本地 API 后执行 npm run api:t
 | /knowledge | 知识库与项目章程 | /projects/*/memories、/memories/*、/projects/*/charter、/projects/*/knowledge-shares |
 | /portfolio | Portfolio 总览 | /portfolio/metrics、/briefing/daily、/notifications、/projects/*/experiments、/portfolio/schedule |
 | /system | 系统设置与运行事件 | /system/mode、/projects/*/status、/projects/*/events |
+| /skills | Skills 管理 | /projects/*/skills、/skills/*/publish、/skills/*/evaluations、/skills/*/archive |
+| /access | 任务临时授权 | /projects/*/members、/projects/*/tasks、/tasks/*/grants |
+| /artifacts | 成果中心 | /tasks/*/artifacts、/artifacts/*/content、/artifacts/*/review、/projects/*/artifacts/archive、/restore、/gc |
 
 所有副作用操作都通过页面中的明确操作按钮触发；关键治理、调度、模式切换和归档类操作会要求用户确认。前端展示的是 API 响应，不以本地状态代替服务端状态。
+
+
+## 第三阶段页面路由
+
+| React 路由 | 页面 | 核心后端接口 |
+|---|---|---|
+| /skills | Skills 管理 | /projects/{id}/skills、/skills/{id}/publish、/skills/{id}/evaluations、/skills/{id}/archive |
+| /access | 任务临时授权 | /projects/{id}/members、/projects/{id}/tasks、/tasks/{id}/grants |
+| /artifacts | 成果中心 | /tasks/{id}/artifacts、/artifacts/{id}/content、/artifacts/{id}/review、/projects/{id}/artifacts/archive、/restore、/gc |
+
+Agent 页面同时管理 AgentRuntime 注册、独立 token 签发/轮换、心跳状态与能力核验。指挥中心的自然语言入口仅使用白名单中文模板解析；不把模型规划器配置密钥暴露给浏览器。

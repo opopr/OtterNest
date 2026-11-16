@@ -601,3 +601,10 @@ button:disabled { opacity: .58; cursor: wait; }
   .runtime-meta { flex-direction: column; gap: 5px; }
   .agent-disable-row { align-items: flex-start; flex-direction: column; }
 }
+
+
+.command-input-panel { display: grid; gap: 11px; }
+.command-examples { display: flex; flex-wrap: wrap; gap: 6px; }
+.command-examples span { padding: 5px 7px; border: 1px solid #e7e6f5; border-radius: 6px; background: #f8f7ff; color: #7771cb; font-size: 9px; }
+.command-safety-note { display: flex; align-items: flex-start; gap: 8px; padding: 10px; border-radius: 8px; background: #f2f8ff; color: #6483a9; font-size: 9px; line-height: 1.6; }
+.command-safety-note svg { flex: 0 0 auto; }

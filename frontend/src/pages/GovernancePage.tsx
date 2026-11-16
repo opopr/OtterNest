@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertCircle, Check, CheckCircle2, ClipboardCheck, FileSearch, MessageSquare,
   RefreshCw, ShieldCheck, X, XCircle
@@ -70,7 +70,8 @@ export default function GovernancePage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"tasks" | "decisions">("tasks");
+  const [tab, setTab] = useState<"tasks" | "decisions" | "command">("tasks");
+  const [commandText, setCommandText] = useState("");
 
   const selectedProject = useMemo(() => projects.find((item) => item.id === selectedId) || null, [projects, selectedId]);
   const selectedDecision = useMemo(() => decisions.find((item) => item.id === selectedDecisionId) || null, [decisions, selectedDecisionId]);
@@ -158,6 +159,23 @@ export default function GovernancePage() {
     finally { setSaving(false); }
   };
 
+
+  const interpretCommand = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedId || commandText.trim().length < 4) return;
+    setSaving(true);
+    setError("");
+    try {
+      const preview = await request<CommandPlan & { interpretation: { mode: string; llm_interpreted: boolean; requires_explicit_confirmation: boolean } }>("/command/interpret", {
+        method: "POST",
+        body: JSON.stringify({ project_id: selectedId, text: commandText.trim() })
+      });
+      setPlan(preview);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "命令无法安全解释；没有创建执行计划");
+    } finally { setSaving(false); }
+  };
+
   const openSecondRound = async () => {
     if (!selectedDecision) return;
     if (!window.confirm("确认开启第二轮独立讨论？开启后不能创建第三轮。")) return;
@@ -220,6 +238,7 @@ export default function GovernancePage() {
       <div className="governance-tabs">
         <button className={tab === "tasks" ? "selected" : ""} onClick={() => setTab("tasks")}><ClipboardCheck size={16} />任务审批 <span>{pendingTasks.length}</span></button>
         <button className={tab === "decisions" ? "selected" : ""} onClick={() => setTab("decisions")}><ShieldCheck size={16} />决策审查 <span>{decisions.filter((item) => item.status === "proposed").length}</span></button>
+        <button className={tab === "command" ? "selected" : ""} onClick={() => setTab("command")}><MessageSquare size={16} />自然语言命令</button>
       </div>
 
       {tab === "tasks" ? (
@@ -238,7 +257,7 @@ export default function GovernancePage() {
             {!pendingTasks.length && <div className="empty-state"><CheckCircle2 size={26} /><strong>没有待处理任务</strong><p>该项目当前没有等待授权或验收的任务。</p></div>}
           </div>
         </section>
-      ) : (
+      ) : tab === "decisions" ? (
         <div className="governance-decision-layout">
           <section className="panel decision-list-panel">
             <div className="panel-heading"><div className="panel-title"><FileSearch size={17} /><h3>决策列表</h3></div><span className="count-chip">{decisions.length}</span></div>
@@ -276,6 +295,23 @@ export default function GovernancePage() {
             </>}
           </section>
         </div>
+      ) : (
+        <section className="panel command-input-panel">
+          <div className="panel-heading"><div className="panel-title"><MessageSquare size={17} /><h3>受限自然语言命令</h3></div><span className="status-tag tag-blue">模板解析 · 非 LLM</span></div>
+          <p className="form-hint">该入口只支持后端白名单中的中文命令模板，不会调用外部模型，也不会直接执行操作。解析成功后会创建与任务审批相同的版本化命令预览。</p>
+          <form className="form-panel" onSubmit={interpretCommand}>
+            <label>输入命令<textarea rows={3} value={commandText} onChange={(event) => setCommandText(event.target.value)} required minLength={4} maxLength={3500} placeholder="例如：验收通过任务「完成首页 React 改造」" /></label>
+            <div className="command-examples">
+              <span>批准任务「任务名称」</span>
+              <span>取消任务「任务名称」</span>
+              <span>验收通过任务「任务名称」</span>
+              <span>验收驳回任务「任务名称」原因：需要补充测试</span>
+              <span>指派任务「任务名称」给「Agent 名称」</span>
+            </div>
+            <div className="form-actions"><button className="primary-button compact" disabled={saving || !selectedId || commandText.trim().length < 4}>解析并生成预览</button></div>
+          </form>
+          <div className="command-safety-note"><ShieldCheck size={16} /><span>命令只会生成预览。你仍需在预览弹窗中检查任务、操作、版本和风险，再点击确认执行。</span></div>
+        </section>
       )}
 
       {plan && <div className="modal-backdrop"><section className="panel command-preview">

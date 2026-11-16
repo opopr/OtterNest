@@ -47,6 +47,7 @@ OtterNest 不是某一个 AI 模型，也不负责“把多个订阅额度合并
 | [31 · 目标生命周期与依赖](docs/31-goal-lifecycle.md) | 目标状态、完成门槛、依赖关系和人工验收 |
 | [32 · React 前后端分离](docs/32-react-frontend-separation.md) | React、FastAPI、OpenAPI、CORS 与 Google AI Studio 工作流 |
 | [33 · React 领域页面迁移](docs/33-react-domain-pages.md) | 指挥中心、目标工作流、知识库、Portfolio 与系统运维页面 |
+| [34 · React 运行与成果管理](docs/34-react-operations-pages.md) | Skills、临时授权、成果生命周期、Agent Runtime 与受限命令 |
 
 ## 三大平面（逻辑）
 
