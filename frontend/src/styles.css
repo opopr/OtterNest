@@ -809,3 +809,48 @@ button:disabled { opacity: .58; cursor: wait; }
  .dispatch-route-row { grid-template-columns: 20px minmax(0,1fr) 14px minmax(0,.8fr); }
  .dispatch-route-row > .status-tag { grid-column: 2 / -1; justify-self: start; }
 }
+
+
+.goal-plan-composer { padding: 18px 20px; }
+.goal-plan-intro { display: flex; align-items: flex-start; gap: 11px; margin: 3px 0 14px; }
+.goal-plan-intro-icon { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 auto; border-radius: 10px; background: #f0efff; color: #7771d7; }
+.goal-plan-intro > div:last-child { display: grid; gap: 4px; }
+.goal-plan-intro strong { color: #515a74; font-size: 11px; }
+.goal-plan-intro p { margin: 0; color: #9198ac; font-size: 9px; line-height: 1.6; }
+.goal-plan-prompt-label { display: grid; gap: 7px; color: #69718a; font-size: 10px; font-weight: 600; }
+.goal-plan-prompt-label textarea { width: 100%; min-height: 76px; resize: vertical; padding: 10px 11px; border: 1px solid var(--border); border-radius: 9px; outline: none; color: #59617a; font: inherit; font-size: 10px; line-height: 1.6; }
+.goal-plan-prompt-label textarea:focus { border-color: #aaa5ed; box-shadow: 0 0 0 3px rgba(124,111,232,.08); }
+.goal-plan-form-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; }
+.goal-plan-form-foot > span { display: flex; align-items: flex-start; gap: 5px; max-width: 65%; color: #9ba1b3; font-size: 8px; line-height: 1.5; }
+.goal-plan-preview { display: grid; gap: 12px; margin-top: 16px; padding-top: 15px; border-top: 1px solid #eff0f6; }
+.goal-plan-preview-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.goal-plan-preview-head h3 { margin: 4px 0 0; color: #4e5772; font-size: 15px; }
+.goal-plan-success { margin: 0; color: #788098; font-size: 10px; line-height: 1.7; }
+.goal-plan-preview-meta { display: flex; flex-wrap: wrap; gap: 7px; }
+.goal-plan-preview-meta span, .goal-plan-task-tags span { padding: 4px 7px; border-radius: 6px; background: #f4f4fa; color: #7f879e; font-size: 8px; }
+.goal-plan-task-list { display: grid; gap: 8px; }
+.goal-plan-task { display: flex; align-items: flex-start; gap: 10px; padding: 11px; border: 1px solid #eff0f6; border-radius: 9px; background: #fdfdff; }
+.goal-plan-task-index { display: grid; place-items: center; width: 26px; height: 26px; flex: 0 0 auto; border-radius: 7px; background: #f0efff; color: #7771d7; font-size: 9px; font-weight: 700; }
+.goal-plan-task-content { display: grid; gap: 7px; min-width: 0; flex: 1; }
+.goal-plan-task-title { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.goal-plan-task-title strong { color: #555e78; font-size: 10px; }
+.goal-plan-task-content > p { margin: 0; color: #858ca1; font-size: 9px; line-height: 1.6; }
+.goal-plan-task-acceptance { display: grid; gap: 3px; padding: 8px 9px; border-radius: 7px; background: #f6f7fb; color: #788098; font-size: 8px; line-height: 1.5; }
+.goal-plan-task-acceptance strong { color: #68718a; font-size: 8px; }
+.goal-plan-task-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.goal-plan-task-tags code { padding: 4px 6px; border-radius: 5px; background: #eef6f5; color: #528b83; font-size: 8px; }
+.goal-plan-dependencies { display: flex; align-items: center; gap: 5px; color: #7f79c7; font-size: 8px; }
+.goal-plan-safety { display: flex; align-items: flex-start; gap: 7px; padding: 10px; border: 1px solid #eeeafa; border-radius: 8px; background: #faf9ff; color: #817da9; font-size: 8px; line-height: 1.6; }
+.goal-plan-safety svg { flex: 0 0 auto; }
+.goal-plan-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.goal-plan-confirmed { display: flex; align-items: flex-start; gap: 9px; margin-top: 14px; padding: 11px; border-radius: 8px; background: #f0faf5; color: #37866a; }
+.goal-plan-confirmed > div { display: grid; gap: 4px; }
+.goal-plan-confirmed strong { font-size: 10px; }
+.goal-plan-confirmed p { margin: 0; color: #6d9888; font-size: 8px; line-height: 1.5; }
+@media (max-width: 620px) {
+ .goal-plan-form-foot { align-items: stretch; flex-direction: column; }
+ .goal-plan-form-foot > span { max-width: 100%; }
+ .goal-plan-form-foot button { width: 100%; }
+ .goal-plan-actions { align-items: stretch; flex-direction: column-reverse; }
+ .goal-plan-actions button { justify-content: center; }
+}
