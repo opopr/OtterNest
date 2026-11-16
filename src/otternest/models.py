@@ -28,6 +28,21 @@ class Project(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
 
 
+class GoalPlanDraft(Base):
+    """A bounded, owner-confirmed multi-step goal plan proposal."""
+    __tablename__ = "goal_plan_drafts"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False, index=True)
+    request_text: Mapped[str] = mapped_column(Text, nullable=False)
+    proposal: Mapped[dict] = mapped_column(JSON, nullable=False)
+    snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="pending", nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
 class Goal(Base):
     __tablename__ = "goals"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)

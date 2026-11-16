@@ -59,3 +59,16 @@ OTTERNEST_PLANNER_API_KEY=YOUR_PRIVATE_SECRET
 数据库迁移 `0010_auto_deliberation.py` 新增 `decision_auto_policies`。升级前备份 PostgreSQL 及附件。
 
 测试覆盖禁用条件、模型候选限制、确认前无副作用、跨项目隔离、证据引用状态、自动协商人数与轮次、原有回归，并提供 PostgreSQL 并发下仅开启一轮的检查。所有测试使用模拟模型响应；未把真实 Muse、Codex 或 Google AI 互操作声称为已验证。
+
+
+## 多步骤目标规划（0017）
+
+`POST /api/v1/goal-plans/proposals` 是可选外部模型能力，默认关闭，沿用本文件所述的 HTTPS 主机白名单与私有服务端密钥配置。
+
+- 输入为项目 ID 和自然语言长期目标；模型只接收项目 ID/名称/描述及启用项目 Agent 的名称、ID、已核验能力，不读取任务正文、附件或记忆。
+- 模型输出一个严格 Schema 的目标和 2–12 个任务，任务包含指令、验收标准、风险、优先级、敏感级别、所需能力和零基依赖索引。
+- 服务端拒绝重复/越界/自引用/循环依赖索引、非法能力标识和超出 Schema 的字段。模型只提出所需能力，不决定 Agent 分配。
+- 计划以 `goal_plan_drafts` 持久化，预览有效期 10 分钟。预览不会创建 Goal、Task 或依赖，也不会触发调度。
+- `POST /api/v1/goal-plans/{draft_id}/confirm` 仅所有者可调用；锁定计划和项目，检查预览时的项目状态、目标数与任务数快照，重新校验计划，并在单一 PostgreSQL 事务中创建 Goal、全部 Task、TaskDependency、R3 审批通知及审计事件。
+- 确认支持幂等重放；过期或项目快照变化时拒绝执行并要求重新规划。计划创建的任务不会自动授权、指派或启动 Runtime。
+- 新迁移：`0017_goal_plan_drafts`。真实外部模型调用仍需显式配置；CI 使用模拟响应，不代表真实供应商互操作已验证。
