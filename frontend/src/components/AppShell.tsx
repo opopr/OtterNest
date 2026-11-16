@@ -15,7 +15,7 @@ const navigation = [
   { to: "/governance", label: "指挥中心", icon: ShieldCheck },
   { to: "/goals-workflows", label: "目标与工作流", icon: GitBranch },
   { to: "/knowledge", label: "知识库", icon: BookOpen },
-  { to: "/portfolio", label: "Portfolio", icon: ChartNoAxesCombined },
+  { to: "/portfolio", label: "Portfolio", icon: Gauge },
   { to: "/system", label: "系统与事件", icon: Settings2 }
 ];
 

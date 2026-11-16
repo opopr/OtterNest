@@ -208,7 +208,7 @@ export default function GovernancePage() {
     <div className="page-stack">
       <div className="page-heading">
         <div><div className="eyebrow">OWNER GOVERNANCE</div><h1>指挥中心与审批</h1><p>高风险授权、任务验收、独立决策审查与所有者最终裁决。</p></div>
-        <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadProjectData(selectedId)} disabled={detailLoading}><RefreshCw size={15} className={detailLoading ? "spin" : ""} />刷新</button></div>
+        <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadProjectData(selectedId)} disabled={loading || detailLoading}><RefreshCw size={15} className={loading || detailLoading ? "spin" : ""} />刷新</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
       <section className="panel governance-toolbar">

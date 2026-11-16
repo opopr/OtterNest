@@ -244,7 +244,7 @@ export default function KnowledgePage() {
             <label>来源与依据<input value={memoryDraft.source} onChange={(event) => setDraftField("source", event.target.value)} required maxLength={3000} /></label>
             {editingId && <label>修订原因（至少 5 个字符）<textarea rows={2} value={revisionReason} onChange={(event) => setRevisionReason(event.target.value)} required minLength={5} /></label>}
             <p className="form-hint">新记忆默认进入待审核状态。只有所有者发布后，Agent 才能把它作为正式项目知识使用。</p>
-            <div className="form-actions"><button className="primary-button compact" disabled={saving || (editingId && revisionReason.trim().length < 5)}>{saving ? "保存中…" : editingId ? "保存修订" : "提交记忆"}</button></div>
+            <div className="form-actions"><button className="primary-button compact" disabled={saving || (Boolean(editingId) && revisionReason.trim().length < 5)}>{saving ? "保存中…" : editingId ? "保存修订" : "提交记忆"}</button></div>
           </form>}
           <div className="memory-grid">
             {memories.map((memory) => <article className="memory-card" key={memory.id}>
