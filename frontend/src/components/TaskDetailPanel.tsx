@@ -203,7 +203,7 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
         <section className="task-detail-section task-detail-wide">
           <div className="task-detail-section-head"><div><h3><Activity size={16}/>关联事件</h3><p>来自项目事件流中 subject_id 与当前任务匹配的记录。</p></div><span className="muted-inline">{events.length} 条</span></div>
           {events.length?<div className="task-event-list">{events.map(event=><div className="task-event-row" key={event.id}><span className="task-event-dot"/><div><strong>{eventLabels[event.kind]||event.kind}</strong><small>{formatTime(event.created_at)} · #{event.id}</small></div></div>)}</div>:<div className="dag-empty">暂时没有关联事件记录。</div>}
-          <p className="task-event-note"><Info size={13}/>事件来自项目事件流；当前接口单次最多读取 500 条项目事件，因此超大项目的早期历史可能不完整。</p>
+          <p className="task-event-note"><Info size={13}/>事件来自项目事件流；当前接口单次最多读取 500 条项目事件，因此事件量超过 500 条时，后续记录可能未包含，列表不保证覆盖完整任务历史。</p>
         </section>
       </>}
       <div className="task-detail-footer"><span><Clock3 size={13}/>任务数据以 FastAPI 服务端为准</span><button className="secondary-button compact" onClick={onClose}>关闭</button></div>
