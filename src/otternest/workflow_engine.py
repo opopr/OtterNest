@@ -324,19 +324,19 @@ def toggle_workflow_rule(rule_id: str, actor: Actor = Depends(authenticate), db:
     if rule is None:
         raise HTTPException(404, "Workflow rule not found")
     db.scalar(select(Project).where(Project.id == rule.project_id).with_for_update())
-    if not rule.enabled:
+    reenabled = not rule.enabled
+    rule.enabled = not rule.enabled
+    emit(db, actor, "workflow.rule_toggled", rule.id, rule.project_id, {"enabled": rule.enabled})
+    if reenabled:
         latest_event_id = db.scalar(
             select(Event.id).where(Event.project_id == rule.project_id).order_by(Event.id.desc()).limit(1)
         ) or 0
         cursor = db.get(WorkflowCursor, rule.id)
         if cursor is None:
-            cursor = WorkflowCursor(rule_id=rule.id, last_event_id=latest_event_id, updated_at=now())
-            db.add(cursor)
+            db.add(WorkflowCursor(rule_id=rule.id, last_event_id=latest_event_id, updated_at=now()))
         else:
             cursor.last_event_id = latest_event_id
             cursor.updated_at = now()
-    rule.enabled = not rule.enabled
-    emit(db, actor, "workflow.rule_toggled", rule.id, rule.project_id, {"enabled": rule.enabled})
     db.commit()
     return _rule_public(rule)
 
