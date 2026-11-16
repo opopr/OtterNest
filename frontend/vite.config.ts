@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
   const port = Number(env.PORT || 5173);
 
   return {
-    base: "/ui-assets/",
+    base: mode === "production" ? "/ui-assets/" : "/",
     plugins: [react()],
     server: {
       host: "0.0.0.0",

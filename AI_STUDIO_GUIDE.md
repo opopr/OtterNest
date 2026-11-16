@@ -26,4 +26,6 @@
 
 ## 同步
 
+导入仓库后，在 Settings > GitHub 中将工作区连接到现有的 opopr/OtterNest 仓库，确认目标分支后再启用双向同步。导入代码与建立 GitHub 同步绑定是两个步骤；首次推送前必须检查文件差异。
+
 GitHub 仓库 opopr/OtterNest 的分支与 Pull Request 是代码审查依据。AI Studio 的修改应先检查文件差异，再同步到 GitHub；不要覆盖未审查的分支或直接把实验性代码推到 main。

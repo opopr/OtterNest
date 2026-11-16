@@ -51,8 +51,9 @@ AI Studio 预览与 API 服务可能属于不同 Origin。此时：
 AI Studio 导入工作流：
 1. Build mode → 输入框旁 + → Import from GitHub → 选择 opopr/OtterNest。
 2. 保留仓库根目录 package.json 和 frontend/ workspace。
-3. 让 AI Studio 只修改 frontend/ 下的 React 代码；所有业务状态和授权仍调用 FastAPI。
-4. 在 Settings → GitHub 使用同步功能。推送或拉取前检查差异；GitHub 分支和 Pull Request 仍是代码审查边界。
+3. 导入后打开 Settings → GitHub，使用 Link repository 连接现有的 opopr/OtterNest 仓库；首次推送前检查文件差异和目标分支，避免覆盖未合并的 GitHub 提交。
+4. 让 AI Studio 只修改 frontend/ 下的 React 代码；所有业务状态和授权仍调用 FastAPI。
+5. 在 Settings → GitHub 使用双向同步。推送或拉取前检查差异；GitHub 分支和 Pull Request 仍是代码审查边界。
 
 建议给 AI Studio 的项目约束：
 “本项目是 OtterNest 的 React 前端工作区。只在 frontend/ 内开发 UI；业务 API 的权威实现位于 Python FastAPI，契约为 /openapi.json。所有业务数据必须通过 /api/v1 API 获取或修改，不能直连 PostgreSQL，不能在浏览器保存服务端密钥，不能重写 auth、权限、审计或任务状态规则。跨域预览使用 VITE_API_BASE_URL 指向 FastAPI HTTPS Origin。修改接口需求时先提出 OpenAPI 契约变更方案，不要自行模拟后端响应。”
