@@ -30,9 +30,9 @@ export default function AppShell() {
     return () => { active = false; };
   }, [location.pathname]);
 
-  const modeLabel = systemMode?.mode === "readonly_protect"
-    ? "只读保护"
-    : systemMode?.mode === "degraded" ? "降级模式" : "正常运行";
+  const modeLabel = !systemMode ? "状态读取中"
+    : systemMode.mode === "readonly_protect" ? "只读保护"
+      : systemMode.mode === "degraded" ? "降级模式" : "正常运行";
 
   return (
     <div className="app-shell">
@@ -73,7 +73,7 @@ export default function AppShell() {
             <div className={"system-pill " + (systemMode?.mode === "normal" ? "is-ok" : "is-warn")}>
               <span className="system-dot" />{modeLabel}
             </div>
-            <div className="connection-pill"><Wifi size={15} /> API 已连接</div>
+            <div className={"connection-pill" + (systemMode ? "" : " is-offline")}><Wifi size={15} />{systemMode ? "API 已连接" : "API 状态未知"}</div>
             <div className="user-menu-wrap">
               <button className="user-button" onClick={() => setMenuOpen((open) => !open)}>
                 <span className="user-avatar">O</span>

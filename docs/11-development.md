@@ -4,7 +4,7 @@
 
 OtterNest 已进入**完整产品开发**。此文件是工程状态登记，而非缩减需求的 MVP 计划。未实现项不应被标记为已完成。
 
-**技术栈**：Python 3.11+、FastAPI、SQLAlchemy、PostgreSQL、Alembic、轻量原生 Web；控制平面与执行平面解耦部署。
+**技术栈**：Python 3.11+、FastAPI、SQLAlchemy、PostgreSQL、Alembic、React、TypeScript、Vite；控制平面与执行平面解耦部署。
 
 ## 功能矩阵
 
@@ -22,7 +22,7 @@ OtterNest 已进入**完整产品开发**。此文件是工程状态登记，而
 | Skills / AG-UI / A2UI / WS | Skills 生命周期已实现；已新增项目 WebSocket 实时事件流、AG-UI 事件投影与 A2UI 组件白名单安全校验 | 全量客户端深度双向 AG-UI/A2UI 渲染 |
 | 多 Agent 协商 / 动态团队 | 第一/二轮独立决策复核、异议记录、显式受邀自动推进名单 | 自动辩论调度与动态成本预算组队 |
 | 自主改进 / 质量评估 | Skill 结构化评估、质量指标与失败归因统计、受控优化实验与回归门禁（`promote`/`rollback`） | 自动化沙箱回归数据集与灰度发布 |
-| Web 管理台 | 每日简报/质量指标、DAG 拓扑图、多轮对话指挥中心、分级通知收件箱、工作流规则与实验面板、系统保护模式、归档与 GC | 全量跨项目图形化监控与团队资源排期 |
+| Web 管理台 | 旧版管理台继续覆盖 DAG、指挥中心、通知、工作流、实验、保护模式和成果归档；React 前端首批迁移登录、总览、项目/任务基础操作和 Agent 登记，FastAPI 提供 OpenAPI 与静态构建交付 | 将审批、目标依赖、记忆、工作流、实验、归档、设置和 Command Center 逐页迁移到 React，并完成全量回归 |
 | 备份 / 安全运维 | `normal`/`degraded`/`readonly_protect` 保护模式、项目 JSON 与成果二进制归档工具 | 自动定时加密备份与生产恢复演练 |
 
 **注意**：本仓库早期代码可用于本地开发验证，尚未进行第三方平台接入、真实 PostgreSQL 并发压力测试或生产安全审计。不要把它部署到公网。
@@ -50,6 +50,15 @@ OtterNest 已进入**完整产品开发**。此文件是工程状态登记，而
 - **阶段 3（WebSocket/AG-UI/A2UI 与 Web 控制台）**：新增 `/api/v1/projects/{id}/events/ws` 认证 WebSocket 实时事件流、AG-UI 只读事件投影、A2UI 组件白名单安全校验、多轮上下文 `/api/v1/command/chat`，以及 Web 控制台 DAG 拓扑图、多轮对话、分级通知抽屉、质量看板与归档 GC 操作面板。
 - **已知限制**：仍未接入真实第三方云端 AI 平台（Muse/Codex/Google AI），未引入 pgvector 与外部 KMS/Secrets 引擎，也未在真实 PostgreSQL 集群上进行高并发压测。
 - 目标生命周期与人工验收边界、API 及手工验收清单见 [31 · 目标生命周期与依赖](31-goal-lifecycle.md)。
+
+## 本轮：React 前后端分离与 AI Studio 工作流
+
+- 新增 `frontend/` React + TypeScript + Vite workspace；仓库根目录 npm scripts 统一执行开发、类型检查和构建。
+- FastAPI 继续作为唯一业务后端与权限边界，前端通过 `/api/v1` 和 `/openapi.json` 访问，不直连 PostgreSQL。
+- 构建产物位于 `frontend/dist`，FastAPI 在构建存在时由 `/` 提供 React，并将旧管理台保留在 `/legacy`。
+- 首批 React 页面覆盖所有者登录/初始化/2FA、团队总览、项目与任务基础操作、Agent 登记；其他复杂业务页面暂由旧版管理台承接。
+- 新增精确 Origin CORS 配置和 WebSocket Origin 校验；默认不开放跨域，禁止通配符 Origin。
+- GitHub Actions 新增前端依赖安装、TypeScript 检查和 Vite 构建任务。分离方案与 AI Studio 导入步骤见 [32 · React 前后端分离](32-react-frontend-separation.md)。
 
 ## 工程规则
 

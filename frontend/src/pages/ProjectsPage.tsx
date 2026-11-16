@@ -77,9 +77,9 @@ export default function ProjectsPage() {
       setProjectName("");
       setProjectDescription("");
       setShowProjectForm(false);
+      setProjects((current) => [created, ...current.filter((project) => project.id !== created.id)]);
       setSelectedId(created.id);
       setSearchParams({ project: created.id });
-      await loadProjects();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "创建项目失败");
     } finally { setSaving(false); }
@@ -116,7 +116,7 @@ export default function ProjectsPage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><div className="eyebrow">PROJECT WORKSPACE</div><h1>项目与任务</h1><p>项目、目标和任务的统一入口。任务状态以 PostgreSQL 中的服务端记录为准。</p></div>
+        <div><div className="eyebrow">PROJECT WORKSPACE</div><h1>项目与任务</h1><p>项目和任务的统一入口；目标依赖等高级治理暂由旧版管理台承接。任务状态以服务端记录为准。</p></div>
         <div className="heading-actions">
           <button className="secondary-button" onClick={() => void loadProjects()} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button>
           <button className="primary-button compact" onClick={() => setShowProjectForm(true)}><Plus size={16} />新建项目</button>
