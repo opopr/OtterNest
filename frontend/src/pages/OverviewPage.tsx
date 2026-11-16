@@ -161,7 +161,7 @@ export default function OverviewPage() {
           <p>目标由你设定，权限由你掌控，成果由你验收。</p>
           <Link to="/projects" className="banner-link">查看项目与任务 <ArrowRight size={16} /></Link>
         </div>
-        <img src="/assets/mascots/otter-explorer.png" alt="OtterNest 水獭" />
+        <img src="/assets/mascots/otter-wave.png" alt="OtterNest 水獭" />
         <div className="banner-orb banner-orb-one" /><div className="banner-orb banner-orb-two" />
       </div>
 
