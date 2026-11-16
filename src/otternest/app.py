@@ -1,9 +1,11 @@
 """OtterNest ASGI entrypoint."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
@@ -29,6 +31,11 @@ from .analytics import router as analytics_router
 from .realtime import router as realtime_router
 from .db import get_engine
 
+_LEGACY_HTML = Path(__file__).with_name("index.html")
+_DEFAULT_WEB_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+_WEB_DIST = Path(os.environ.get("OTTERNEST_WEB_DIST", str(_DEFAULT_WEB_DIST))).resolve()
+_WEB_INDEX = _WEB_DIST / "index.html"
+
 app = FastAPI(
     title="OtterNest AI Team OS",
     description="Owner-controlled AI team coordination, task leases and authoritative knowledge",
@@ -36,6 +43,26 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url=None,
 )
+
+# Cross-origin access is opt-in. Vite development normally uses a same-origin proxy;
+# remote previews must explicitly allow their exact browser Origin.
+_allowed_origins = [
+    origin.strip().rstrip("/")
+    for origin in os.environ.get("OTTERNEST_CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if "*" in _allowed_origins:
+    raise RuntimeError("OTTERNEST_CORS_ORIGINS must list exact Origins; wildcard '*' is not allowed")
+if _allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_allowed_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+        max_age=600,
+    )
+
 app.include_router(router)
 app.include_router(extension_router)
 app.include_router(webhook_router)
@@ -73,9 +100,31 @@ def ready():
 
 @app.get("/", include_in_schema=False)
 def home():
-    return FileResponse(Path(__file__).with_name("index.html"), media_type="text/html")
+    # Keep the old console available until all React pages have been migrated.
+    if _WEB_INDEX.is_file():
+        return FileResponse(_WEB_INDEX, media_type="text/html")
+    return FileResponse(_LEGACY_HTML, media_type="text/html")
 
+
+@app.get("/legacy", include_in_schema=False)
+def legacy_console():
+    return FileResponse(_LEGACY_HTML, media_type="text/html")
+
+
+if _WEB_DIST.is_dir():
+    # Vite emits files under dist/assets; mount the dist root so /ui-assets/assets/* resolves.
+    app.mount("/ui-assets", StaticFiles(directory=_WEB_DIST), name="ui-assets")
 
 _assets_dir = Path(__file__).with_name("assets")
 if _assets_dir.is_dir():
     app.mount("/assets", StaticFiles(directory=_assets_dir), name="assets")
+
+
+@app.get("/{frontend_path:path}", include_in_schema=False)
+def frontend_fallback(frontend_path: str):
+    # API and static misses must remain 404s; only browser routes fall back to React.
+    if frontend_path.startswith(("api/", "assets/", "ui-assets/")):
+        raise HTTPException(404, "Not found")
+    if _WEB_INDEX.is_file():
+        return FileResponse(_WEB_INDEX, media_type="text/html")
+    raise HTTPException(404, "Not found")

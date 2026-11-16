@@ -7,7 +7,7 @@ import os
 from datetime import timedelta, timezone
 from pathlib import Path
 from typing import Literal
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
@@ -746,11 +746,17 @@ async def upload_artifact(
     request: Request,
     epoch: int | None = None,
     filename: str = Header(default="artifact.bin", alias="X-Artifact-Name"),
+    filename_encoded: str | None = Header(default=None, alias="X-Artifact-Name-Encoded"),
     sensitivity: str = Header(default="internal", alias="X-Artifact-Sensitivity"),
     actor: Actor = Depends(authenticate),
     db: Session = Depends(get_session),
 ):
     require_writable_system(db)
+    if filename_encoded is not None:
+        try:
+            filename = unquote(filename_encoded, encoding="utf-8", errors="strict")
+        except (UnicodeDecodeError, ValueError):
+            raise HTTPException(422, "Invalid UTF-8 artifact filename") from None
     if sensitivity not in SENSITIVITY_ORDER:
         raise HTTPException(422, "Invalid artifact sensitivity")
     row = require_task(db, task_id, actor, lock=True)

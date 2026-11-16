@@ -45,6 +45,9 @@ OtterNest 不是某一个 AI 模型，也不负责“把多个订阅额度合并
 | [22 · 成果版本与验收](docs/22-artifact-lifecycle.md) | 不可变文件版本、校验下载与所有者审查 |
 | [24 · Runner 成果与多 Agent 交接](docs/24-runner-artifact-handoff.md) | 工作空间成果上传、已核验检查点与 DAG 后继交接 |
 | [31 · 目标生命周期与依赖](docs/31-goal-lifecycle.md) | 目标状态、完成门槛、依赖关系和人工验收 |
+| [32 · React 前后端分离](docs/32-react-frontend-separation.md) | React、FastAPI、OpenAPI、CORS 与 Google AI Studio 工作流 |
+| [33 · React 领域页面迁移](docs/33-react-domain-pages.md) | 指挥中心、目标工作流、知识库、Portfolio 与系统运维页面 |
+| [34 · React 运行与成果管理](docs/34-react-operations-pages.md) | Skills、临时授权、成果生命周期、Agent Runtime 与受限命令 |
 
 ## 三大平面（逻辑）
 
@@ -67,6 +70,6 @@ OtterNest 不是某一个 AI 模型，也不负责“把多个订阅额度合并
 
 ## 当前状态与范围
 
-本仓库包含**架构设计文档与正在开发的核心服务代码**。当前实现了基础项目、Agent、任务租约、记忆/决策记录和 Web 管理接口；尚无真实第三方 AI 平台接入，不应部署到公网。
+本仓库包含**架构设计文档、正在开发的核心服务代码与 React 前端工作区**。React 前端位于 frontend/，由 FastAPI 提供同源服务；旧版管理台暂保留在 /legacy。当前尚无真实第三方 AI 平台接入，不应部署到公网。
 
 **不要把规划中的“能力”误认为已经存在的“平台接口”。** 具体可行性见 [待验证事项](docs/10-open-questions.md)。

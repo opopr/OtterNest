@@ -4,7 +4,7 @@
 
 OtterNest 已进入**完整产品开发**。此文件是工程状态登记，而非缩减需求的 MVP 计划。未实现项不应被标记为已完成。
 
-**技术栈**：Python 3.11+、FastAPI、SQLAlchemy、PostgreSQL、Alembic、轻量原生 Web；控制平面与执行平面解耦部署。
+**技术栈**：Python 3.11+、FastAPI、SQLAlchemy、PostgreSQL、Alembic、React、TypeScript、Vite；控制平面与执行平面解耦部署。
 
 ## 功能矩阵
 
@@ -22,7 +22,7 @@ OtterNest 已进入**完整产品开发**。此文件是工程状态登记，而
 | Skills / AG-UI / A2UI / WS | Skills 生命周期已实现；已新增项目 WebSocket 实时事件流、AG-UI 事件投影与 A2UI 组件白名单安全校验 | 全量客户端深度双向 AG-UI/A2UI 渲染 |
 | 多 Agent 协商 / 动态团队 | 第一/二轮独立决策复核、异议记录、显式受邀自动推进名单 | 自动辩论调度与动态成本预算组队 |
 | 自主改进 / 质量评估 | Skill 结构化评估、质量指标与失败归因统计、受控优化实验与回归门禁（`promote`/`rollback`） | 自动化沙箱回归数据集与灰度发布 |
-| Web 管理台 | 每日简报/质量指标、DAG 拓扑图、多轮对话指挥中心、分级通知收件箱、工作流规则与实验面板、系统保护模式、归档与 GC | 全量跨项目图形化监控与团队资源排期 |
+| Web 管理台 | React 已覆盖登录、总览、项目/任务基础操作、Agent 登记与 Runtime、任务审批/决策审查/受限中文命令、目标依赖/工作流、记忆/项目章程/跨项目共享、Skills、TaskGrant、成果版本/验收/归档/恢复/GC、Portfolio/通知/实验、系统保护模式/项目状态/事件流；旧版管理台继续兜底高级 A2UI/AG-UI 和其他低频运维页面 | 完整 Command Center 多轮自然语言对话、A2UI/AG-UI 深度交互、外部运行时诊断和真实生产恢复演练，并完成全量回归 |
 | 备份 / 安全运维 | `normal`/`degraded`/`readonly_protect` 保护模式、项目 JSON 与成果二进制归档工具 | 自动定时加密备份与生产恢复演练 |
 
 **注意**：本仓库早期代码可用于本地开发验证，尚未进行第三方平台接入、真实 PostgreSQL 并发压力测试或生产安全审计。不要把它部署到公网。
@@ -50,6 +50,15 @@ OtterNest 已进入**完整产品开发**。此文件是工程状态登记，而
 - **阶段 3（WebSocket/AG-UI/A2UI 与 Web 控制台）**：新增 `/api/v1/projects/{id}/events/ws` 认证 WebSocket 实时事件流、AG-UI 只读事件投影、A2UI 组件白名单安全校验、多轮上下文 `/api/v1/command/chat`，以及 Web 控制台 DAG 拓扑图、多轮对话、分级通知抽屉、质量看板与归档 GC 操作面板。
 - **已知限制**：仍未接入真实第三方云端 AI 平台（Muse/Codex/Google AI），未引入 pgvector 与外部 KMS/Secrets 引擎，也未在真实 PostgreSQL 集群上进行高并发压测。
 - 目标生命周期与人工验收边界、API 及手工验收清单见 [31 · 目标生命周期与依赖](31-goal-lifecycle.md)。
+
+## 本轮：React 前后端分离与 AI Studio 工作流
+
+- 新增 `frontend/` React + TypeScript + Vite workspace；仓库根目录 npm scripts 统一执行开发、类型检查和构建。
+- FastAPI 继续作为唯一业务后端与权限边界，前端通过 `/api/v1` 和 `/openapi.json` 访问，不直连 PostgreSQL。
+- 构建产物位于 `frontend/dist`，FastAPI 在构建存在时由 `/` 提供 React，并将旧管理台保留在 `/legacy`。
+- 首批 React 页面覆盖所有者登录/初始化/2FA、团队总览、项目与任务基础操作、Agent 登记；其他复杂业务页面暂由旧版管理台承接。
+- 新增精确 Origin CORS 配置和 WebSocket Origin 校验；默认不开放跨域，禁止通配符 Origin。
+- GitHub Actions 新增前端依赖安装、TypeScript 检查和 Vite 构建任务。分离方案与 AI Studio 导入步骤见 [32 · React 前后端分离](32-react-frontend-separation.md)。
 
 ## 工程规则
 
@@ -185,3 +194,25 @@ network restrictions, manual reconciliation and cancellation semantics.
 - 显式授权 `workspace-write` 时，比较源基线和结果工作区并输出 `changes.patch` 与 `otternest-provenance.json`，记录原始提交、补丁 SHA-256 和变更数量；**不会自动向 GitHub push、提交 PR、应用补丁或合并**。
 - 自动化测试基于临时真实 Git 源仓库、模拟 Codex CLI、Git 补丁校验和完整 Runner/API/人工验收流水线。真实公共 GitHub 网络拉取、个人 Codex 登录、WSL2/ARM 联调、私有仓库认证、完整代码安全隔离及人工审核后的 PR 创建仍未完成。
 - 边界与操作说明见 [30 · GitHub 固定提交快照与代码补丁](30-git-snapshot-patch.md)。
+
+
+## 本轮：React 领域页面迁移（前后端分离第二阶段）
+
+- 新增指挥中心：按项目读取待授权/待验收任务和决策；任务写操作使用 CommandPlan 先预览、再确认，服务端二次校验任务版本；决策审查显示独立 Agent 意见，第二轮讨论必须显式关闭，最终批准仍由所有者完成。
+- 新增目标与工作流：读取 Goal Board；创建目标、维护前置依赖、暂停/恢复/完成人工状态；规则按事件前缀匹配，可显式评估并查看 WorkflowRun。前置依赖环检测、完成门槛、链深度和冷却熔断仍由 FastAPI 强制执行。
+- 新增知识库：记忆提案、发布、修订、归档；项目章程与并发/任务总量预算；跨项目知识共享申请和所有者审批。共享批准在目标项目创建独立副本。
+- 新增 Portfolio：跨项目质量指标、每日简报、三级通知收件箱、公平调度入口、受控实验评估/采纳/回滚。实验采纳门槛仍由后端执行。
+- 新增系统与事件：全局 normal/degraded/readonly_protect 模式、项目 active/paused/archived 状态和项目持久事件流。
+- 前端页面只调用现有 /api/v1 路由，不新增数据库表，不将数据库访问移入浏览器。详细页面/API 对照见 [33 · React 领域页面迁移](33-react-domain-pages.md)。
+- 尚未迁移：Skills 完整管理、任务级临时授权、成果版本与二进制归档、运行时诊断、完整 Command Center 自然语言对话及深度 AG-UI/A2UI。若后端尚无可安全使用的列表/写入 API，不在前端伪造功能。
+
+
+## 本轮：React 运行与成果管理页面迁移（第三阶段）
+
+- Skills：新增项目级 Skill 提案/列表 API；提案默认 proposed，只有所有者发布后 Agent 才能读取；支持评价记录和归档。新增 API 回归测试覆盖提案可见性、重复版本冲突、发布、评价和归档。
+- TaskGrant：新增任务级临时授权 UI，按项目成员授予范围、敏感级上限和有效期；支持列表与撤销。后端仍验证 Agent 必须是该任务所属项目成员。
+- 成果中心：新增二进制上传/下载、版本列表、所有者验收/驳回、.tar.gz 导出/恢复和 GC dry-run/执行。增加 UTF-8 文件名编码请求头，兼容中文成果名；单文件 5 MiB 与后端路径/哈希校验不变。
+- Agent Runtime：新增 Runtime 注册、独立凭据签发/轮换、在线状态/健康心跳展示、禁用 Runtime、声明能力与所有者核验能力管理。禁用 Agent/Runtime 不代表外部进程已停止。
+- 指挥中心增加受限中文命令模板入口。它只调用 /command/interpret，不调用外部模型；解析后仍生成 CommandPlan，必须由所有者检查预览并显式确认。
+- 当前 React 页面继续复用 FastAPI 现有权限和数据库；新增 Skill 列表/提案/发布 API 不新增数据库表。成果文件二进制流通过独立 authenticated binaryRequest 处理，不将文件内容误作 JSON。
+- 细节见 [34 · React 运行与成果管理](34-react-operations-pages.md)。

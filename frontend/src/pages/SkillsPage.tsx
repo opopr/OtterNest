@@ -1,0 +1,166 @@
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  AlertCircle, Archive, BookMarked, Check, ClipboardList, Plus,
+  RefreshCw, ShieldCheck, X
+} from "lucide-react";
+import { request } from "../api/client";
+import type { Project } from "../api/types";
+import ProjectSelect from "../components/ProjectSelect";
+
+interface Skill {
+  id: string;
+  project_id: string;
+  name: string;
+  version: string;
+  content: string;
+  source: string;
+  status: string;
+  created_at: string;
+}
+interface SkillEvaluation {
+  id: string;
+  project_id: string;
+  skill_id: string;
+  actor_kind: string;
+  actor_id: string;
+  verdict: "pass" | "fail" | "concern";
+  notes: string;
+  task_id: string | null;
+  created_at: string;
+}
+const statusLabel: Record<string, string> = { proposed: "待审核", published: "已发布", archived: "已归档" };
+const verdictLabel: Record<string, string> = { pass: "通过", fail: "未通过", concern: "有疑虑" };
+
+export default function SkillsPage() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [evaluations, setEvaluations] = useState<Record<string, SkillEvaluation[]>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [name, setName] = useState("");
+  const [version, setVersion] = useState("1.0.0");
+  const [content, setContent] = useState("");
+  const [source, setSource] = useState("");
+
+  const selectedProject = useMemo(() => projects.find((item) => item.id === selectedId) || null, [projects, selectedId]);
+
+  const loadProjects = useCallback(async () => {
+    setLoading(true);
+    try {
+      const rows = await request<Project[]>("/projects");
+      setProjects(rows);
+      setSelectedId((current) => rows.some((item) => item.id === current) ? current : rows[0]?.id || "");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "项目列表读取失败"); }
+    finally { setLoading(false); }
+  }, []);
+
+  const loadSkills = useCallback(async (projectId: string) => {
+    setLoading(true);
+    setError("");
+    try {
+      const rows = await request<Skill[]>("/projects/" + encodeURIComponent(projectId) + "/skills");
+      setSkills(rows);
+      const pairs = await Promise.all(rows.map(async (skill) => {
+        try {
+          const list = await request<SkillEvaluation[]>("/skills/" + encodeURIComponent(skill.id) + "/evaluations");
+          return [skill.id, list] as const;
+        } catch {
+          return [skill.id, []] as const;
+        }
+      }));
+      setEvaluations(Object.fromEntries(pairs));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Skill 列表读取失败"); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { void loadProjects(); }, [loadProjects]);
+  useEffect(() => { if (selectedId) void loadSkills(selectedId); else { setSkills([]); setEvaluations({}); } }, [selectedId, loadSkills]);
+
+  const createSkill = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedId) return;
+    setSaving(true);
+    setError("");
+    try {
+      await request<Skill>("/projects/" + encodeURIComponent(selectedId) + "/skills", {
+        method: "POST",
+        body: JSON.stringify({ name: name.trim(), version: version.trim(), content: content.trim(), source: source.trim() })
+      });
+      setName(""); setVersion("1.0.0"); setContent(""); setSource(""); setShowForm(false);
+      await loadSkills(selectedId);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "提交 Skill 提案失败"); }
+    finally { setSaving(false); }
+  };
+
+  const publishSkill = async (skill: Skill) => {
+    if (!window.confirm("确认发布 Skill「" + skill.name + "」？发布后该项目的 Agent 才能读取它。")) return;
+    setSaving(true);
+    try {
+      await request("/skills/" + encodeURIComponent(skill.id) + "/publish", { method: "POST" });
+      await loadSkills(selectedId);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "发布 Skill 失败"); }
+    finally { setSaving(false); }
+  };
+
+  const evaluateSkill = async (skill: Skill) => {
+    const verdict = window.prompt("评价结果：输入 pass、fail 或 concern", "pass");
+    if (!verdict || !["pass", "fail", "concern"].includes(verdict.trim())) return;
+    const notes = window.prompt("评价说明（至少 5 个字符）");
+    if (!notes || notes.trim().length < 5) return;
+    setSaving(true);
+    try {
+      await request<SkillEvaluation>("/skills/" + encodeURIComponent(skill.id) + "/evaluations", {
+        method: "POST", body: JSON.stringify({ verdict: verdict.trim(), notes: notes.trim(), task_id: null })
+      });
+      await loadSkills(selectedId);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Skill 评价失败"); }
+    finally { setSaving(false); }
+  };
+
+  const archiveSkill = async (skill: Skill) => {
+    const reason = window.prompt("填写归档原因（至少 5 个字符）");
+    if (!reason || reason.trim().length < 5) return;
+    if (!window.confirm("确认归档该 Skill？归档不会删除历史评价。")) return;
+    setSaving(true);
+    try {
+      await request("/skills/" + encodeURIComponent(skill.id) + "/archive", {
+        method: "POST", body: JSON.stringify({ reason: reason.trim() })
+      });
+      await loadSkills(selectedId);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "归档 Skill 失败"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="page-stack">
+      <div className="page-heading">
+        <div><div className="eyebrow">AGENT SKILLS LIFECYCLE</div><h1>Skills 管理</h1><p>Skill 先作为不可信提案进入项目，再经所有者发布；评价与归档保留生命周期记录。</p></div>
+        <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadSkills(selectedId)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
+      </div>
+      {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
+      <section className="panel project-toolbar"><div><div className="eyebrow">PROJECT WORKSPACE</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={setSelectedId} /><span className="muted-inline">{skills.length} 个 Skill 版本</span></section>
+      <section className="panel">
+        <div className="panel-heading"><div className="panel-title"><BookMarked size={17} /><h3>项目 Skill 注册表</h3></div><button className="primary-button compact" onClick={() => setShowForm((value) => !value)} disabled={!selectedId}><Plus size={15} />提出 Skill</button></div>
+        {showForm && <form className="form-panel embedded-form" onSubmit={createSkill}>
+          <div className="form-grid"><label>Skill 名称<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={120} /></label><label>版本号<input value={version} onChange={(event) => setVersion(event.target.value)} required maxLength={40} /></label></div>
+          <label>Skill 内容<textarea rows={7} value={content} onChange={(event) => setContent(event.target.value)} required maxLength={20000} placeholder="写入 Agent 可执行的操作步骤、约束和验收要求。提案在发布前不会对项目 Agent 开放。" /></label>
+          <label>来源与依据<input value={source} onChange={(event) => setSource(event.target.value)} required maxLength={3000} /></label>
+          <p className="form-hint">同一项目内 Skill 名称与版本组合必须唯一。发布是单独的所有者审批动作。</p>
+          <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "提交中…" : "提交提案"}</button></div>
+        </form>}
+        <div className="skill-grid">
+          {loading ? <div className="panel-loading"><div className="spinner" /></div> : skills.map((skill) => <article className="skill-card" key={skill.id}>
+            <div className="skill-card-head"><div><strong>{skill.name}</strong><small>版本 {skill.version} · {skill.id.slice(0, 8)}</small></div><span className={"status-tag " + (skill.status === "published" ? "tag-green" : skill.status === "proposed" ? "tag-amber" : "tag-neutral")}>{statusLabel[skill.status] || skill.status}</span></div>
+            <pre className="skill-content">{skill.content}</pre><small className="memory-source">来源：{skill.source}</small>
+            <div className="skill-evaluations"><div><strong><ClipboardList size={13} />评价记录</strong><span>{(evaluations[skill.id] || []).length} 条</span></div>{(evaluations[skill.id] || []).map((item) => <div className="skill-evaluation" key={item.id}><span className={"status-tag " + (item.verdict === "pass" ? "tag-green" : item.verdict === "fail" ? "tag-red" : "tag-amber")}>{verdictLabel[item.verdict]}</span><p>{item.notes}</p></div>)}</div>
+            <div className="skill-actions">{skill.status === "proposed" && <button className="secondary-button compact" disabled={saving} onClick={() => void publishSkill(skill)}><ShieldCheck size={13} />所有者发布</button>}{skill.status !== "archived" && <button className="text-button" disabled={saving} onClick={() => void evaluateSkill(skill)}><Check size={13} />记录评价</button>}{skill.status !== "archived" && <button className="icon-button" title="归档" disabled={saving} onClick={() => void archiveSkill(skill)}><Archive size={14} /></button>}</div>
+          </article>)}
+          {!loading && !skills.length && <div className="empty-state"><BookMarked size={25} /><strong>暂无 Skill</strong><p>提交一个 Skill 提案，经过所有者发布后才会对 Agent 可见。</p></div>}
+        </div>
+      </section>
+    </div>
+  );
+}
