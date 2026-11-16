@@ -13,7 +13,10 @@ OtterNest 在原有 `--sandbox bwrap`（bubblewrap 命名空间）以及可选�
 ## Runner 参数
 
 ```bash
-export OTTERNEST_AGENT_TOKEN='<agent-token>'
+export OTTERNEST_RUNTIME_TOKEN='<runtime-token>'
+export OTTERNEST_RUNTIME_ID='<runtime-id>'
+# 兼容模式（未绑定 Runtime）：
+# export OTTERNEST_AGENT_TOKEN='<agent-token>'
 otternest-runner \
   --server https://YOUR_PRIVATE_HOST \
   --once \
@@ -47,3 +50,6 @@ otternest-runner \
 - **待补**：进程崩溃后 orphan cgroup 扫描与清理、恶意程序隔离压测、seccomp 规则、任务级监控指标和复杂多租约并发恢复；真实 Codex、Gemini 等平台联调也尚未完成。
 
 参见 [25 · bubblewrap](25-runner-bwrap-isolation.md)、[26 · Runner 进程回收和 RLIMIT](26-runner-process-limits.md)。
+
+
+推荐使用 Runtime 级凭据启动 Runner：设置 `OTTERNEST_RUNTIME_TOKEN` 和 `OTTERNEST_RUNTIME_ID`。Runtime Token 只能为签发时绑定的实例发送心跳；Runner 会在读取队列前先验证绑定关系。旧 `OTTERNEST_AGENT_TOKEN` 仍可用于兼容部署。两种控制平面凭据均不会传递给子进程。

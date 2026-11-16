@@ -28,10 +28,13 @@
 
 ## 二、启动方式
 
-在隔离执行主机上预先创建可写且仅执行账户有权访问的绝对目录，例如 `/srv/otternest/workspaces`。准备好带 Agent Token 的 Worker 身份，并且已经把它加入相应的项目。运行示例：
+在隔离执行主机上预先创建可写且仅执行账户有权访问的绝对目录，例如 `/srv/otternest/workspaces`。准备好已加入项目的 Worker Agent。推荐先注册一个 Runtime 并签发该实例的独立 Runtime Token；旧 Agent Token 仍可兼容。运行示例：
 
 ```bash
-export OTTERNEST_AGENT_TOKEN='<agent-token>'
+export OTTERNEST_RUNTIME_TOKEN='<runtime-token>'
+export OTTERNEST_RUNTIME_ID='<runtime-id>'
+# 兼容模式（未绑定 Runtime）：
+# export OTTERNEST_AGENT_TOKEN='<agent-token>'
 mkdir -p /srv/otternest/workspaces
 chmod 700 /srv/otternest/workspaces
 
@@ -44,7 +47,7 @@ otternest-runner \
 
 `--workspace-root` 必须为已经存在的**绝对**目录。Runner 为每轮任务分配一个独立的临时目录，作为子进程的 cwd；上传和检查点记录完成或失败后清理目录。未指定此选项时保持旧行为：允许纯文本结果，但**拒绝**包含文件清单的输出。
 
-子进程不会继承 `OTTERNEST_AGENT_TOKEN`、`OTTERNEST_OWNER_TOKEN` 或数据库 URL。确有必要传递的非控制平面凭据，需要逐个用 `--pass-env KEY` 显式许可；不能把服务端凭据放进工作目录。所有 Agent 运行身份仍由后端访问控制校验。
+子进程不会继承 `OTTERNEST_AGENT_TOKEN`、`OTTERNEST_RUNTIME_TOKEN`、`OTTERNEST_OWNER_TOKEN` 或数据库 URL。确有必要传递的非控制平面凭据，需要逐个用 `--pass-env KEY` 显式许可；不能把服务端凭据放进工作目录。所有 Agent 运行身份仍由后端访问控制校验。
 
 ## 三、后续 Agent 如何接收成果
 
@@ -66,3 +69,11 @@ OpenAI-compatible 文本模型适配器现也能在用户消息里的**参考数
 - 回归测试覆盖真实 ASGI API、可信子进程写文件、完整成果回传、两名不同身份 Agent 的依赖放行和核验交接；不代表公网部署或第三方产品已实测。
 
 查看之前的模型适配器说明：[23 · 模型执行器](23-model-worker.md)。
+
+
+## 五、Runtime 级执行身份
+
+- 推荐为每个真实执行实例单独注册 Runtime，并通过管理界面签发 Runtime Token。
+- 设置 `OTTERNEST_RUNTIME_TOKEN` 与 `OTTERNEST_RUNTIME_ID` 后，Runner 在读取任务队列前先向绑定 Runtime 发送心跳；Runtime Token 必须与该 ID 匹配，否则请求被拒绝。
+- Runtime Token 的 Agent 归属由服务端从哈希凭据解析，不接受客户端自报 Agent ID。该身份可领取其 Agent 有权访问的任务，但 Runtime 心跳只能更新其绑定实例。
+- Runner 子进程环境明确禁止继承 Runtime Token。Agent Token 模式继续兼容旧部署，但共享 Agent Token 不提供单实例凭据隔离。
