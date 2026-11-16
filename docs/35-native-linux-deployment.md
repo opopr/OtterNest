@@ -240,12 +240,9 @@ systemctl list-timers otternest-backup.timer
 
 ```bash
 sudo install -d -m 0700 /var/tmp/otternest-restore
-sudo tar -xzf /var/backups/otternest/otternest-backup-YYYYMMDDTHHMMSSZ.tar.gz \\
+sudo tar -xzf /var/backups/otternest/otternest-backup-YYYYMMDDTHHMMSSZ-PID.tar.gz \\
   -C /var/tmp/otternest-restore
-cd /var/tmp/otternest-restore
-sudo sha256sum -c SHA256SUMS
-sudo pg_restore --list database.dump
-sudo tar -tzf artifacts.tar.gz
+sudo bash -c 'cd /var/tmp/otternest-restore && sha256sum -c SHA256SUMS && pg_restore --list database.dump && tar -tzf artifacts.tar.gz'
 ```
 
 完整恢复应先还原到隔离数据库和暂存成果目录，核对 Alembic revision、成果 SHA-256 和应用版本，再安排停机窗口切换。当前仅提供备份和归档完整性验证，不提供自动覆盖式恢复命令。
