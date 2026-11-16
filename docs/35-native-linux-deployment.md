@@ -240,7 +240,7 @@ systemctl list-timers otternest-backup.timer
 
 ```bash
 sudo install -d -m 0700 /var/tmp/otternest-restore
-sudo tar -xzf /var/backups/otternest/otternest-backup-YYYYMMDDTHHMMSSZ-PID.tar.gz \\
+sudo tar -xzf /var/backups/otternest/otternest-backup-YYYYMMDDTHHMMSSZ-PID.tar.gz \
   -C /var/tmp/otternest-restore
 sudo bash -c 'cd /var/tmp/otternest-restore && sha256sum -c SHA256SUMS && pg_restore --list database.dump && tar -tzf artifacts.tar.gz'
 ```
