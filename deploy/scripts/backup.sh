@@ -31,6 +31,7 @@ if [[ ! -d "${APP_DIR}/.git" ]]; then
 fi
 
 TMP_DIR="$(mktemp -d "${BACKUP_DIR}/.otternest-backup.XXXXXX")"
+ARCHIVE_TMP=""
 declare -A WAS_ACTIVE=()
 RESTORE_ORDER=(
   otternest-api.service
@@ -50,6 +51,7 @@ restore_services() {
       fi
     fi
   done
+  if [[ -n "$ARCHIVE_TMP" ]]; then rm -f -- "$ARCHIVE_TMP"; fi
   rm -rf -- "$TMP_DIR"
   exit "$status"
 }
@@ -87,15 +89,21 @@ fi
 # PostgreSQL peer authentication requires pg_dump to run as the otternest OS user.
 runuser -u "$SERVICE_USER" -- pg_dump --format=custom --no-owner --no-acl \
   --dbname=otternest | cat > "${TMP_DIR}/database.dump"
+pg_restore --list "${TMP_DIR}/database.dump" >/dev/null
 
 tar -czf "${TMP_DIR}/artifacts.tar.gz" -C "$(dirname -- "$ARTIFACT_DIR")" \
   "$(basename -- "$ARTIFACT_DIR")"
+tar -tzf "${TMP_DIR}/artifacts.tar.gz" >/dev/null
 
 created_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 git_commit="$(runuser -u "$SERVICE_USER" -- git -C "$APP_DIR" rev-parse HEAD)"
 alembic_revision="$(runuser -u "$SERVICE_USER" -- psql --no-psqlrc --tuples-only --no-align \
   --dbname=otternest --command="SELECT version_num FROM alembic_version LIMIT 1;")"
 alembic_revision="${alembic_revision//[[:space:]]/}"
+if [[ -z "$alembic_revision" ]]; then
+  echo "Could not read the Alembic revision; refusing backup." >&2
+  exit 1
+fi
 
 {
   printf 'created_utc=%s\n' "$created_utc"
@@ -114,10 +122,11 @@ alembic_revision="${alembic_revision//[[:space:]]/}"
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 archive_name="otternest-backup-${timestamp}.tar.gz"
-archive_tmp="${BACKUP_DIR}/.${archive_name}.tmp"
-tar -czf "$archive_tmp" -C "$TMP_DIR" database.dump artifacts.tar.gz manifest.txt SHA256SUMS
-chmod 0600 "$archive_tmp"
-mv -- "$archive_tmp" "${BACKUP_DIR}/${archive_name}"
+ARCHIVE_TMP="${BACKUP_DIR}/.${archive_name}.tmp"
+tar -czf "$ARCHIVE_TMP" -C "$TMP_DIR" database.dump artifacts.tar.gz manifest.txt SHA256SUMS
+chmod 0600 "$ARCHIVE_TMP"
+mv -- "$ARCHIVE_TMP" "${BACKUP_DIR}/${archive_name}"
+ARCHIVE_TMP=""
 
 find "$BACKUP_DIR" -maxdepth 1 -type f -name 'otternest-backup-*.tar.gz' \
   -mtime "+${RETENTION_DAYS}" -delete
