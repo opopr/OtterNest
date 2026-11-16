@@ -97,3 +97,11 @@ FastAPI 运行时暴露 /openapi.json。启动本地 API 后执行 npm run api:t
 | /artifacts | 成果中心 | /tasks/{id}/artifacts、/artifacts/{id}/content、/artifacts/{id}/review、/projects/{id}/artifacts/archive、/restore、/gc |
 
 Agent 页面同时管理 AgentRuntime 注册、独立 token 签发/轮换、心跳状态与能力核验。指挥中心的自然语言入口仅使用白名单中文模板解析；不把模型规划器配置密钥暴露给浏览器。
+
+
+## 第二阶段：统一任务中心
+
+- React 新增 `/tasks` 跨项目任务中心，聚合当前所有者可访问项目的任务列表。
+- 支持项目、状态、风险等级和关键词筛选；优先展示待授权、待验收与阻塞任务。
+- 所有者授权与任务验收均先调用 `POST /api/v1/command/plans` 生成有时效的命令预览，再由用户显式确认 `POST /api/v1/command/plans/{id}/confirm`。
+- 确认成功后重新读取项目任务，不在浏览器中乐观伪造任务状态。后端仍负责版本校验、权限校验、系统保护模式与审计事件。

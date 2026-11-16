@@ -5,6 +5,7 @@ import LoginPage from "./pages/LoginPage";
 import OverviewPage from "./pages/OverviewPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import AgentsPage from "./pages/AgentsPage";
+import TaskCenterPage from "./pages/TaskCenterPage";
 import GovernancePage from "./pages/GovernancePage";
 import GoalsWorkflowPage from "./pages/GoalsWorkflowPage";
 import KnowledgePage from "./pages/KnowledgePage";
@@ -26,6 +27,7 @@ function AuthGate() {
         <Route element={<AppShell />}>
           <Route index element={<OverviewPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/tasks" element={<TaskCenterPage />} />
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/governance" element={<GovernancePage />} />
           <Route path="/goals-workflows" element={<GoalsWorkflowPage />} />

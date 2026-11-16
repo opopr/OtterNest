@@ -608,3 +608,25 @@ button:disabled { opacity: .58; cursor: wait; }
 .command-examples span { padding: 5px 7px; border: 1px solid #e7e6f5; border-radius: 6px; background: #f8f7ff; color: #7771cb; font-size: 9px; }
 .command-safety-note { display: flex; align-items: flex-start; gap: 8px; padding: 10px; border-radius: 8px; background: #f2f8ff; color: #6483a9; font-size: 9px; line-height: 1.6; }
 .command-safety-note svg { flex: 0 0 auto; }
+
+
+.task-center-panel { padding: 17px 19px; }
+.task-filters { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 11px; }
+.task-filters label { display: grid; gap: 6px; color: #7c839b; font-size: 10px; }
+.task-filters select, .task-filters input { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; outline: none; background: white; color: #48506a; font-size: 10px; }
+.task-filters select:focus, .task-filters input:focus { border-color: #938fea; box-shadow: 0 0 0 3px rgba(98,92,232,.08); }
+.task-center-list { display: grid; }
+.task-center-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-top: 1px solid #f0f1f6; }
+.task-center-main { min-width: 0; display: grid; gap: 5px; }
+.task-center-title { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.task-center-title strong { color: #3d445d; font-size: 12px; }
+.task-center-main p, .task-center-main small { margin: 0; color: #969caf; font-size: 9px; line-height: 1.5; overflow-wrap: anywhere; }
+.task-center-main small { color: #a1a6b6; }
+.task-center-actions { display: flex; flex: 0 0 auto; gap: 7px; }
+.modal-backdrop { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(30,34,58,.32); backdrop-filter: blur(3px); }
+.confirm-dialog { width: min(100%,460px); padding: 20px; border: 1px solid var(--border); border-radius: 15px; background: white; box-shadow: 0 24px 70px rgba(30,34,58,.2); }
+.confirm-dialog > p { color: #858ba2; font-size: 11px; line-height: 1.6; }
+.command-summary { display: grid; gap: 8px; margin: 14px 0; padding: 13px; border: 1px solid #ecebf8; border-radius: 10px; background: #fafaff; color: #747b95; font-size: 10px; }
+.command-summary strong { color: #424861; font-size: 12px; }
+@media (max-width: 760px) { .task-filters { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 580px) { .task-filters { grid-template-columns: 1fr; } .task-center-row { align-items: flex-start; flex-direction: column; } .task-center-actions { width: 100%; } }
