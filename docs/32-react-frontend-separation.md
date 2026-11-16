@@ -96,7 +96,7 @@ FastAPI 运行时暴露 /openapi.json。启动本地 API 后执行 npm run api:t
 | /access | 任务临时授权 | /projects/{id}/members、/projects/{id}/tasks、/tasks/{id}/grants |
 | /artifacts | 成果中心 | /tasks/{id}/artifacts、/artifacts/{id}/content、/artifacts/{id}/review、/projects/{id}/artifacts/archive、/restore、/gc |
 
-Agent 页面同时管理 AgentRuntime 注册、独立 token 签发/轮换、心跳状态与能力核验。指挥中心的自然语言入口仅使用白名单中文模板解析；不把模型规划器配置密钥暴露给浏览器。
+Agent 页面同时管理 AgentRuntime 注册、独立 token 签发/轮换、心跳状态与能力核验。指挥中心支持白名单中文模板和可选的服务端模型建议两种模式；两种模式都只生成待确认预览，模型端点与密钥仅保留在服务端，不暴露给浏览器。
 
 
 ## 第二阶段：统一任务中心
