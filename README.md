@@ -4,7 +4,7 @@
 > Personal AI Team OS · Local-first ownership, distributed execution.
 
 **项目状态：完整产品开发已启动；核心控制平面的首批代码已经提交，尚未具备生产可用性。**  
-**文档基准日期：2026-11-14。**
+**文档基准日期：2026-11-16。**
 
 ## 名称与愿景
 

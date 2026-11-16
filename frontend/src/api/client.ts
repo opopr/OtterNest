@@ -88,3 +88,35 @@ export async function binaryRequest(
   }
   return response;
 }
+
+export interface HealthStatus {
+  status: string;
+}
+
+/** Probe public liveness/readiness endpoints without sending the owner token. */
+export async function healthRequest(
+  path: "/health/live" | "/health/ready"
+): Promise<HealthStatus> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(new URL(path, getApiOrigin()), {
+      method: "GET",
+      credentials: "omit",
+      cache: "no-store",
+      signal: controller.signal
+    });
+    const payload: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new ApiError("健康检查返回 HTTP " + response.status, response.status);
+    }
+    if (typeof payload !== "object" || payload === null ||
+        !("status" in payload) || typeof payload.status !== "string") {
+      throw new Error("健康检查返回了无效响应");
+    }
+    return payload as HealthStatus;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+

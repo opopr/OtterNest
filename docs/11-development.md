@@ -22,7 +22,7 @@ OtterNest 已进入**完整产品开发**。此文件是工程状态登记，而
 | Skills / AG-UI / A2UI / WS | Skills 生命周期已实现；已新增项目 WebSocket 实时事件流、AG-UI 事件投影与 A2UI 组件白名单安全校验 | 全量客户端深度双向 AG-UI/A2UI 渲染 |
 | 多 Agent 协商 / 动态团队 | 第一/二轮独立决策复核、异议记录、显式受邀自动推进名单 | 自动辩论调度与动态成本预算组队 |
 | 自主改进 / 质量评估 | Skill 结构化评估、质量指标与失败归因统计、受控优化实验与回归门禁（`promote`/`rollback`） | 自动化沙箱回归数据集与灰度发布 |
-| Web 管理台 | React 已覆盖登录、总览、项目/任务基础操作、Agent 登记与 Runtime、任务审批/决策审查/受限中文命令、目标依赖/工作流、记忆/项目章程/跨项目共享、Skills、TaskGrant、成果版本/验收/归档/恢复/GC、Portfolio/通知/实验、系统保护模式/项目状态/事件流；旧版管理台继续兜底高级 A2UI/AG-UI 和其他低频运维页面 | 完整 Command Center 多轮自然语言对话、A2UI/AG-UI 深度交互、外部运行时诊断和真实生产恢复演练，并完成全量回归 |
+| Web 管理台 | React 已覆盖登录、总览、项目/任务基础操作、Agent 登记与 Runtime、任务审批/决策审查、多轮 Command Center（规则模板/可选模型建议/A2UI 预览）、目标依赖/工作流、知识库、Skills、TaskGrant、成果版本/验收/归档/恢复/GC、Portfolio/通知/实验、系统保护模式/项目状态/事件流、API/数据库/身份连接诊断；旧版管理台继续兜底低频运维页面 | 对话持久化、A2UI/AG-UI 深度交互、真实远端 Runner 唤醒与恢复演练、生产级安全审计，并完成全量回归 |
 | 备份 / 安全运维 | `normal`/`degraded`/`readonly_protect` 保护模式、项目 JSON 与成果二进制归档工具 | 自动定时加密备份与生产恢复演练 |
 
 **注意**：本仓库早期代码可用于本地开发验证，尚未进行第三方平台接入、真实 PostgreSQL 并发压力测试或生产安全审计。不要把它部署到公网。
@@ -204,7 +204,7 @@ network restrictions, manual reconciliation and cancellation semantics.
 - 新增 Portfolio：跨项目质量指标、每日简报、三级通知收件箱、公平调度入口、受控实验评估/采纳/回滚。实验采纳门槛仍由后端执行。
 - 新增系统与事件：全局 normal/degraded/readonly_protect 模式、项目 active/paused/archived 状态和项目持久事件流。
 - 前端页面只调用现有 /api/v1 路由，不新增数据库表，不将数据库访问移入浏览器。详细页面/API 对照见 [33 · React 领域页面迁移](33-react-domain-pages.md)。
-- 尚未迁移：Skills 完整管理、任务级临时授权、成果版本与二进制归档、运行时诊断、完整 Command Center 自然语言对话及深度 AG-UI/A2UI。若后端尚无可安全使用的列表/写入 API，不在前端伪造功能。
+- 本阶段交付时尚未迁移的 Skills、TaskGrant、成果版本/二进制归档与 Runtime 诊断，已在第三阶段完成；多轮 Command Center 与模型建议入口已在后续阶段完成。深度 AG-UI 双向交互、对话持久化和生产恢复演练仍待实现。
 
 
 ## 本轮：React 运行与成果管理页面迁移（第三阶段）
@@ -216,3 +216,11 @@ network restrictions, manual reconciliation and cancellation semantics.
 - 指挥中心增加受限中文命令模板入口。它只调用 /command/interpret，不调用外部模型；解析后仍生成 CommandPlan，必须由所有者检查预览并显式确认。
 - 当前 React 页面继续复用 FastAPI 现有权限和数据库；新增 Skill 列表/提案/发布 API 不新增数据库表。成果文件二进制流通过独立 authenticated binaryRequest 处理，不将文件内容误作 JSON。
 - 细节见 [34 · React 运行与成果管理](34-react-operations-pages.md)。
+
+
+## 本轮：AI Studio 与真实后端连接诊断
+
+- React「系统设置与运行事件」页面新增连接诊断，分别检查 FastAPI 存活、数据库就绪与当前所有者会话。
+- `/health/live` 与 `/health/ready` 使用不携带 Bearer 令牌的公开健康请求；`/api/v1/me` 仅使用当前页面内存中的会话令牌。
+- 页面显示浏览器前端 Origin 和配置的 API Origin，并在失败时提示检查 `VITE_API_BASE_URL` 与 `OTTERNEST_CORS_ORIGINS`。
+- 诊断仅验证连通性，不等于公网部署、生产安全审计或真实 Codex/Muse/Google AI 平台联调。
