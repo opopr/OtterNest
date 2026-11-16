@@ -121,7 +121,7 @@ fi
 )
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-archive_name="otternest-backup-${timestamp}.tar.gz"
+archive_name="otternest-backup-${timestamp}-$.tar.gz"
 ARCHIVE_TMP="${BACKUP_DIR}/.${archive_name}.tmp"
 tar -czf "$ARCHIVE_TMP" -C "$TMP_DIR" database.dump artifacts.tar.gz manifest.txt SHA256SUMS
 chmod 0600 "$ARCHIVE_TMP"
@@ -129,6 +129,6 @@ mv -- "$ARCHIVE_TMP" "${BACKUP_DIR}/${archive_name}"
 ARCHIVE_TMP=""
 
 find "$BACKUP_DIR" -maxdepth 1 -type f -name 'otternest-backup-*.tar.gz' \
-  -mtime "+${RETENTION_DAYS}" -delete
+  -mmin "+$((RETENTION_DAYS * 1440))" -delete
 
 echo "Created local OtterNest backup: ${BACKUP_DIR}/${archive_name}"
