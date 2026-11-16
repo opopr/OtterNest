@@ -29,3 +29,14 @@
 导入仓库后，在 Settings > GitHub 中将工作区连接到现有的 opopr/OtterNest 仓库，确认目标分支后再启用双向同步。导入代码与建立 GitHub 同步绑定是两个步骤；首次推送前必须检查文件差异。
 
 GitHub 仓库 opopr/OtterNest 的分支与 Pull Request 是代码审查依据。AI Studio 的修改应先检查文件差异，再同步到 GitHub；不要覆盖未审查的分支或直接把实验性代码推到 main。
+
+
+## 连接真实后端
+
+配置好 `VITE_API_BASE_URL` 与服务端 CORS 后，打开 React 的「系统设置与运行事件」页面，使用「API 与数据库连接诊断」执行检查：
+
+- API 服务：`/health/live`；
+- 数据库就绪：`/health/ready`；
+- 当前登录身份：`/api/v1/me`。
+
+只有三项均成功，才说明当前浏览器预览已经连到预期的 FastAPI 服务、数据库和所有者会话。若前两项成功但身份失败，重新登录并检查 Authorization 预检请求是否被 CORS 放行。健康检查不暴露数据库连接串或任何密钥。
