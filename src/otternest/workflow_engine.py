@@ -18,6 +18,7 @@ from .models import (
     Project,
     Task,
     WorkflowRule,
+    WorkflowCursor,
     WorkflowRun,
     now,
 )
@@ -287,6 +288,7 @@ def create_workflow_rule(project_id: str, body: WorkflowRuleIn, actor: Actor = D
         title = str(body.action_config.get("title", "")).strip()
         if not title:
             raise HTTPException(422, "create_task action_config requires a non-empty 'title'")
+    db.scalar(select(Project).where(Project.id == project_id).with_for_update())
     rule = WorkflowRule(
         project_id=project_id,
         name=body.name.strip(),
@@ -300,6 +302,10 @@ def create_workflow_rule(project_id: str, body: WorkflowRuleIn, actor: Actor = D
     db.add(rule)
     db.flush()
     emit(db, actor, "workflow.rule_created", rule.id, project_id, {"name": rule.name, "event_prefix": rule.event_prefix})
+    latest_event_id = db.scalar(
+        select(Event.id).where(Event.project_id == project_id).order_by(Event.id.desc()).limit(1)
+    ) or 0
+    db.add(WorkflowCursor(rule_id=rule.id, last_event_id=latest_event_id, updated_at=now()))
     db.commit()
     return _rule_public(rule)
 
@@ -317,6 +323,18 @@ def toggle_workflow_rule(rule_id: str, actor: Actor = Depends(authenticate), db:
     rule = db.scalar(select(WorkflowRule).where(WorkflowRule.id == rule_id).with_for_update())
     if rule is None:
         raise HTTPException(404, "Workflow rule not found")
+    db.scalar(select(Project).where(Project.id == rule.project_id).with_for_update())
+    if not rule.enabled:
+        latest_event_id = db.scalar(
+            select(Event.id).where(Event.project_id == rule.project_id).order_by(Event.id.desc()).limit(1)
+        ) or 0
+        cursor = db.get(WorkflowCursor, rule.id)
+        if cursor is None:
+            cursor = WorkflowCursor(rule_id=rule.id, last_event_id=latest_event_id, updated_at=now())
+            db.add(cursor)
+        else:
+            cursor.last_event_id = latest_event_id
+            cursor.updated_at = now()
     rule.enabled = not rule.enabled
     emit(db, actor, "workflow.rule_toggled", rule.id, rule.project_id, {"enabled": rule.enabled})
     db.commit()
@@ -340,6 +358,7 @@ def evaluate_workflow_rules(project_id: str, limit: int = 50, actor: Actor = Dep
     owner_only(actor)
     require_writable_system(db, allow_degraded=False)
     project = require_project(db, project_id, actor)
+    db.scalar(select(Project).where(Project.id == project_id).with_for_update())
     if project.status != "active":
         raise Conflict("Project is not active")
 
@@ -496,4 +515,121 @@ def evaluate_workflow_rules(project_id: str, limit: int = 50, actor: Actor = Dep
             executed += 1
 
     db.commit()
+    return {"project_id": project_id, "runs": runs_out, "executed": executed, "skipped": skipped}
+
+
+
+def process_rule_batch(db: Session, rule: WorkflowRule, events: list[Event], actor: Actor) -> dict:
+    """Process one rule's ordered event batch inside the caller's transaction."""
+    executed = 0
+    skipped = 0
+    runs_out: list[dict] = []
+    project_id = rule.project_id
+    for ev in events:
+        if not ev.kind.startswith(rule.event_prefix):
+            continue
+        if db.scalar(select(WorkflowRun.id).where(
+            WorkflowRun.rule_id == rule.id, WorkflowRun.event_id == ev.id
+        )):
+            continue
+        if rule.condition_status:
+            subject_task = db.get(Task, ev.subject_id)
+            subject_goal = db.get(Goal, ev.subject_id) if subject_task is None else None
+            subject_status = subject_task.status if subject_task is not None else (
+                subject_goal.status if subject_goal is not None and subject_goal.project_id == project_id else None
+            )
+            if subject_status != rule.condition_status:
+                continue
+
+        payload = ev.payload or {}
+        corr_id = str(payload.get("correlation_id") or ev.subject_id)[:36]
+        next_depth = int(payload.get("workflow_chain_depth") or 0) + 1
+        if next_depth > rule.max_chain_depth:
+            run = WorkflowRun(
+                project_id=project_id, rule_id=rule.id, event_id=ev.id,
+                correlation_id=corr_id, chain_depth=next_depth,
+                status="skipped_circuit_breaker",
+                detail=f"Chain depth {next_depth} exceeded max_chain_depth={rule.max_chain_depth}",
+            )
+            db.add(run)
+            db.add(Notification(
+                project_id=project_id, level="urgent",
+                title=f"工作流熔断触发：{rule.name}", body=run.detail,
+                source_kind="workflow_rule", source_id=rule.id,
+            ))
+            runs_out.append(_run_public(run)); skipped += 1
+            continue
+
+        last_trig = as_utc(rule.last_triggered_at)
+        if rule.cooldown_seconds > 0 and last_trig is not None and (
+            now() - last_trig
+        ) < timedelta(seconds=rule.cooldown_seconds):
+            run = WorkflowRun(
+                project_id=project_id, rule_id=rule.id, event_id=ev.id,
+                correlation_id=corr_id, chain_depth=next_depth,
+                status="skipped_cooldown", detail=f"Rule in cooldown ({rule.cooldown_seconds}s)",
+            )
+            db.add(run); runs_out.append(_run_public(run)); skipped += 1
+            continue
+
+        created_task_id: str | None = None
+        detail = f"Executed {rule.action_kind}"
+        if rule.action_kind == "create_task":
+            try:
+                enforce_project_task_total_budget(db, project_id)
+            except Conflict as exc:
+                run = WorkflowRun(
+                    project_id=project_id, rule_id=rule.id, event_id=ev.id,
+                    correlation_id=corr_id, chain_depth=next_depth,
+                    status="blocked_budget", detail=str(exc.detail),
+                )
+                db.add(run); runs_out.append(_run_public(run)); skipped += 1
+                continue
+            cfg = rule.action_config or {}
+            risk = cfg.get("risk", "R1")
+            if risk not in ("R0", "R1", "R2", "R3"):
+                risk = "R1"
+            priority = max(0, min(100, int(cfg.get("priority", 50))))
+            task = Task(
+                project_id=project_id,
+                title=str(cfg.get("title", f"Follow-up: {ev.kind}"))[:240],
+                instruction=str(cfg.get("instruction", f"Triggered by event #{ev.id} ({ev.kind})"))[:12000],
+                acceptance=str(cfg.get("acceptance", "Verified by owner"))[:6000],
+                risk=risk, priority=priority, correlation_id=corr_id,
+            )
+            db.add(task); db.flush()
+            task.status = task_ready_status(db, task)
+            created_task_id = task.id
+            emit(db, actor, "task.created", task.id, project_id, {
+                "risk": task.risk, "correlation_id": corr_id,
+                "workflow_rule_id": rule.id, "workflow_chain_depth": next_depth,
+            })
+        elif rule.action_kind == "notify_inbox":
+            cfg = rule.action_config or {}
+            level = cfg.get("level", "important")
+            if level not in ("urgent", "important", "digest"):
+                level = "important"
+            db.add(Notification(
+                project_id=project_id, level=level,
+                title=str(cfg.get("title", f"工作流提醒：{rule.name}"))[:240],
+                body=str(cfg.get("body", f"事件 {ev.kind} (#{ev.id}) 触发规则 {rule.name}"))[:2000],
+                source_kind="workflow_rule", source_id=rule.id,
+            ))
+        else:
+            run = WorkflowRun(
+                project_id=project_id, rule_id=rule.id, event_id=ev.id,
+                correlation_id=corr_id, chain_depth=next_depth,
+                status="skipped_unsupported", detail="Unsupported workflow action",
+            )
+            db.add(run); runs_out.append(_run_public(run)); skipped += 1
+            continue
+
+        rule.triggered_count += 1
+        rule.last_triggered_at = now()
+        run = WorkflowRun(
+            project_id=project_id, rule_id=rule.id, event_id=ev.id,
+            correlation_id=corr_id, chain_depth=next_depth,
+            status="executed", created_task_id=created_task_id, detail=detail,
+        )
+        db.add(run); runs_out.append(_run_public(run)); executed += 1
     return {"project_id": project_id, "runs": runs_out, "executed": executed, "skipped": skipped}

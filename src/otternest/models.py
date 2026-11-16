@@ -516,6 +516,14 @@ class WorkflowRule(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
 
 
+class WorkflowCursor(Base):
+    """Per-rule durable event cursor for the trusted workflow worker."""
+    __tablename__ = "workflow_cursors"
+    rule_id: Mapped[str] = mapped_column(ForeignKey("workflow_rules.id", ondelete="CASCADE"), primary_key=True)
+    last_event_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+
+
 class WorkflowRun(Base):
     """Audit trail of one workflow rule evaluation/execution or circuit-breaker skip."""
     __tablename__ = "workflow_runs"
