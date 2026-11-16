@@ -142,3 +142,16 @@ Agent 页面同时管理 AgentRuntime 注册、独立 token 签发/轮换、心�
 - 规则模式不调用外部模型；模型模式仅由服务器端配置的 OpenAI-compatible HTTPS endpoint 提供候选建议。浏览器不会接触模型密钥。
 - 模型或模板只创建候选命令预览。最终执行仍调用现有 `POST /command/plans/{id}/confirm`，重新校验任务版本、权限和操作条件。
 - 对话历史目前仅保存在页面内存中，刷新或切换项目后清空；尚未做数据库持久化。
+
+
+## AI Studio 预览连接诊断
+
+React「系统设置与运行事件」页面增加了连接诊断卡片，按真实请求检查三层状态：
+
+- `GET /health/live`：确认 FastAPI 进程可访问。
+- `GET /health/ready`：确认服务端能够访问数据库（执行 `SELECT 1`，不暴露数据库类型、地址或凭据）。
+- `GET /api/v1/me`：使用当前页面内存中的登录令牌确认所有者会话有效。
+
+页面同时显示前端 Origin 与 API Origin。若健康检查失败，先核对 `VITE_API_BASE_URL`；若健康检查成功但身份检查失败，核对登录状态以及服务端 `OTTERNEST_CORS_ORIGINS` 是否精确包含当前前端 Origin。诊断请求不会将令牌发送到公开健康端点，也不会尝试连接 PostgreSQL 直连端口。
+
+连接诊断只证明浏览器到 API 和 API 到数据库的基础连通性，不代表已经完成生产部署、安全审计或第三方 AI 平台接入。
