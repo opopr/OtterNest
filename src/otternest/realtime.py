@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from .db import get_engine, get_session
 from .models import Event, Task
-from .security import actor_from_token, authenticate
+from .security import Actor, actor_from_token, authenticate
 from .services import require_project
 
 router = APIRouter(prefix="/api/v1", tags=["Realtime, AG-UI & A2UI"])
