@@ -204,7 +204,7 @@ network restrictions, manual reconciliation and cancellation semantics.
 - 新增 Portfolio：跨项目质量指标、每日简报、三级通知收件箱、公平调度入口、受控实验评估/采纳/回滚。实验采纳门槛仍由后端执行。
 - 新增系统与事件：全局 normal/degraded/readonly_protect 模式、项目 active/paused/archived 状态和项目持久事件流。
 - 前端页面只调用现有 /api/v1 路由，不新增数据库表，不将数据库访问移入浏览器。详细页面/API 对照见 [33 · React 领域页面迁移](33-react-domain-pages.md)。
-- 尚未迁移：Skills 完整管理、任务级临时授权、成果版本与二进制归档、运行时诊断、完整 Command Center 自然语言对话及深度 AG-UI/A2UI。若后端尚无可安全使用的列表/写入 API，不在前端伪造功能。
+- 本阶段交付时尚未迁移的 Skills、TaskGrant、成果版本/二进制归档与 Runtime 诊断，已在第三阶段完成；多轮 Command Center 与模型建议入口已在后续阶段完成。深度 AG-UI 双向交互、对话持久化和生产恢复演练仍待实现。
 
 
 ## 本轮：React 运行与成果管理页面迁移（第三阶段）
