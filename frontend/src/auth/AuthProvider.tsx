@@ -1,7 +1,8 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode
 } from "react";
-import { request, setAccessToken } from "../api/client";
+import { getApiOrigin, request, setAccessToken } from "../api/client";
+import { formatAuthConnectionError } from "../api/url";
 import type { AuthStatus, OwnerActor } from "../api/types";
 
 interface AuthResponse {
@@ -11,6 +12,7 @@ interface AuthResponse {
 }
 interface AuthContextValue {
   authStatus: AuthStatus | null;
+  authError: string;
   checking: boolean;
   token: string | null;
   user: OwnerActor | null;
@@ -28,21 +30,26 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
+  const [authError, setAuthError] = useState("");
   const [checking, setChecking] = useState(true);
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<OwnerActor | null>(null);
 
   const refreshAuthStatus = useCallback(async () => {
     setChecking(true);
+    setAuthError("");
     try {
       setAuthStatus(await request<AuthStatus>("/auth/status", {}, null));
+    } catch (reason) {
+      setAuthStatus(null);
+      setAuthError(formatAuthConnectionError(reason, getApiOrigin()));
     } finally {
       setChecking(false);
     }
   }, []);
 
   useEffect(() => {
-    void refreshAuthStatus().catch(() => setChecking(false));
+    void refreshAuthStatus();
   }, [refreshAuthStatus]);
 
   const establishSession = useCallback(async (newToken: string) => {
@@ -112,9 +119,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const value = useMemo<AuthContextValue>(() => ({
-    authStatus, checking, token, user, isAuthenticated: Boolean(token && user),
+    authStatus, authError, checking, token, user, isAuthenticated: Boolean(token && user),
     refreshAuthStatus, bootstrap, loginWithPassword, verifyMfa, loginWithToken, logout
-  }), [authStatus, checking, token, user, refreshAuthStatus, bootstrap, loginWithPassword, verifyMfa, loginWithToken, logout]);
+  }), [authStatus, authError, checking, token, user, refreshAuthStatus, bootstrap, loginWithPassword, verifyMfa, loginWithToken, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

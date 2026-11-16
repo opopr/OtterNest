@@ -4,7 +4,7 @@ import {
   FolderKanban, GitBranch, LayoutDashboard, LogOut, Monitor, PlugZap, Settings2, ShieldCheck, Wifi
 } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { request } from "../api/client";
+import { getApiOrigin, request } from "../api/client";
 import type { SystemMode } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 
@@ -70,8 +70,8 @@ export default function AppShell() {
           <div className="sidebar-note-icon"><ShieldCheck size={17} /></div>
           <div><strong>所有者控制</strong><p>重要操作始终经过授权与审查。</p></div>
         </div>
-        <a className="side-link" href="/legacy"><ArrowUpRight size={16} />进入旧版完整管理台</a>
-        <a className="side-link" href="/api/docs" target="_blank" rel="noreferrer"><CircleHelp size={16} />API 文档</a>
+        <a className="side-link" href={getApiOrigin() + "/legacy"} target="_blank" rel="noreferrer"><ArrowUpRight size={16} />进入旧版完整管理台</a>
+        <a className="side-link" href={getApiOrigin() + "/api/docs"} target="_blank" rel="noreferrer"><CircleHelp size={16} />API 文档</a>
         <div className="sidebar-footer">Personal AI Team OS · v0.1.0</div>
       </aside>
 
