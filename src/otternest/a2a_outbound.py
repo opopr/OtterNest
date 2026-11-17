@@ -180,6 +180,31 @@ def queue_delegation(task_id: str, body: DelegationIn, actor: Actor = Depends(au
     return public_delegation(delegation)
 
 
+@router.get("/projects/{project_id}/a2a/delegations")
+def list_project_delegations(
+    project_id: str,
+    limit: int = 100,
+    actor: Actor = Depends(authenticate),
+    db: Session = Depends(get_session),
+):
+    """Owner-only bounded, read-only history for the project operations console.
+
+    Existing ID-based lookup alone is insufficient after a browser refresh.
+    No dispatch, polling, retries or external side effects occur on this route.
+    """
+    owner_only(actor)
+    require_project(db, project_id, actor)
+    if not 1 <= limit <= 200:
+        raise HTTPException(422, "limit must be 1..200")
+    rows = db.scalars(
+        select(A2ADelegation)
+        .where(A2ADelegation.project_id == project_id)
+        .order_by(A2ADelegation.updated_at.desc(), A2ADelegation.id.desc())
+        .limit(limit)
+    ).all()
+    return [public_delegation(row) for row in rows]
+
+
 @router.get("/a2a/delegations/{delegation_id}")
 def get_delegation(delegation_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     owner_only(actor)
