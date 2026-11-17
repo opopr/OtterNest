@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Activity, ArrowUpRight, Bot, BookMarked, BookOpen, FileArchive, Gauge, ChevronDown, CircleHelp, KeyRound, ClipboardCheck, MessageSquare,
-  FolderKanban, GitBranch, LayoutDashboard, LogOut, Monitor, PlugZap, Settings2, ShieldCheck, ShieldUser, ArchiveRestore, Wifi
+  FolderKanban, GitBranch, LayoutDashboard, LogOut, Monitor, PlugZap, Settings2, ShieldCheck, ArchiveRestore, Wifi
 } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { getApiOrigin, request } from "../api/client";
@@ -17,7 +17,7 @@ const navigation = [
   { to: "/runtimes", label: "Runtime 监控", icon: Monitor },
   { to: "/interfaces", label: "外部接口", icon: PlugZap },
   { to: "/project-portability", label: "项目导入导出", icon: ArchiveRestore },
-  { to: "/account-security", label: "账号安全", icon: ShieldUser },
+  { to: "/account-security", label: "账号安全", icon: ShieldCheck },
   { to: "/governance", label: "审批与治理", icon: ShieldCheck },
   { to: "/goals-workflows", label: "目标与工作流", icon: GitBranch },
   { to: "/knowledge", label: "知识库", icon: BookOpen },
