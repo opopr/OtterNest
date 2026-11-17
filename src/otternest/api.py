@@ -76,6 +76,11 @@ class MemberIn(BaseModel):
     expires_in_hours: int | None = Field(default=None, ge=1, le=8760)
 
 
+class MemberUpdateIn(BaseModel):
+    role: Literal["worker", "manager", "reviewer", "advisor"] | None = None
+    max_sensitivity: Literal["public", "internal", "confidential", "restricted"] | None = None
+
+
 class TaskIn(BaseModel):
     title: str = Field(min_length=1, max_length=240)
     instruction: str = Field(min_length=1, max_length=12000)
@@ -442,7 +447,7 @@ def add_member(project_id: str, body: MemberIn, actor: Actor = Depends(authentic
     owner_only(actor)
     require_project(db, project_id, actor)
     agent = db.get(Agent, body.agent_id)
-    if not agent or not agent.enabled:
+    if not agent or not agent.enabled or agent.deleted_at is not None:
         raise HTTPException(404, "Agent not available")
     existing = db.scalar(select(Membership).where(Membership.project_id == project_id, Membership.agent_id == body.agent_id))
     if existing:
@@ -466,7 +471,57 @@ def add_member(project_id: str, body: MemberIn, actor: Actor = Depends(authentic
 def members(project_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     require_project(db, project_id, actor)
     query = select(Membership, Agent).join(Agent, Membership.agent_id == Agent.id).where(Membership.project_id == project_id)
-    return [{"id": m.id, "agent_id": a.id, "agent_name": a.name, "role": m.role, "enabled": a.enabled, "max_sensitivity": m.max_sensitivity, "expires_at": m.expires_at} for m, a in db.execute(query)]
+    return [{"id": m.id, "agent_id": a.id, "agent_name": a.name, "role": m.role, "enabled": a.enabled and a.deleted_at is None, "max_sensitivity": m.max_sensitivity, "expires_at": m.expires_at} for m, a in db.execute(query)]
+
+
+@router.patch("/projects/{project_id}/members/{agent_id}")
+def update_member(
+    project_id: str,
+    agent_id: str,
+    body: MemberUpdateIn,
+    actor: Actor = Depends(authenticate),
+    db: Session = Depends(get_session),
+):
+    owner_only(actor)
+    require_project(db, project_id, actor)
+    member = db.scalar(
+        select(Membership).where(Membership.project_id == project_id, Membership.agent_id == agent_id).with_for_update()
+    )
+    if not member:
+        raise HTTPException(404, "Project member not found")
+    if body.role is not None:
+        member.role = body.role
+    if body.max_sensitivity is not None:
+        member.max_sensitivity = body.max_sensitivity
+    emit(db, actor, "project.member_updated", member.id, project_id, {"agent_id": agent_id, "role": member.role, "max_sensitivity": member.max_sensitivity})
+    db.commit()
+    return as_dict(member, "id", "project_id", "agent_id", "role", "max_sensitivity", "expires_at")
+
+
+@router.delete("/projects/{project_id}/members/{agent_id}")
+def remove_member(
+    project_id: str,
+    agent_id: str,
+    actor: Actor = Depends(authenticate),
+    db: Session = Depends(get_session),
+):
+    owner_only(actor)
+    require_project(db, project_id, actor)
+    member = db.scalar(
+        select(Membership).where(Membership.project_id == project_id, Membership.agent_id == agent_id).with_for_update()
+    )
+    if not member:
+        raise HTTPException(404, "Project member not found")
+    running_task = db.scalar(
+        select(Task.id).where(Task.project_id == project_id, Task.assigned_agent_id == agent_id, Task.status == "running")
+    )
+    if running_task:
+        raise Conflict("Cannot remove member while it holds an active running task in this project")
+    member_id = member.id
+    db.delete(member)
+    emit(db, actor, "project.member_removed", member_id, project_id, {"agent_id": agent_id})
+    db.commit()
+    return {"project_id": project_id, "agent_id": agent_id, "removed": True}
 
 
 @router.post("/projects/{project_id}/tasks", status_code=201)
@@ -752,6 +807,34 @@ def cancel_task(task_id: str, actor: Actor = Depends(authenticate), db: Session 
     emit(db, actor, "task.cancelled", task_id, row.project_id)
     db.commit()
     return task_public(row)
+
+
+@router.delete("/tasks/{task_id}")
+def delete_task(task_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    """Safely delete a non-running task and its dependent records."""
+    owner_only(actor)
+    require_writable_system(db)
+    row = require_task(db, task_id, actor, lock=True)
+    if row.status == "running":
+        raise Conflict("Cannot delete a running task; cancel it first")
+    external = db.scalar(select(A2ADelegation).where(A2ADelegation.task_id == task_id))
+    if external and external.status not in {"canceled", "failed", "submitted"}:
+        raise Conflict("External A2A delegation active or unknown; resolve or cancel it before deleting")
+
+    from .models import A2AInboxMessage, CommandPlan, SkillEvaluation, TaskCheckpoint, TaskGrant, TaskSideEffect
+    for dep in db.scalars(select(TaskDependency).where((TaskDependency.task_id == task_id) | (TaskDependency.depends_on_id == task_id))):
+        db.delete(dep)
+    for model in (TaskCheckpoint, TaskSideEffect, TaskGrant, CommandPlan, A2AInboxMessage, A2ADelegation, Artifact):
+        for child in db.scalars(select(model).where(model.task_id == task_id)):
+            db.delete(child)
+    for ev in db.scalars(select(SkillEvaluation).where(SkillEvaluation.task_id == task_id)):
+        ev.task_id = None
+
+    project_id = row.project_id
+    db.delete(row)
+    emit(db, actor, "task.deleted", task_id, project_id)
+    db.commit()
+    return {"id": task_id, "deleted": True}
 
 
 @router.post("/projects/{project_id}/memories", status_code=201)

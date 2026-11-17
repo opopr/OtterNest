@@ -152,6 +152,20 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
     finally{setSaving(false);}
   };
 
+  const deleteTask = async () => {
+    if (!task || !window.confirm(`确认删除任务「${task.title}」？此操作不可撤销。`)) return;
+    setSaving(true); setError("");
+    try {
+      await request("/tasks/" + encodeURIComponent(task.id), { method: "DELETE" });
+      onChanged();
+      onClose();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "删除任务失败");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const taskNode = (row:Task,role:"upstream"|"downstream") => (
     <div className="dag-task" key={row.id}>
       <div className="dag-task-title"><strong>{row.title}</strong><span className={"status-tag "+(statusTones[row.status]||"tag-neutral")}>{statusLabels[row.status]||row.status}</span></div>
@@ -211,7 +225,17 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
           <p className="task-event-note"><Info size={13}/>事件来自项目事件流；当前接口单次最多读取 500 条项目事件，因此事件量超过 500 条时，后续记录可能未包含，列表不保证覆盖完整任务历史。</p>
         </section>
       </>}
-      <div className="task-detail-footer"><span><Clock3 size={13}/>任务数据以 FastAPI 服务端为准</span><button className="secondary-button compact" onClick={onClose}>关闭</button></div>
+      <div className="task-detail-footer">
+        <span><Clock3 size={13}/>任务数据以 FastAPI 服务端为准</span>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          {isOwner && task && task.status !== "running" && (
+            <button className="text-button" disabled={saving} onClick={() => void deleteTask()}>
+              <Trash2 size={14}/>删除任务
+            </button>
+          )}
+          <button className="secondary-button compact" onClick={onClose}>关闭</button>
+        </div>
+      </div>
     </section>
   </div>;
 }
