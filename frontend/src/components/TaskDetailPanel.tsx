@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { request } from "../api/client";
 import TaskExecutionSafety from "./TaskExecutionSafety";
+import TaskContinuityPanel from "./TaskContinuityPanel";
 import type { Task } from "../api/types";
 
 interface TaskDetail extends Task {
@@ -202,6 +203,7 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
         </section>
 
         <TaskExecutionSafety taskId={task.id} projectId={selection.projectId} taskStatus={task.status} taskRisk={task.risk} isOwner={isOwner} onChanged={() => { void load(); onChanged(); }} />
+        <TaskContinuityPanel taskId={task.id} taskStatus={task.status} isOwner={isOwner} onChanged={() => { void load(); onChanged(); }} />
 
         <section className="task-detail-section task-detail-wide">
           <div className="task-detail-section-head"><div><h3><Activity size={16}/>关联事件</h3><p>来自项目事件流中 subject_id 与当前任务匹配的记录。</p></div><span className="muted-inline">{events.length} 条</span></div>
