@@ -96,6 +96,9 @@ def test_delegation_history_is_owner_only_bounded_and_project_scoped(env, owner_
     assert "message_id" not in history[0]
 
     agent_headers = {"Authorization": "Bearer " + agent_a["token"]}
+    lookup = env.get(f"/api/v1/tasks/{task_a['id']}/a2a/delegation", headers=owner_headers)
+    assert lookup.status_code == 200 and lookup.json()["id"] == queued_a.json()["id"]
+    assert env.get(f"/api/v1/tasks/{task_a['id']}/a2a/delegation", headers=agent_headers).status_code == 403
     assert env.get(url, headers=agent_headers).status_code == 403
     assert env.get(url, headers=owner_headers, params={"limit": 0}).status_code == 422
     assert env.get(url, headers=owner_headers, params={"limit": 201}).status_code == 422
