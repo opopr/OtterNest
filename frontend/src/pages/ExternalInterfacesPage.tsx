@@ -6,6 +6,7 @@ import { getApiOrigin, request } from "../api/client";
 import type { Agent, Project } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import ProjectSelect from "../components/ProjectSelect";
+import TaskDetailPanel from "../components/TaskDetailPanel";
 
 interface WebhookEndpoint {
   id: string;
@@ -26,6 +27,18 @@ interface A2ARemote {
 interface A2ARemoteCreated extends A2ARemote {
   secret_env: string;
 }
+interface DelegationRow {
+  id: string;
+  project_id: string;
+  task_id: string;
+  endpoint_id: string;
+  status: string;
+  remote_task_id: string | null;
+  remote_state: string | null;
+  attempts: number;
+  last_error: string;
+  updated_at: string;
+}
 interface ProjectMember {
   agent_id: string;
   enabled: boolean;
@@ -43,6 +56,8 @@ export default function ExternalInterfacesPage() {
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [webhooks, setWebhooks] = useState<WebhookEndpoint[]>([]);
   const [remotes, setRemotes] = useState<A2ARemote[]>([]);
+  const [delegations, setDelegations] = useState<DelegationRow[]>([]);
+  const [selectedTaskId, setSelectedTaskId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -76,7 +91,7 @@ export default function ExternalInterfacesPage() {
 
   const loadConnections = useCallback(async (id: string) => {
     if (!isOwner || !id) {
-      setWebhooks([]); setRemotes([]); setMembers([]);
+      setWebhooks([]); setRemotes([]); setMembers([]); setDelegations([]);
       return;
     }
     setLoading(true);
@@ -84,15 +99,18 @@ export default function ExternalInterfacesPage() {
     setWebhooks([]);
     setRemotes([]);
     setMembers([]);
+    setDelegations([]);
     try {
-      const [hooks, peers, memberships] = await Promise.all([
+      const [hooks, peers, memberships, delegationRows] = await Promise.all([
         request<WebhookEndpoint[]>("/projects/" + encodeURIComponent(id) + "/webhooks"),
         request<A2ARemote[]>("/projects/" + encodeURIComponent(id) + "/a2a/remotes"),
-        request<ProjectMember[]>("/projects/" + encodeURIComponent(id) + "/members")
+        request<ProjectMember[]>("/projects/" + encodeURIComponent(id) + "/members"),
+        request<DelegationRow[]>("/projects/" + encodeURIComponent(id) + "/a2a/delegations?limit=200")
       ]);
       setWebhooks(hooks);
       setRemotes(peers);
       setMembers(memberships);
+      setDelegations(delegationRows);
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setLoading(false); }
   }, [isOwner]);
@@ -211,7 +229,7 @@ export default function ExternalInterfacesPage() {
     <section className="panel external-project-selector">
       <div><strong>项目级接口配置</strong><p>Webhook 与 A2A 远端均隶属于项目，切换项目后显示各自的记录。</p></div>
       <ProjectSelect projects={projects} value={projectId} onChange={(value) => {
-        setProjectId(value); setNewWebhookSecret(null); setNewRemote(null); setNotice("");
+        setProjectId(value); setNewWebhookSecret(null); setNewRemote(null); setSelectedTaskId(""); setNotice("");
       }} />
     </section>
 
@@ -278,6 +296,28 @@ export default function ExternalInterfacesPage() {
       </section>
     </div>
 
+    <section className="panel external-delegation-history">
+      <div className="panel-heading"><div className="panel-title"><Network size={17} /><h3>A2A 任务委托历史</h3></div>
+        <span className="count-chip">{delegations.length}</span></div>
+      <p className="form-hint">当前项目最近最多 200 条委托，按最后更新时间排序。项目登记不代表远端执行成功；点击任务详情核对或处理。</p>
+      <div className="external-endpoint-list">
+        {delegations.map((item) => <article className="external-endpoint" key={item.id}>
+          <div><strong>任务 {item.task_id.slice(0, 12)}…</strong>
+            <p>远端：{remotes.find((remote) => remote.id === item.endpoint_id)?.url || "已移除的远端记录"}</p>
+            <p>远端任务：{item.remote_task_id || "尚未确认"} · 通信尝试 {item.attempts} 次</p>
+            <p>更新：{new Date(item.updated_at).toLocaleString("zh-CN", { hour12: false })}</p>
+            {item.last_error && <p>最近异常：{item.last_error}</p>}</div>
+          <div className="external-endpoint-actions">
+            <span className={"status-tag " + (item.status === "unknown" ? "tag-red" : item.status === "submitted" ? "tag-green" : "tag-amber")}>
+              {item.status === "unknown" ? "结果未知" : item.status === "pending" ? "待发送" : item.status === "remote" ? "远端处理中" : item.status === "cancel_requested" ? "取消待确认" : item.status === "submitted" ? "待验收" : item.status}
+            </span>
+            <button className="secondary-button compact" onClick={() => setSelectedTaskId(item.task_id)}>任务详情</button>
+          </div>
+        </article>)}
+        {!loading && delegations.length === 0 && <div className="empty-mini">该项目没有 A2A 委托记录。</div>}
+      </div>
+    </section>
+
     <section className="panel external-guide">
       <div className="panel-heading"><div className="panel-title"><Bot size={17} /><h3>第三方平台接入状态</h3></div></div>
       <div className="external-provider-grid">
@@ -287,5 +327,11 @@ export default function ExternalInterfacesPage() {
       </div>
       <p className="form-hint">本页展示的是数据库中的登记状态与后端能力，不是第三方平台实时联网探测；服务可用性仍需端到端验证。</p>
     </section>
+    {selectedTaskId && projectId && <TaskDetailPanel
+      selection={{ id: selectedTaskId, projectId, projectName: projects.find((p) => p.id === projectId)?.name || "当前项目" }}
+      isOwner={isOwner}
+      onClose={() => setSelectedTaskId("")}
+      onChanged={() => { void loadConnections(projectId); }}
+    />}
   </div>;
 }
