@@ -44,6 +44,17 @@ interface ProjectMember {
   enabled: boolean;
   role: string;
 }
+interface SystemCapabilities {
+  executors: {
+    openai_worker: { available: boolean; entrypoint: string };
+    codex_worker: { available: boolean; entrypoint: string };
+    gemini_worker: { available: boolean; entrypoint: string };
+    muse_adapter: { available: boolean; entrypoint: string };
+  };
+  storage: { backend: string; multipart_enabled: boolean; s3_bucket: string | null };
+  vector_search: { enabled: boolean; mode: string; embedding_dim: number };
+  kms: { enabled: boolean; provider: string; key_source: string };
+}
 
 const errorMessage = (reason: unknown) => reason instanceof Error ? reason.message : "接口操作失败";
 
@@ -57,6 +68,7 @@ export default function ExternalInterfacesPage() {
   const [webhooks, setWebhooks] = useState<WebhookEndpoint[]>([]);
   const [remotes, setRemotes] = useState<A2ARemote[]>([]);
   const [delegations, setDelegations] = useState<DelegationRow[]>([]);
+  const [capabilities, setCapabilities] = useState<SystemCapabilities | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,11 +91,14 @@ export default function ExternalInterfacesPage() {
     setLoading(true);
     setError("");
     try {
-      const [projectRows, agentRows] = await Promise.all([
-        request<Project[]>("/projects"), request<Agent[]>("/agents")
+      const [projectRows, agentRows, capData] = await Promise.all([
+        request<Project[]>("/projects"),
+        request<Agent[]>("/agents"),
+        request<SystemCapabilities>("/system/capabilities").catch(() => null),
       ]);
       setProjects(projectRows);
       setAgents(agentRows);
+      setCapabilities(capData);
       setProjectId((current) => projectRows.some((p) => p.id === current) ? current : (projectRows[0]?.id || ""));
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setLoading(false); }
@@ -220,11 +235,35 @@ export default function ExternalInterfacesPage() {
         <a href={apiOrigin + "/.well-known/agent-card.json"} target="_blank" rel="noreferrer" className="secondary-button compact">Agent Card<ArrowUpRight size={14} /></a>
       </section>
       <section className="panel external-protocol">
-        <div className="external-protocol-head"><Activity size={20} /><span className="status-tag tag-amber">取决于订阅和运行环境</span></div>
-        <h3>外部 AI 执行器</h3><p>支持 OpenAI-compatible 文本模型 Worker 和 Codex CLI Worker；未自动接入 Codex、Google AI 或 Muse 账号。</p>
+        <div className="external-protocol-head">
+          <Activity size={20} />
+          <span className={`status-tag ${capabilities && Object.values(capabilities.executors).some((e) => e.available) ? "tag-green" : "tag-amber"}`}>
+            {capabilities && Object.values(capabilities.executors).some((e) => e.available) ? "已就绪" : "待配置密钥/环境"}
+          </span>
+        </div>
+        <h3>外部 AI 执行器</h3>
+        <p>已内置 OpenAI Worker、Codex CLI、Google Gemini Worker (<code>otternest-gemini-worker</code>) 与 Muse 适配器 (<code>otternest-muse-worker</code>)。</p>
+        {capabilities && <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px", fontSize: "12px" }}>
+          <span className={`status-tag ${capabilities.executors.openai_worker.available ? "tag-green" : "tag-amber"}`}>OpenAI {capabilities.executors.openai_worker.available ? "✓" : "未配置"}</span>
+          <span className={`status-tag ${capabilities.executors.codex_worker.available ? "tag-green" : "tag-amber"}`}>Codex {capabilities.executors.codex_worker.available ? "✓" : "未安装"}</span>
+          <span className={`status-tag ${capabilities.executors.gemini_worker.available ? "tag-green" : "tag-amber"}`}>Gemini {capabilities.executors.gemini_worker.available ? "✓" : "未配置"}</span>
+          <span className={`status-tag ${capabilities.executors.muse_adapter.available ? "tag-green" : "tag-amber"}`}>Muse {capabilities.executors.muse_adapter.available ? "✓" : "未配置"}</span>
+        </div>}
         <Link to="/agents" className="secondary-button compact">Agent 管理<ArrowUpRight size={14} /></Link>
       </section>
     </div>
+
+    {capabilities && <section className="panel external-project-selector" style={{ gap: "12px", flexWrap: "wrap" }}>
+      <div>
+        <strong>底层基础设施引擎</strong>
+        <p>对象存储、混合向量检索与 KMS 信封加密已在控制面激活。</p>
+      </div>
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+        <span className="status-tag tag-green">存储: {capabilities.storage.backend.toUpperCase()} (分块上传已启用)</span>
+        <span className="status-tag tag-green">向量检索: {capabilities.vector_search.mode} ({capabilities.vector_search.embedding_dim}d)</span>
+        <span className="status-tag tag-green">KMS 密钥源: {capabilities.kms.key_source}</span>
+      </div>
+    </section>}
 
     <section className="panel external-project-selector">
       <div><strong>项目级接口配置</strong><p>Webhook 与 A2A 远端均隶属于项目，切换项目后显示各自的记录。</p></div>

@@ -100,14 +100,38 @@ export default function ArtifactsPage() {
     setSaving(true);
     setError("");
     try {
-      await binaryRequest("/tasks/" + encodeURIComponent(selectedTaskId) + "/artifacts", {
-        method: "POST",
-        headers: {
-          "X-Artifact-Name-Encoded": encodeURIComponent(uploadFile.name),
-          "X-Artifact-Sensitivity": sensitivity
-        },
-        body: uploadFile
-      });
+      const MULTIPART_THRESHOLD = 4 * 1024 * 1024;
+      const CHUNK_SIZE = 2 * 1024 * 1024;
+      if (uploadFile.size > MULTIPART_THRESHOLD) {
+        const init = await request<{ upload_id: string }>("/tasks/" + encodeURIComponent(selectedTaskId) + "/artifacts/multipart/init", {
+          method: "POST",
+          body: JSON.stringify({ filename: uploadFile.name, sensitivity })
+        });
+        const parts: Array<{ part_number: number; sha256: string; size: number }> = [];
+        let partNumber = 1;
+        for (let offset = 0; offset < uploadFile.size; offset += CHUNK_SIZE) {
+          const chunk = uploadFile.slice(offset, offset + CHUNK_SIZE);
+          const partRes = await binaryRequest("/tasks/" + encodeURIComponent(selectedTaskId) + "/artifacts/multipart/" + encodeURIComponent(init.upload_id) + "/parts/" + partNumber, {
+            method: "PUT",
+            body: chunk
+          });
+          parts.push(await partRes.json() as { part_number: number; sha256: string; size: number });
+          partNumber += 1;
+        }
+        await request("/tasks/" + encodeURIComponent(selectedTaskId) + "/artifacts/multipart/" + encodeURIComponent(init.upload_id) + "/complete?filename=" + encodeURIComponent(uploadFile.name) + "&sensitivity=" + encodeURIComponent(sensitivity), {
+          method: "POST",
+          body: JSON.stringify({ parts })
+        });
+      } else {
+        await binaryRequest("/tasks/" + encodeURIComponent(selectedTaskId) + "/artifacts", {
+          method: "POST",
+          headers: {
+            "X-Artifact-Name-Encoded": encodeURIComponent(uploadFile.name),
+            "X-Artifact-Sensitivity": sensitivity
+          },
+          body: uploadFile
+        });
+      }
       setUploadFile(null);
       await loadArtifacts(selectedTaskId);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "成果上传失败"); }

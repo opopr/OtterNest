@@ -693,13 +693,22 @@ def add_memory(project_id: str, body: MemoryIn, actor: Actor = Depends(authentic
 
 
 @router.get("/projects/{project_id}/memories")
-def memories(project_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+def memories(
+    project_id: str,
+    q: str | None = None,
+    limit: int = 50,
+    actor: Actor = Depends(authenticate),
+    db: Session = Depends(get_session),
+):
     require_project(db, project_id, actor)
     query = select(Memory).where(Memory.project_id == project_id)
     if not actor.is_owner:
         query = query.where(Memory.status == "published")
     allowed = effective_sensitivity(db, project_id, actor)
     rows = [m for m in db.scalars(query) if sensitivity_allowed(m.sensitivity, allowed)]
+    if q and q.strip():
+        from .vector import search_hybrid
+        return search_hybrid(rows, q.strip(), allowed_sensitivity=allowed, limit=max(1, min(limit, 200)))
     return [as_dict(m, "id", "kind", "title", "content", "source", "sensitivity", "status", "version") for m in rows]
 
 
@@ -899,3 +908,196 @@ def review_artifact(artifact_id: str, body: ArtifactReviewIn, actor: Actor = Dep
     )
     db.commit()
     return as_dict(artifact, "id", "family_id", "version", "project_id", "task_id", "name", "checksum", "size_bytes", "sensitivity", "review_status", "review_note", "reviewed_at", "deleted_at", "created_at")
+
+
+@router.get("/system/capabilities")
+def system_capabilities(actor: Actor = Depends(authenticate)):
+    import shutil
+    openai_ready = bool(os.environ.get("OTTERNEST_OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY"))
+    codex_cli = shutil.which("codex")
+    gemini_ready = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or shutil.which("gemini"))
+    muse_ready = bool(
+        (os.environ.get("OTTERNEST_MUSE_BASE_URL") or os.environ.get("MUSE_API_URL"))
+        and (os.environ.get("OTTERNEST_MUSE_TOKEN") or os.environ.get("MUSE_API_TOKEN"))
+    )
+    storage_type = os.environ.get("OTTERNEST_STORAGE_TYPE", "local").lower()
+    kms_key_source = (
+        "OTTERNEST_KMS_KEY"
+        if os.environ.get("OTTERNEST_KMS_KEY")
+        else ("OTTERNEST_OWNER_TOKEN" if os.environ.get("OTTERNEST_OWNER_TOKEN") else "ephemeral")
+    )
+    return {
+        "executors": {
+            "openai_worker": {"available": openai_ready, "entrypoint": "otternest-openai-worker"},
+            "codex_worker": {"available": codex_cli is not None, "entrypoint": "otternest-codex-worker"},
+            "gemini_worker": {"available": gemini_ready, "entrypoint": "otternest-gemini-worker"},
+            "muse_adapter": {"available": muse_ready, "entrypoint": "otternest-muse-worker"},
+        },
+        "storage": {
+            "backend": storage_type,
+            "multipart_enabled": True,
+            "s3_bucket": os.environ.get("OTTERNEST_S3_BUCKET", "") if storage_type == "s3" else None,
+        },
+        "vector_search": {
+            "enabled": True,
+            "mode": "hybrid",
+            "embedding_dim": 64,
+        },
+        "kms": {
+            "enabled": True,
+            "provider": "EnvelopeKmsProvider",
+            "key_source": kms_key_source,
+        },
+    }
+
+
+@router.get("/system/security-audit")
+def system_security_audit(actor: Actor = Depends(authenticate)):
+    owner_only(actor)
+    from .security_audit import audit_configuration
+    findings = audit_configuration()
+    critical_count = sum(1 for f in findings if f["level"] == "critical")
+    warning_count = sum(1 for f in findings if f["level"] == "warning")
+    pass_count = sum(1 for f in findings if f["level"] == "pass")
+    return {
+        "status": "critical" if critical_count else ("warning" if warning_count else "pass"),
+        "summary": {"critical": critical_count, "warning": warning_count, "pass": pass_count},
+        "findings": findings,
+    }
+
+
+class MultipartInitIn(BaseModel):
+    filename: str = Field(min_length=1, max_length=240)
+    sensitivity: str = "internal"
+
+
+class MultipartCompletePart(BaseModel):
+    part_number: int = Field(ge=1)
+    sha256: str = ""
+    size: int = 0
+
+
+class MultipartCompleteIn(BaseModel):
+    parts: list[MultipartCompletePart] = Field(min_length=1)
+
+
+def _active_storage():
+    from .storage import LocalStorageBackend, S3StorageBackend
+    stype = os.environ.get("OTTERNEST_STORAGE_TYPE", "local").lower()
+    if stype == "s3":
+        return S3StorageBackend(
+            bucket=os.environ.get("OTTERNEST_S3_BUCKET", "otternest-artifacts"),
+            endpoint_url=os.environ.get("OTTERNEST_S3_ENDPOINT"),
+        )
+    return LocalStorageBackend()
+
+
+@router.post("/tasks/{task_id}/artifacts/multipart/init", status_code=201)
+def init_multipart_artifact(
+    task_id: str,
+    body: MultipartInitIn,
+    epoch: int | None = None,
+    actor: Actor = Depends(authenticate),
+    db: Session = Depends(get_session),
+):
+    require_writable_system(db)
+    if body.sensitivity not in SENSITIVITY_ORDER:
+        raise HTTPException(422, "Invalid artifact sensitivity")
+    if any(ord(c) < 32 for c in body.filename) or "/" in body.filename or "\\" in body.filename:
+        raise HTTPException(422, "Invalid artifact filename")
+    row = require_task(db, task_id, actor, lock=True)
+    if not actor.is_owner:
+        if epoch is None:
+            raise HTTPException(422, "epoch required for agent upload")
+        ensure_lease(row, actor, epoch)
+    backend = _active_storage()
+    artifact_id = new_id()
+    upload_id = backend.initiate_multipart(row.project_id, artifact_id, body.filename)
+    return {
+        "upload_id": upload_id,
+        "artifact_id": artifact_id,
+        "task_id": task_id,
+        "project_id": row.project_id,
+        "filename": body.filename,
+        "sensitivity": body.sensitivity,
+    }
+
+
+@router.put("/tasks/{task_id}/artifacts/multipart/{upload_id}/parts/{part_number}")
+async def upload_multipart_part(
+    task_id: str,
+    upload_id: str,
+    part_number: int,
+    request: Request,
+    epoch: int | None = None,
+    actor: Actor = Depends(authenticate),
+    db: Session = Depends(get_session),
+):
+    require_writable_system(db)
+    if part_number < 1:
+        raise HTTPException(422, "part_number must be >= 1")
+    row = require_task(db, task_id, actor)
+    if not actor.is_owner:
+        if epoch is None:
+            raise HTTPException(422, "epoch required for agent upload")
+        ensure_lease(row, actor, epoch)
+    content = await request.body()
+    backend = _active_storage()
+    try:
+        return backend.upload_part(upload_id, part_number, content)
+    except Exception as exc:
+        raise HTTPException(400, str(exc)) from None
+
+
+@router.post("/tasks/{task_id}/artifacts/multipart/{upload_id}/complete", status_code=201)
+def complete_multipart_artifact(
+    task_id: str,
+    upload_id: str,
+    body: MultipartCompleteIn,
+    filename: str,
+    sensitivity: str = "internal",
+    epoch: int | None = None,
+    actor: Actor = Depends(authenticate),
+    db: Session = Depends(get_session),
+):
+    require_writable_system(db)
+    if sensitivity not in SENSITIVITY_ORDER:
+        raise HTTPException(422, "Invalid artifact sensitivity")
+    row = require_task(db, task_id, actor, lock=True)
+    if not actor.is_owner:
+        if epoch is None:
+            raise HTTPException(422, "epoch required for agent upload")
+        ensure_lease(row, actor, epoch)
+    backend = _active_storage()
+    try:
+        uri, checksum, total_size = backend.complete_multipart(
+            upload_id,
+            [p.model_dump() for p in body.parts],
+        )
+    except Exception as exc:
+        raise HTTPException(400, str(exc)) from None
+
+    latest = db.scalar(
+        select(Artifact)
+        .where(Artifact.task_id == task_id, Artifact.name == filename)
+        .order_by(Artifact.version.desc(), Artifact.created_at.desc(), Artifact.id.desc())
+        .limit(1)
+        .with_for_update()
+    )
+    record = Artifact(
+        family_id=latest.family_id if latest else new_id(),
+        version=(latest.version + 1) if latest else 1,
+        project_id=row.project_id,
+        task_id=task_id,
+        name=filename,
+        checksum=checksum,
+        size_bytes=total_size,
+        uri=uri,
+        sensitivity=sensitivity,
+        review_status="pending",
+    )
+    db.add(record)
+    db.flush()
+    emit(db, actor, "artifact.submitted", record.id, row.project_id, {"task_id": task_id, "sha256": checksum, "multipart": True})
+    db.commit()
+    return as_dict(record, "id", "family_id", "version", "project_id", "task_id", "name", "checksum", "size_bytes", "sensitivity", "review_status", "review_note", "reviewed_at", "deleted_at", "created_at")

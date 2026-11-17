@@ -34,6 +34,16 @@ interface SecurityEvent {
   payload: Record<string, unknown>;
   created_at: string;
 }
+interface SecurityAuditFinding {
+  check: string;
+  level: "pass" | "warning" | "critical";
+  message: string;
+}
+interface SecurityAuditResult {
+  status: "pass" | "warning" | "critical";
+  summary: { critical: number; warning: number; pass: number };
+  findings: SecurityAuditFinding[];
+}
 
 const eventNames: Record<string, string> = {
   "owner.bootstrapped": "账户初始化",
@@ -65,16 +75,18 @@ export default function AccountSecurityPage() {
   const [oneTimeCode, setOneTimeCode] = useState("");
   const [disablePassword, setDisablePassword] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
+  const [audit, setAudit] = useState<SecurityAuditResult | null>(null);
 
   const load = useCallback(async () => {
     if (!isOwner) { setLoading(false); return; }
     setLoading(true); setError("");
     try {
-      const [result, recent] = await Promise.all([
+      const [result, recent, auditResult] = await Promise.all([
         request<AccountResponse>("/auth/account"),
-        request<SecurityEvent[]>("/auth/events?limit=30")
+        request<SecurityEvent[]>("/auth/events?limit=30"),
+        request<SecurityAuditResult>("/system/security-audit").catch(() => null),
       ]);
-      setAccount(result); setEvents(recent);
+      setAccount(result); setEvents(recent); setAudit(auditResult);
     } catch (reason) { setError(message(reason)); }
     finally { setLoading(false); }
   }, [isOwner]);
@@ -252,6 +264,27 @@ export default function AccountSecurityPage() {
       <div className="panel-heading"><div className="panel-title"><LogOut size={17} /><h3>会话控制</h3></div></div>
       <p className="form-hint">可撤销所有密码登录会话。服务器 Owner Token 由服务器环境配置单独管理，不会因此轮换。</p>
       <button className="secondary-button compact" onClick={() => void revokeSessions()} disabled={saving || !token}><LogOut size={14} />注销所有会话</button>
+    </section>
+
+    <section className="panel">
+      <div className="panel-heading">
+        <div className="panel-title"><ShieldCheck size={17} /><h3>部署前安全自检</h3></div>
+        {audit && <span className={"status-tag " + (audit.status === "pass" ? "tag-green" : audit.status === "warning" ? "tag-amber" : "tag-neutral")}>
+          {audit.status === "pass" ? "全部通过" : audit.status === "warning" ? `${audit.summary.warning} 项警告` : `${audit.summary.critical} 项严重`}
+        </span>}
+      </div>
+      <div className="admin-event-list">
+        {audit?.findings.map((finding, idx) => (
+          <div className="admin-event-row" key={idx} style={{ gap: "12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span className={"status-tag " + (finding.level === "pass" ? "tag-green" : finding.level === "warning" ? "tag-amber" : "tag-neutral")}>{finding.level}</span>
+              <strong>{finding.check}</strong>
+            </div>
+            <small>{finding.message}</small>
+          </div>
+        ))}
+        {!audit && !loading && <div className="empty-mini">暂未获取到安全自检结果。</div>}
+      </div>
     </section>
 
     <section className="panel">

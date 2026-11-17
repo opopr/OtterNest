@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertCircle, Archive, BookOpen, Check, Database, FilePlus2, Globe2,
-  LockKeyhole, Pencil, Plus, RefreshCw, Share2, ShieldCheck, X
+  LockKeyhole, Pencil, Plus, RefreshCw, Search, Share2, ShieldCheck, X
 } from "lucide-react";
 import { request } from "../api/client";
 import type { Project } from "../api/types";
@@ -16,6 +16,7 @@ interface Memory {
   sensitivity: string;
   status: string;
   version: number;
+  score?: number;
 }
 interface Charter {
   project_id: string;
@@ -72,6 +73,7 @@ export default function KnowledgePage() {
   const [targetProjectId, setTargetProjectId] = useState("");
   const [shareMemoryId, setShareMemoryId] = useState("");
   const [shareRationale, setShareRationale] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [tab, setTab] = useState<"memories" | "charter" | "sharing">("memories");
 
   const selectedProject = useMemo(() => projects.find((item) => item.id === selectedId) || null, [projects, selectedId]);
@@ -88,12 +90,13 @@ export default function KnowledgePage() {
     finally { setLoading(false); }
   }, [selectedId]);
 
-  const loadProjectData = useCallback(async (projectId: string) => {
+  const loadProjectData = useCallback(async (projectId: string, q?: string) => {
     setLoading(true);
     setError("");
     try {
+      const queryStr = q && q.trim() ? "?q=" + encodeURIComponent(q.trim()) : "";
       const [memoryRows, projectCharter, shareRows] = await Promise.all([
-        request<Memory[]>("/projects/" + encodeURIComponent(projectId) + "/memories"),
+        request<Memory[]>("/projects/" + encodeURIComponent(projectId) + "/memories" + queryStr),
         request<Charter>("/projects/" + encodeURIComponent(projectId) + "/charter"),
         request<KnowledgeShare[]>("/projects/" + encodeURIComponent(projectId) + "/knowledge-shares")
       ]);
@@ -232,7 +235,22 @@ export default function KnowledgePage() {
       </div>
       {loading && !selectedProject ? <div className="panel-loading"><div className="spinner" />正在读取项目知识…</div> : tab === "memories" ? (
         <section className="panel">
-          <div className="panel-heading"><div className="panel-title"><Database size={17} /><h3>知识生命周期</h3></div><button className="primary-button compact" onClick={() => { cancelMemoryForm(); setShowMemoryForm(true); }} disabled={!selectedId}><Plus size={15} />新增记忆</button></div>
+          <div className="panel-heading">
+            <div className="panel-title"><Database size={17} /><h3>知识生命周期</h3></div>
+            <div className="heading-actions" style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+              <form onSubmit={(e) => { e.preventDefault(); if (selectedId) void loadProjectData(selectedId, searchQuery); }} style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="混合向量语义检索…"
+                  style={{ minWidth: "200px", padding: "6px 10px" }}
+                />
+                <button type="submit" className="secondary-button compact" disabled={!selectedId || loading}><Search size={14} />检索</button>
+                {searchQuery && <button type="button" className="text-button" onClick={() => { setSearchQuery(""); if (selectedId) void loadProjectData(selectedId, ""); }}>清除</button>}
+              </form>
+              <button className="primary-button compact" onClick={() => { cancelMemoryForm(); setShowMemoryForm(true); }} disabled={!selectedId}><Plus size={15} />新增记忆</button>
+            </div>
+          </div>
           {showMemoryForm && <form className="form-panel embedded-form" onSubmit={saveMemory}>
             <div className="panel-heading"><div className="panel-title"><FilePlus2 size={16} /><h3>{editingId ? "修订知识记录" : "提出新记忆"}</h3></div><button type="button" className="icon-button" onClick={cancelMemoryForm}><X size={16} /></button></div>
             <div className="form-grid">
@@ -250,7 +268,7 @@ export default function KnowledgePage() {
             {memories.map((memory) => <article className="memory-card" key={memory.id}>
               <div className="memory-card-head"><span className="capability-tag">{kindLabel[memory.kind] || memory.kind}</span><span className={"status-tag " + (memory.status === "published" ? "tag-green" : memory.status === "proposed" ? "tag-amber" : "tag-neutral")}>{statusLabel[memory.status] || memory.status}</span></div>
               <h3>{memory.title}</h3><p>{memory.content}</p>
-              <div className="memory-meta"><span><LockKeyhole size={12} />{sensitivityLabel[memory.sensitivity] || memory.sensitivity}</span><span>版本 {memory.version}</span></div>
+              <div className="memory-meta"><span><LockKeyhole size={12} />{sensitivityLabel[memory.sensitivity] || memory.sensitivity}</span><span>版本 {memory.version}</span>{typeof memory.score === "number" && <span className="status-tag tag-green">相关度 {memory.score}</span>}</div>
               <small className="memory-source">来源：{memory.source}</small>
               <div className="memory-actions">{memory.status !== "archived" && <button className="text-button" onClick={() => editMemory(memory)}><Pencil size={13} />修订</button>}{memory.status === "proposed" && <button className="secondary-button compact" disabled={saving} onClick={() => void publishMemory(memory)}><Check size={13} />发布</button>}{memory.status !== "archived" && <button className="icon-button" title="归档" disabled={saving} onClick={() => void archiveMemory(memory)}><Archive size={15} /></button>}</div>
             </article>)}
