@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { AlertTriangle, ArchiveRestore, CheckCircle2, ClipboardCheck, Download, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ArchiveRestore, CheckCircle2, ClipboardCheck, Download, RefreshCw, ShieldAlert } from "lucide-react";
 import { request } from "../api/client";
 import "./TaskContinuityPanel.css";
 
