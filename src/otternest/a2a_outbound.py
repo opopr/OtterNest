@@ -205,6 +205,15 @@ def list_project_delegations(
     return [public_delegation(row) for row in rows]
 
 
+@router.get("/tasks/{task_id}/a2a/delegation")
+def get_task_delegation(task_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    """Exact task lookup, including historic attempts beyond project list windows."""
+    owner_only(actor)
+    task = require_task(db, task_id, actor)
+    row = db.scalar(select(A2ADelegation).where(A2ADelegation.task_id == task.id))
+    return public_delegation(row) if row is not None else None
+
+
 @router.get("/a2a/delegations/{delegation_id}")
 def get_delegation(delegation_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     owner_only(actor)
