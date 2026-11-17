@@ -104,14 +104,15 @@ export default function TaskExecutionSafety({ taskId, projectId, taskStatus, tas
 
   useEffect(() => { void load(); }, [load]);
 
-  const mutate = async (action: () => Promise<unknown>, success: string) => {
+  const mutate = async (action: () => Promise<unknown>, success: string): Promise<boolean> => {
     setSaving(true); setError(""); setNotice("");
     try {
       await action();
       await load();
       setNotice(success);
       onChanged();
-    } catch (reason) { setError(errorText(reason)); }
+      return true;
+    } catch (reason) { setError(errorText(reason)); return false; }
     finally { setSaving(false); }
   };
 
@@ -134,7 +135,7 @@ export default function TaskExecutionSafety({ taskId, projectId, taskStatus, tas
         method: "POST", body: JSON.stringify({ status: outcome, note: evidenceNote.trim() })
       }),
       "人工对账结论已记录。"
-    ).then(() => { setEffectId(""); setOutcome(""); setEvidenceNote(""); });
+    ).then((ok) => { if (ok) { setEffectId(""); setOutcome(""); setEvidenceNote(""); } });
   };
 
   const queueDelegation = () => {
@@ -146,7 +147,7 @@ export default function TaskExecutionSafety({ taskId, projectId, taskStatus, tas
         method: "POST", body: JSON.stringify({ endpoint_id: endpointId })
       }),
       "A2A 委托已进入待处理队列；尚不代表远端已接单。"
-    ).then(() => setEndpointId(""));
+    ).then((ok) => { if (ok) setEndpointId(""); });
   };
 
   const cancelDelegation = () => {
@@ -174,7 +175,7 @@ export default function TaskExecutionSafety({ taskId, projectId, taskStatus, tas
         method: "POST", body: JSON.stringify({ remote_task_id: remoteTaskId.trim() })
       }),
       "远端任务 ID 已记录，后端将根据可用的轮询 Worker 继续核对。"
-    ).then(() => setRemoteTaskId(""));
+    ).then((ok) => { if (ok) setRemoteTaskId(""); });
   };
 
   const unresolvedEffects = effects.filter((effect) => ["pending", "unknown", "reported_executed"].includes(effect.status));
