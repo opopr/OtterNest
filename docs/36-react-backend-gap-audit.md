@@ -13,12 +13,12 @@
 | Webhook、A2A 远端登记 | `/projects/{project_id}/webhooks`、`/webhooks/{webhook_id}/disable`、`/projects/{project_id}/a2a/remotes`、`/a2a/remotes/{endpoint_id}/disable` | 上轮 **外部接口** `/interfaces` | 仅注册/禁用；不等于外部连通、远端身份验证或 Worker 正常 |
 | A2A 任务委托生命周期 | 新增 `GET /projects/{project_id}/a2a/delegations`、`GET /tasks/{task_id}/a2a/delegation`；复用现有 `POST /tasks/{task_id}/a2a/delegate`、`/cancel`、`/release`、`/reconcile` | **外部接口**项目级最近 200 条委托历史；**任务详情**远端委托操作 | 只允许 R0/R1 就绪任务；发送未知状态禁止重发；取消不等于远端确认取消；已终止且阻塞才可解除绑定 |
 | 任务副作用人工对账 | `GET /tasks/{task_id}/side-effects`、`POST /side-effects/{effect_id}/reconcile` | **任务详情**副作用台账、人工核实结果、证据备注 | `POST /tasks/{task_id}/side-effects` 登记和 `POST /side-effects/{effect_id}/report` 报告仍只能由有租约的执行 Agent 调用，管理员不得冒用 |
+| 检查点/租约/交接 | `GET /tasks/{task_id}/checkpoints`、`POST /checkpoints/{checkpoint_id}/verify`、`POST /tasks/{task_id}/revoke-lease`、`GET /tasks/{task_id}/handoff` | **任务详情**检查点核验、交接包预览/导出、带风险确认的租约撤销 | Agent 持租约登记检查点；撤销仅隔离旧 epoch，服务器明确报告没有验证外部进程停止，重新调度需谨慎 |
 
 ## 尚缺完整 React 操作入口：优先级清单
 
 | 优先级 | 域 | 后端有但新版 React 不完整的 API / 业务 | 推荐补齐位置 |
 |---|---|---|---|
-| P1 | 检查点与故障交接 | `POST/GET /tasks/{task_id}/checkpoints`、`POST /checkpoints/{checkpoint_id}/verify`、`POST /tasks/{task_id}/revoke-lease`、`GET /tasks/{task_id}/handoff` | 任务详情中的“执行连续性”标签页；管理员可以核验、撤租约、查看交接包，不能伪造 Runner 已完成 |
 | P1 | 决策审核与证据 | `POST /decisions/{decision_id}/reviews`、`POST /decisions/{decision_id}/evidence/inspect` | 审批与治理；现有页面主要展示复核、协商与最终决议，尚缺评审提交和证据链检查 |
 | P1 | 第二轮协商策略 | `POST/GET /decisions/{decision_id}/deliberation/auto-policy`、`POST /decisions/{decision_id}/deliberation/rebuttals` | 审批与治理，新增自动继续名单与反驳意见管理，服务端仍裁定参与和权限 |
 | P2 | 项目级简报 | `GET /projects/{project_id}/briefing` | 项目详情；全局每日简报已存在，不能替代单项目简报 |
@@ -38,7 +38,7 @@
 1. 每个新增 React 动作必须调用真实现有后端 API，而非只提供表单或静态演示。
 2. 所有者/Agent 权限、项目边界、一次性密钥展示、外部 URL allowlist 由后端验证；前端只能做次级提示。
 3. 破坏性操作必须明确二次确认；对恢复、远端副作用和未知执行状态不得自动重试。
-4. 完成的顺序建议：**检查点/交接 → 决策审核 → 单项目简报与知识检索 → 接入端真实联调**。
+4. 完成的顺序建议：**决策审核 → 单项目简报与知识检索 → 接入端真实联调与故障恢复演练**。
 5. 每批上线验证 `frontend`、`unit`、`postgres` CI；真实 Oracle 主机、Worker 和三方服务另做现场验收。
 
 
@@ -48,3 +48,11 @@
 - 项目历史取最近 200 条；任务详情按任务 ID 精确查询，不受历史窗口限制。
 - 前端副作用对账需要选择明确结果、填写至少 5 字符的权威外部核查依据、二次确认，服务器再次校验所有者身份。
 - 新界面不能证明 Oracle 实机已接通 A2A Worker，也不能替代真实外部系统对账。
+
+
+## 检查点与故障交接 UI 边界
+
+- 查看、核验/驳回检查点是对既有服务端记录的审议；页面不代替 Agent 创建检查点，不将 `self_reported` 冒充 `owner_verified`。
+- 交接包展示当前最新自报与最近核验快照、任务依赖、成果数和副作用台账。导出由所有者显式确认，资料不自动发往远端 AI。
+- 租约撤销需要运行中的任务、至少 5 字符原因、理解风险勾选和二次确认。服务端仅隔离旧 epoch，`remote_execution_stopped_verified=false`：既不能关闭外部进程，也不能证明外部任务未产生副作用。已有 A2A 委托的任务仍由后端拒绝直接撤销。
+- 真实多节点崩溃、并发任务、未知副作用恢复尚未在 Oracle ARM 主机上演练。
