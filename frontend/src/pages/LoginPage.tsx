@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from "react";
-import { ArrowRight, KeyRound, LockKeyhole, ShieldCheck } from "lucide-react";
+import { ArrowRight, KeyRound, LockKeyhole, RefreshCw, ShieldCheck } from "lucide-react";
+import { getApiOrigin } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 
 type LoginMode = "account" | "token";
 
 export default function LoginPage() {
-  const { authStatus, bootstrap, loginWithPassword, verifyMfa, loginWithToken } = useAuth();
+  const { authStatus, authError, checking, refreshAuthStatus, bootstrap, loginWithPassword, verifyMfa, loginWithToken } = useAuth();
   const [mode, setMode] = useState<LoginMode>("account");
   const [challenge, setChallenge] = useState("");
   const [username, setUsername] = useState("");
@@ -66,6 +67,27 @@ export default function LoginPage() {
             <button className="primary-button" disabled={busy}>{busy ? "正在验证…" : "验证并进入"}<ArrowRight size={16} /></button>
             <button type="button" className="text-button" onClick={() => { setChallenge(""); setCode(""); setError(""); }}>返回账号登录</button>
           </form>
+        ) : authStatus === null ? (
+          <div className="login-connection-error">
+            <div className="form-error setup-warning">
+              {authError || "无法连接到 OtterNest FastAPI 服务，请检查网络或跨域配置。"}
+            </div>
+            <div className="connection-origin-list">
+              <div><span>当前前端 Origin</span><code>{window.location.origin}</code></div>
+              <div><span>后端 API Origin</span><code>{getApiOrigin()}</code></div>
+            </div>
+            <p className="form-hint">
+              请确认后端环境变量 <code>OTTERNEST_CORS_ORIGINS</code> 已精确包含上方「当前前端 Origin」（不含路径与通配符），且 <code>VITE_API_BASE_URL</code> 指向可访问的 FastAPI HTTPS Origin。
+            </p>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={checking}
+              onClick={() => void refreshAuthStatus()}
+            >
+              <RefreshCw size={15} className={checking ? "spin" : ""} />重新检测连接
+            </button>
+          </div>
         ) : !configured && canBootstrap ? (
           <form className="login-form" onSubmit={handleBootstrap}>
             <div className="login-form-heading"><LockKeyhole size={19} /><strong>初始化所有者账户</strong></div>

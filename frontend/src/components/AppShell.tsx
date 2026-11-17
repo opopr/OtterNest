@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import {
   Activity, ArrowUpRight, Bot, BookMarked, BookOpen, FileArchive, Gauge, ChevronDown, CircleHelp, KeyRound, ClipboardCheck, MessageSquare,
-  FolderKanban, GitBranch, LayoutDashboard, LogOut, Monitor, Settings2, ShieldCheck, Wifi
+  FolderKanban, GitBranch, LayoutDashboard, LogOut, Monitor, PlugZap, Settings2, ShieldCheck, ArchiveRestore, Wifi
 } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { request } from "../api/client";
+import { getApiOrigin, request } from "../api/client";
 import type { SystemMode } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 
@@ -15,6 +15,9 @@ const navigation = [
   { to: "/command", label: "AI 指挥中心", icon: MessageSquare },
   { to: "/agents", label: "Agent 管理", icon: Bot },
   { to: "/runtimes", label: "Runtime 监控", icon: Monitor },
+  { to: "/interfaces", label: "外部接口", icon: PlugZap },
+  { to: "/project-portability", label: "项目导入导出", icon: ArchiveRestore },
+  { to: "/account-security", label: "账号安全", icon: ShieldCheck },
   { to: "/governance", label: "审批与治理", icon: ShieldCheck },
   { to: "/goals-workflows", label: "目标与工作流", icon: GitBranch },
   { to: "/knowledge", label: "知识库", icon: BookOpen },
@@ -69,8 +72,8 @@ export default function AppShell() {
           <div className="sidebar-note-icon"><ShieldCheck size={17} /></div>
           <div><strong>所有者控制</strong><p>重要操作始终经过授权与审查。</p></div>
         </div>
-        <a className="side-link" href="/legacy"><ArrowUpRight size={16} />进入旧版完整管理台</a>
-        <a className="side-link" href="/api/docs" target="_blank" rel="noreferrer"><CircleHelp size={16} />API 文档</a>
+        <a className="side-link" href={getApiOrigin() + "/legacy"} target="_blank" rel="noreferrer"><ArrowUpRight size={16} />进入旧版完整管理台</a>
+        <a className="side-link" href={getApiOrigin() + "/api/docs"} target="_blank" rel="noreferrer"><CircleHelp size={16} />API 文档</a>
         <div className="sidebar-footer">Personal AI Team OS · v0.1.0</div>
       </aside>
 

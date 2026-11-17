@@ -1,4 +1,11 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
+import {
+  buildApiUrl,
+  buildWebSocketUrl,
+  normalizeApiBaseUrl,
+  resolveApiOrigin
+} from "./url";
+
+const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
 let accessToken: string | null = null;
 
 export class ApiError extends Error {
@@ -15,13 +22,11 @@ export function setAccessToken(token: string | null): void {
 }
 
 export function getApiOrigin(): string {
-  return API_BASE_URL || window.location.origin;
+  return resolveApiOrigin(API_BASE_URL, window.location.origin);
 }
 
 export function websocketUrl(path: string): string {
-  const url = new URL(path, getApiOrigin());
-  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  return url.toString();
+  return buildWebSocketUrl(getApiOrigin(), path);
 }
 
 export async function request<T>(
@@ -34,7 +39,7 @@ export async function request<T>(
   if (token) headers.set("Authorization", "Bearer " + token);
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
 
-  const response = await fetch(API_BASE_URL + "/api/v1" + path, {
+  const response = await fetch(buildApiUrl(API_BASE_URL, path), {
     ...init,
     headers,
     credentials: "omit"
@@ -67,7 +72,7 @@ export async function binaryRequest(
   const headers = new Headers(init.headers);
   const token = tokenOverride === undefined ? accessToken : tokenOverride;
   if (token) headers.set("Authorization", "Bearer " + token);
-  const response = await fetch(API_BASE_URL + "/api/v1" + path, {
+  const response = await fetch(buildApiUrl(API_BASE_URL, path), {
     ...init,
     headers,
     credentials: "omit"
