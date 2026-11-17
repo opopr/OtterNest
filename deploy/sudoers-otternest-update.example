@@ -1,0 +1,3 @@
+# Copy to /etc/sudoers.d/otternest-update (chmod 0440) to allow the non-root
+# `otternest` service user to restart OtterNest systemd units during web updates.
+otternest ALL=(root) NOPASSWD: /bin/systemctl restart otternest-api, /bin/systemctl restart otternest-api otternest-scheduler, /bin/systemctl restart otternest-api otternest-scheduler otternest-workflows

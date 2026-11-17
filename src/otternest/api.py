@@ -1049,6 +1049,48 @@ def system_security_audit(actor: Actor = Depends(authenticate)):
     }
 
 
+class UpdateApplyIn(BaseModel):
+    force: bool = False
+
+
+@router.get("/system/update/check")
+def system_update_check(fetch: bool = True, actor: Actor = Depends(authenticate)):
+    owner_only(actor)
+    from .updater import UpdateError, check_for_updates
+    try:
+        return check_for_updates(fetch=fetch)
+    except UpdateError as exc:
+        raise HTTPException(400, str(exc)) from None
+
+
+@router.get("/system/update/status")
+def system_update_status(actor: Actor = Depends(authenticate)):
+    owner_only(actor)
+    from .updater import get_update_status
+    return get_update_status()
+
+
+@router.post("/system/update/apply")
+def system_update_apply(
+    body: UpdateApplyIn | None = None,
+    actor: Actor = Depends(authenticate),
+    db: Session = Depends(get_session),
+):
+    owner_only(actor)
+    from sqlalchemy import func
+    from .updater import UpdateError, start_update_job
+    running_count = db.scalar(select(func.count(Task.id)).where(Task.status == "running")) or 0
+    if running_count > 0 and not (body and body.force):
+        raise Conflict(f"There are {running_count} running tasks; finish or cancel them first, or confirm force update")
+    try:
+        status_data = start_update_job()
+    except UpdateError as exc:
+        raise HTTPException(400, str(exc)) from None
+    emit(db, actor, "system.update_started", "system", payload={"force": bool(body and body.force)})
+    db.commit()
+    return status_data
+
+
 class MultipartInitIn(BaseModel):
     filename: str = Field(min_length=1, max_length=240)
     sensitivity: str = "internal"

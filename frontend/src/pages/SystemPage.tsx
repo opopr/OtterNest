@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AlertCircle, Activity, CheckCircle2, Clock3, RefreshCw,
+  AlertCircle, Activity, CheckCircle2, Clock3, DownloadCloud, RefreshCw,
   Shield, ShieldAlert, X
 } from "lucide-react";
 import { getApiOrigin, healthRequest, request } from "../api/client";
@@ -25,6 +25,28 @@ interface ConnectionDiagnostics {
   api: ConnectionCheck;
   database: ConnectionCheck;
   identity: ConnectionCheck;
+}
+interface UpdateCheckResult {
+  enabled: boolean;
+  branch: string;
+  target_ref: string;
+  current_commit: string;
+  remote_commit: string;
+  behind_count: number;
+  update_available: boolean;
+  working_tree_clean: boolean;
+  recent_commits: string[];
+  fetch_error: string;
+  restart_command_configured: boolean;
+  checked_at: string;
+}
+interface UpdateStatusResult {
+  state: "idle" | "running" | "succeeded" | "failed" | string;
+  step: string;
+  logs: string[];
+  started_at: string | null;
+  finished_at: string | null;
+  error: string;
 }
 
 const modeLabel: Record<string, string> = { normal: "正常运行", degraded: "降级运行", readonly_protect: "只读保护" };
@@ -57,6 +79,72 @@ export default function SystemPage() {
   const [connectionChecks, setConnectionChecks] = useState<ConnectionDiagnostics | null>(null);
   const [checkingConnection, setCheckingConnection] = useState(false);
   const [connectionCheckedAt, setConnectionCheckedAt] = useState("");
+  const [updateCheck, setUpdateCheck] = useState<UpdateCheckResult | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatusResult | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [applyingUpdate, setApplyingUpdate] = useState(false);
+
+  const checkForUpdates = useCallback(async (fetchRemote = true) => {
+    setCheckingUpdate(true);
+    try {
+      const [info, status] = await Promise.all([
+        request<UpdateCheckResult>("/system/update/check?fetch=" + (fetchRemote ? "true" : "false")),
+        request<UpdateStatusResult>("/system/update/status")
+      ]);
+      setUpdateCheck(info);
+      setUpdateStatus(status);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "检查更新失败");
+    } finally {
+      setCheckingUpdate(false);
+    }
+  }, []);
+
+  const applySelfUpdate = async (force = false) => {
+    if (!force && !window.confirm("确认执行一键更新？将自动拉取最新代码、执行数据库迁移、重新构建前端并重启服务。")) return;
+    setApplyingUpdate(true);
+    setError("");
+    try {
+      const res = await request<UpdateStatusResult>("/system/update/apply", {
+        method: "POST",
+        body: JSON.stringify({ force })
+      });
+      setUpdateStatus(res);
+    } catch (reason) {
+      const msg = reason instanceof Error ? reason.message : "触发更新失败";
+      if (!force && msg.includes("running tasks")) {
+        if (window.confirm(msg + "\n\n是否强制继续更新？")) {
+          await applySelfUpdate(true);
+          return;
+        }
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setApplyingUpdate(false);
+    }
+  };
+
+  useEffect(() => {
+    void checkForUpdates(false);
+  }, [checkForUpdates]);
+
+  useEffect(() => {
+    if (updateStatus?.state !== "running") return;
+    const timer = window.setInterval(() => {
+      void request<UpdateStatusResult>("/system/update/status")
+        .then((status) => {
+          setUpdateStatus(status);
+          if (status.state !== "running") {
+            void checkForUpdates(false);
+          }
+        })
+        .catch(() => {
+          // Server may be restarting during final step; keep polling until it recovers.
+        });
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [updateStatus?.state, checkForUpdates]);
 
   const checkConnection = useCallback(async () => {
     setCheckingConnection(true);
@@ -207,6 +295,56 @@ export default function SystemPage() {
         <div className="form-actions">
           <a className="secondary-button compact" href={getApiOrigin() + "/api/docs"} target="_blank" rel="noreferrer">打开 FastAPI 文档</a>
         </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-heading">
+          <div className="panel-title"><DownloadCloud size={17} /><h3>系统版本与一键更新</h3></div>
+          <div className="heading-actions" style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            {updateCheck && <span className={"status-tag " + (updateCheck.update_available ? "tag-amber" : "tag-green")}>
+              {updateCheck.update_available ? `发现 ${updateCheck.behind_count} 个新提交` : "已是最新版本"}
+            </span>}
+            <button className="secondary-button compact" onClick={() => void checkForUpdates(true)} disabled={checkingUpdate || updateStatus?.state === "running"}>
+              <RefreshCw size={14} className={checkingUpdate ? "spin" : ""} />检查更新
+            </button>
+            <button
+              className="primary-button compact"
+              onClick={() => void applySelfUpdate(false)}
+              disabled={applyingUpdate || updateStatus?.state === "running" || !updateCheck?.enabled}
+              title={!updateCheck?.enabled ? "需在服务端配置 OTTERNEST_ENABLE_WEB_UPDATE=true" : ""}
+            >
+              <DownloadCloud size={14} />{updateStatus?.state === "running" ? "更新执行中…" : "一键更新并重启"}
+            </button>
+          </div>
+        </div>
+        {updateCheck && (
+          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", fontSize: "13px", marginBottom: "10px" }}>
+            <span>分支：<code>{updateCheck.branch}</code></span>
+            <span>当前版本：<code>{updateCheck.current_commit}</code></span>
+            <span>远端版本：<code>{updateCheck.remote_commit}</code></span>
+            <span>工作区：{updateCheck.working_tree_clean ? "干净" : "有未提交修改"}</span>
+            <span>自动重启：{updateCheck.restart_command_configured ? "已配置" : "未配置（仅拉取/迁移/构建）"}</span>
+          </div>
+        )}
+        {updateCheck && !updateCheck.enabled && (
+          <div className="connection-help" style={{ marginBottom: "10px" }}>
+            网页一键更新当前处于关闭状态。如需在页面直接更新，请在服务端环境变量中配置 <code>OTTERNEST_ENABLE_WEB_UPDATE=true</code>（以及可选的 <code>OTTERNEST_RESTART_COMMAND</code>）。
+          </div>
+        )}
+        {updateCheck && updateCheck.recent_commits.length > 0 && (
+          <pre className="json-preview" style={{ marginBottom: "10px" }}>{updateCheck.recent_commits.join("\n")}</pre>
+        )}
+        {updateStatus && updateStatus.state !== "idle" && (
+          <div style={{ marginTop: "8px" }}>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px" }}>
+              <span className={"status-tag " + (updateStatus.state === "succeeded" ? "tag-green" : updateStatus.state === "running" ? "tag-amber" : "tag-neutral")}>
+                {updateStatus.state === "running" ? `执行中：${updateStatus.step}` : updateStatus.state === "succeeded" ? "更新成功" : "更新失败"}
+              </span>
+              {updateStatus.error && <span style={{ color: "#b91c1c", fontSize: "12px" }}>{updateStatus.error}</span>}
+            </div>
+            {updateStatus.logs.length > 0 && <pre className="json-preview">{updateStatus.logs.join("\n")}</pre>}
+          </div>
+        )}
       </section>
 
       {loading && !systemMode ? <div className="panel-loading"><div className="spinner" />正在读取系统状态…</div> : <>
