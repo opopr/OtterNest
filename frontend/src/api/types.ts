@@ -11,6 +11,7 @@ export interface Agent {
   id: string; name: string; platform: string;
   execution_mode: "manual" | "polling" | "remote";
   enabled: boolean; declared_capabilities: string[]; verified_capabilities: string[];
+  deleted_at?: string | null;
 }
 export interface Task {
   id: string; project_id: string; goal_id: string | null; title: string;

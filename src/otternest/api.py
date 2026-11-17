@@ -223,13 +223,16 @@ def register_agent(body: AgentIn, actor: Actor = Depends(authenticate), db: Sess
     emit(db, actor, "agent.registered", agent.id)
     db.commit()
     # The token is only returned at creation time; never included in list responses.
-    return {**as_dict(agent, "id", "name", "platform", "execution_mode", "enabled", "declared_capabilities", "verified_capabilities"), "token": credential}
+    return {**as_dict(agent, "id", "name", "platform", "execution_mode", "enabled", "declared_capabilities", "verified_capabilities", "deleted_at"), "token": credential}
 
 
 @router.get("/agents")
-def agents(actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+def agents(include_deleted: bool = False, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     owner_only(actor)
-    return [as_dict(a, "id", "name", "platform", "execution_mode", "enabled", "declared_capabilities", "verified_capabilities") for a in db.scalars(select(Agent))]
+    query = select(Agent)
+    if not include_deleted:
+        query = query.where(Agent.deleted_at.is_(None))
+    return [as_dict(a, "id", "name", "platform", "execution_mode", "enabled", "declared_capabilities", "verified_capabilities", "deleted_at") for a in db.scalars(query)]
 
 
 @router.put("/agents/{agent_id}/verified-capabilities")
@@ -346,12 +349,92 @@ def schedule_project(project_id: str, body: ScheduleIn, actor: Actor = Depends(a
 def disable_agent(agent_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     owner_only(actor)
     agent = db.get(Agent, agent_id)
-    if not agent:
+    if not agent or agent.deleted_at is not None:
         raise HTTPException(404, "Agent not found")
     agent.enabled = False
     emit(db, actor, "agent.disabled", agent.id)
     db.commit()
     return {"id": agent_id, "enabled": False}
+
+
+@router.post("/agents/{agent_id}/enable")
+def enable_agent(agent_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    owner_only(actor)
+    agent = db.get(Agent, agent_id)
+    if not agent or agent.deleted_at is not None:
+        raise HTTPException(404, "Agent not found or is in recycle bin")
+    agent.enabled = True
+    emit(db, actor, "agent.enabled", agent.id)
+    db.commit()
+    return {"id": agent_id, "enabled": True}
+
+
+@router.delete("/agents/{agent_id}")
+def delete_agent(agent_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    """Soft-delete an agent into the recycle bin."""
+    owner_only(actor)
+    agent = db.scalar(select(Agent).where(Agent.id == agent_id).with_for_update())
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+    if agent.deleted_at is not None:
+        raise Conflict("Agent is already in the recycle bin")
+    running_task = db.scalar(
+        select(Task).where(Task.assigned_agent_id == agent_id, Task.status == "running")
+    )
+    if running_task:
+        raise Conflict("Cannot delete agent while it holds an active running task")
+    agent.enabled = False
+    agent.deleted_at = now()
+    for membership in db.scalars(select(Membership).where(Membership.agent_id == agent_id)):
+        membership.enabled = False
+    emit(db, actor, "agent.deleted", agent.id)
+    db.commit()
+    return {"id": agent_id, "deleted_at": agent.deleted_at.isoformat(), "enabled": False}
+
+
+@router.post("/agents/{agent_id}/restore")
+def restore_agent(agent_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    """Restore a soft-deleted agent from the recycle bin."""
+    owner_only(actor)
+    agent = db.scalar(select(Agent).where(Agent.id == agent_id).with_for_update())
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+    if agent.deleted_at is None:
+        raise Conflict("Agent is not in the recycle bin")
+    agent.deleted_at = None
+    agent.enabled = True
+    emit(db, actor, "agent.restored", agent.id)
+    db.commit()
+    return as_dict(agent, "id", "name", "platform", "execution_mode", "enabled", "declared_capabilities", "verified_capabilities", "deleted_at")
+
+
+@router.delete("/agents/{agent_id}/permanent")
+def permanent_delete_agent(agent_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    """Permanently purge an agent from the recycle bin if no historical tasks/records depend on it."""
+    owner_only(actor)
+    agent = db.scalar(select(Agent).where(Agent.id == agent_id).with_for_update())
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+    if agent.deleted_at is None:
+        raise Conflict("Move agent to recycle bin before permanent deletion")
+    has_task = db.scalar(
+        select(Task.id).where((Task.assigned_agent_id == agent_id) | (Task.target_agent_id == agent_id)).limit(1)
+    )
+    if has_task:
+        raise Conflict("Agent has historical task references and cannot be permanently purged; keep it in recycle bin")
+    for rt in db.scalars(select(AgentRuntime).where(AgentRuntime.agent_id == agent_id)):
+        db.delete(rt)
+    for m in db.scalars(select(Membership).where(Membership.agent_id == agent_id)):
+        db.delete(m)
+    try:
+        db.delete(agent)
+        db.flush()
+    except Exception:
+        db.rollback()
+        raise Conflict("Agent has historical references and cannot be permanently purged") from None
+    emit(db, actor, "agent.permanently_deleted", agent_id)
+    db.commit()
+    return {"id": agent_id, "permanently_deleted": True}
 
 
 @router.post("/projects/{project_id}/members", status_code=201)

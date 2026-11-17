@@ -71,6 +71,7 @@ class Agent(Base):
     execution_mode: Mapped[str] = mapped_column(String(24), default="manual", nullable=False)
     declared_capabilities: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     verified_capabilities: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
 
 

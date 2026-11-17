@@ -81,14 +81,14 @@ def actor_from_token(token: str, db: Session) -> Actor:
             if account and (not account.totp_enabled or session.mfa_verified):
                 return Actor("owner", "owner", "session")
     if token.startswith("on_agent_"):
-        agent = db.scalar(select(Agent).where(Agent.token_hash == hash_token(token), Agent.enabled.is_(True)))
+        agent = db.scalar(select(Agent).where(Agent.token_hash == hash_token(token), Agent.enabled.is_(True), Agent.deleted_at.is_(None)))
         if agent:
             return Actor("agent", agent.id, "agent_token")
     if token.startswith("on_runtime_"):
         runtime = db.scalar(select(AgentRuntime).where(AgentRuntime.token_hash == hash_token(token), AgentRuntime.enabled.is_(True)))
         if runtime:
             agent = db.get(Agent, runtime.agent_id)
-            if agent and agent.enabled:
+            if agent and agent.enabled and agent.deleted_at is None:
                 return Actor("agent", agent.id, "runtime_token", runtime_id=runtime.id)
     raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
 

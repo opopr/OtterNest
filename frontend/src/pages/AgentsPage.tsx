@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  Bot, Copy, Cpu, KeyRound, Plus, RefreshCw, ShieldCheck,
-  Terminal, X, XCircle
+  Bot, Copy, Cpu, KeyRound, Plus, Power, RefreshCw, RotateCcw, ShieldCheck,
+  Terminal, Trash2, X, XCircle
 } from "lucide-react";
 import { request } from "../api/client";
 import type { Agent } from "../api/types";
@@ -38,16 +38,20 @@ export default function AgentsPage() {
   const [verifiedCapabilities, setVerifiedCapabilities] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [tab, setTab] = useState<"active" | "trash">("active");
 
+  const activeAgents = useMemo(() => agents.filter((agent) => !agent.deleted_at), [agents]);
+  const trashedAgents = useMemo(() => agents.filter((agent) => Boolean(agent.deleted_at)), [agents]);
+  const visibleAgents = tab === "active" ? activeAgents : trashedAgents;
   const selectedAgent = useMemo(() => agents.find((agent) => agent.id === selectedAgentId) || null, [agents, selectedAgentId]);
 
   const loadAgents = useCallback(async () => {
     setLoading(true);
     try {
-      const rows = await request<Agent[]>("/agents");
+      const rows = await request<Agent[]>("/agents?include_deleted=true");
       setAgents(rows);
       setError("");
-      setSelectedAgentId((current) => rows.some((agent) => agent.id === current) ? current : "");
+      setSelectedAgentId((current) => rows.some((agent) => agent.id === current && !agent.deleted_at) ? current : "");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Agent 列表读取失败");
     } finally { setLoading(false); }
@@ -148,14 +152,52 @@ export default function AgentsPage() {
     finally { setSaving(false); }
   };
 
-  const disableAgent = async () => {
-    if (!selectedAgent || !window.confirm("确认禁用 Agent？相关 Runtime 不会被自动终止，请单独检查外部进程。")) return;
+  const disableAgent = async (agent: Agent) => {
+    if (!window.confirm(`确认停用 Agent「${agent.name}」？它将无法继续领取新任务或鉴权。`)) return;
     setSaving(true);
     try {
-      await request("/agents/" + encodeURIComponent(selectedAgent.id) + "/disable", { method: "POST" });
-      setSelectedAgentId("");
+      await request("/agents/" + encodeURIComponent(agent.id) + "/disable", { method: "POST" });
       await loadAgents();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "禁用 Agent 失败"); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "停用 Agent 失败"); }
+    finally { setSaving(false); }
+  };
+
+  const enableAgent = async (agent: Agent) => {
+    setSaving(true);
+    try {
+      await request("/agents/" + encodeURIComponent(agent.id) + "/enable", { method: "POST" });
+      await loadAgents();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "启用 Agent 失败"); }
+    finally { setSaving(false); }
+  };
+
+  const deleteAgent = async (agent: Agent) => {
+    if (!window.confirm(`确认删除 Agent「${agent.name}」并移入回收站？它将被立即停用，稍后可在回收站恢复。`)) return;
+    setSaving(true);
+    try {
+      await request("/agents/" + encodeURIComponent(agent.id), { method: "DELETE" });
+      if (selectedAgentId === agent.id) setSelectedAgentId("");
+      await loadAgents();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "删除 Agent 失败"); }
+    finally { setSaving(false); }
+  };
+
+  const restoreAgent = async (agent: Agent) => {
+    setSaving(true);
+    try {
+      await request("/agents/" + encodeURIComponent(agent.id) + "/restore", { method: "POST" });
+      await loadAgents();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "恢复 Agent 失败"); }
+    finally { setSaving(false); }
+  };
+
+  const permanentDeleteAgent = async (agent: Agent) => {
+    if (!window.confirm(`警告：确认彻底永久删除 Agent「${agent.name}」？此操作不可恢复。`)) return;
+    setSaving(true);
+    try {
+      await request("/agents/" + encodeURIComponent(agent.id) + "/permanent", { method: "DELETE" });
+      await loadAgents();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "彻底删除 Agent 失败"); }
     finally { setSaving(false); }
   };
 
@@ -208,12 +250,30 @@ export default function AgentsPage() {
         </form>
       )}
 
+      <div className="governance-tabs">
+        <button className={tab === "active" ? "selected" : ""} onClick={() => setTab("active")}>
+          <Bot size={16} />已登记 Agent <span>{activeAgents.length}</span>
+        </button>
+        <button className={tab === "trash" ? "selected" : ""} onClick={() => { setTab("trash"); setSelectedAgentId(""); }}>
+          <Trash2 size={16} />回收站 <span>{trashedAgents.length}</span>
+        </button>
+      </div>
+
       <div className="agent-grid">
-        {loading ? <div className="panel-loading"><div className="spinner" /></div> : agents.length === 0 ? (
-          <div className="panel empty-state"><Bot size={30} /><strong>尚未登记 Agent</strong><p>创建一个身份后，再配置项目成员关系与执行环境。</p></div>
-        ) : agents.map((agent) => (
+        {loading ? <div className="panel-loading"><div className="spinner" /></div> : visibleAgents.length === 0 ? (
+          <div className="panel empty-state">
+            {tab === "active" ? <Bot size={30} /> : <Trash2 size={30} />}
+            <strong>{tab === "active" ? "尚未登记 Agent" : "回收站为空"}</strong>
+            <p>{tab === "active" ? "创建一个身份后，再配置项目成员关系与执行环境。" : "已删除的 Agent 会暂存在这里，支持随时恢复或彻底删除。"}</p>
+          </div>
+        ) : visibleAgents.map((agent) => (
           <article className={"panel agent-card " + (selectedAgentId === agent.id ? "agent-card-selected" : "")} key={agent.id}>
-            <div className="agent-card-head"><div className="agent-avatar"><Bot size={20} /></div><span className={"status-tag " + (agent.enabled ? "tag-green" : "tag-neutral")}>{agent.enabled ? "已启用" : "已禁用"}</span></div>
+            <div className="agent-card-head">
+              <div className="agent-avatar"><Bot size={20} /></div>
+              <span className={"status-tag " + (agent.deleted_at ? "tag-neutral" : agent.enabled ? "tag-green" : "tag-amber")}>
+                {agent.deleted_at ? "已删除" : agent.enabled ? "已启用" : "已停用"}
+              </span>
+            </div>
             <h3>{agent.name}</h3><p>{agent.platform} · {agent.execution_mode}</p>
             <div className="agent-capabilities"><span>声明能力 {agent.declared_capabilities.length}</span><span>已核验 {agent.verified_capabilities.length}</span></div>
             <div className="capability-list">
@@ -222,7 +282,34 @@ export default function AgentsPage() {
                 : <span className="muted-inline">暂无已核验能力</span>}
             </div>
             <small className="agent-id">ID · {agent.id}</small>
-            <button className="secondary-button compact agent-detail-button" onClick={() => setSelectedAgentId((current) => current === agent.id ? "" : agent.id)}><Cpu size={14} />{selectedAgentId === agent.id ? "收起运行环境" : "运行环境与能力"}</button>
+            {tab === "active" ? (
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "8px" }}>
+                <button className="secondary-button compact agent-detail-button" style={{ flex: 1 }} onClick={() => setSelectedAgentId((current) => current === agent.id ? "" : agent.id)}>
+                  <Cpu size={14} />{selectedAgentId === agent.id ? "收起" : "环境与能力"}
+                </button>
+                {agent.enabled ? (
+                  <button className="secondary-button compact" disabled={saving} onClick={() => void disableAgent(agent)} title="停用">
+                    <XCircle size={14} />停用
+                  </button>
+                ) : (
+                  <button className="secondary-button compact" disabled={saving} onClick={() => void enableAgent(agent)} title="启用">
+                    <Power size={14} />启用
+                  </button>
+                )}
+                <button className="text-button" disabled={saving} onClick={() => void deleteAgent(agent)} title="移入回收站">
+                  <Trash2 size={14} />删除
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
+                <button className="primary-button compact" style={{ flex: 1 }} disabled={saving} onClick={() => void restoreAgent(agent)}>
+                  <RotateCcw size={14} />恢复
+                </button>
+                <button className="text-button" disabled={saving} onClick={() => void permanentDeleteAgent(agent)}>
+                  <Trash2 size={14} />彻底删除
+                </button>
+              </div>
+            )}
           </article>
         ))}
       </div>
@@ -243,7 +330,7 @@ export default function AgentsPage() {
             {Object.keys(runtime.last_health || {}).length > 0 && <pre className="json-preview">{JSON.stringify(runtime.last_health, null, 2)}</pre>}
             <div className="runtime-actions">{runtime.enabled && <button className="secondary-button compact" disabled={saving} onClick={() => void issueRuntimeToken(runtime)}><KeyRound size={13} />签发 / 轮换凭据</button>}{runtime.enabled && <button className="text-button" disabled={saving} onClick={() => void disableRuntime(runtime)}><XCircle size={13} />禁用 Runtime</button>}</div>
           </article>)}{!runtimes.length && <div className="empty-mini">尚未登记 Runtime。创建 Runtime 后，Runner 使用独立凭据定期上报心跳。</div>}</div>
-          {selectedAgent.enabled && <div className="agent-disable-row"><span className="form-hint">禁用 Agent 会阻止新分配；它不会自动终止外部机器上的进程。</span><button className="text-button" disabled={saving} onClick={() => void disableAgent()}><XCircle size={14} />禁用整个 Agent</button></div>}
+          {selectedAgent.enabled && <div className="agent-disable-row"><span className="form-hint">停用 Agent 会阻止新分配；它不会自动终止外部机器上的进程。</span><button className="text-button" disabled={saving} onClick={() => void disableAgent(selectedAgent)}><XCircle size={14} />停用整个 Agent</button></div>}
         </section>
       )}
     </div>
