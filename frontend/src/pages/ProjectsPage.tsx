@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { AlertCircle, FolderKanban, Plus, RefreshCw, Search, Trash2, Users, X } from "lucide-react";
+import { AlertCircle, FolderKanban, Pencil, Plus, RefreshCw, Search, Trash2, Users, X } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { request } from "../api/client";
 import type { Agent, Project, Task } from "../api/types";
@@ -30,6 +30,10 @@ export default function ProjectsPage() {
   const [newMemberAgentId, setNewMemberAgentId] = useState("");
   const [newMemberRole, setNewMemberRole] = useState<ProjectMember["role"]>("worker");
   const [showMemberForm, setShowMemberForm] = useState(false);
+  const [editingProject, setEditingProject] = useState(false);
+  const [editProjectName, setEditProjectName] = useState("");
+  const [editProjectDescription, setEditProjectDescription] = useState("");
+  const [editProjectPriority, setEditProjectPriority] = useState("50");
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState("");
@@ -200,6 +204,49 @@ export default function ProjectsPage() {
     } finally { setSaving(false); }
   };
 
+  const startEditProject = () => {
+    if (!selectedProject) return;
+    setEditProjectName(selectedProject.name);
+    setEditProjectDescription(selectedProject.description || "");
+    setEditProjectPriority(String(selectedProject.priority ?? 50));
+    setEditingProject(true);
+  };
+
+  const saveEditProject = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedProject) return;
+    setSaving(true);
+    setError("");
+    try {
+      const updated = await request<Project>("/projects/" + encodeURIComponent(selectedProject.id), {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: editProjectName.trim(),
+          description: editProjectDescription.trim(),
+          priority: Number(editProjectPriority) || 50
+        })
+      });
+      setProjects((cur) => cur.map((p) => p.id === updated.id ? updated : p));
+      setEditingProject(false);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "修改项目失败");
+    } finally { setSaving(false); }
+  };
+
+  const deleteProject = async () => {
+    if (!selectedProject || !window.confirm(`确认永久删除项目「${selectedProject.name}」及其所有目标、任务与记录？此操作不可撤销。`)) return;
+    setSaving(true);
+    setError("");
+    try {
+      await request("/projects/" + encodeURIComponent(selectedProject.id), { method: "DELETE" });
+      setEditingProject(false);
+      setSelectedId("");
+      await loadProjects();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "删除项目失败");
+    } finally { setSaving(false); }
+  };
+
   const visibleProjects = projects.filter((project) =>
     (project.name + " " + project.description).toLowerCase().includes(query.toLowerCase())
   );
@@ -257,8 +304,24 @@ export default function ProjectsPage() {
                   <div className="project-avatar large"><FolderKanban size={21} /></div>
                   <div><div className="eyebrow">PROJECT</div><h2>{selectedProject.name}</h2><p>{selectedProject.description || "暂无项目说明"}</p></div>
                 </div>
-                <span className={"status-tag " + (selectedProject.status === "active" ? "tag-green" : "tag-neutral")}>{selectedProject.status}</span>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <span className={"status-tag " + (selectedProject.status === "active" ? "tag-green" : "tag-neutral")}>{selectedProject.status}</span>
+                  <button className="secondary-button compact" onClick={startEditProject} disabled={saving}><Pencil size={13} />编辑</button>
+                  <button className="text-button" onClick={() => void deleteProject()} disabled={saving}><Trash2 size={14} />删除项目</button>
+                </div>
               </div>
+
+              {editingProject && (
+                <form className="panel form-panel" onSubmit={saveEditProject}>
+                  <div className="panel-heading"><div className="panel-title"><Pencil size={16} /><h3>编辑项目</h3></div><button type="button" className="icon-button" onClick={() => setEditingProject(false)}><X size={17} /></button></div>
+                  <div className="form-grid three">
+                    <label>项目名称<input value={editProjectName} onChange={(e) => setEditProjectName(e.target.value)} required maxLength={160} /></label>
+                    <label>项目说明<input value={editProjectDescription} onChange={(e) => setEditProjectDescription(e.target.value)} maxLength={3000} /></label>
+                    <label>优先级 (0-100)<input type="number" min={0} max={100} value={editProjectPriority} onChange={(e) => setEditProjectPriority(e.target.value)} /></label>
+                  </div>
+                  <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "保存中…" : "保存修改"}</button></div>
+                </form>
+              )}
 
               <div className="section-heading compact-heading">
                 <div><h2>任务列表</h2><p>{tasks.length} 项任务 · 按创建时间倒序</p></div>

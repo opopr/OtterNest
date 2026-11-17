@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  AlertCircle, ArrowUp, GitBranch, ListChecks, Plus, RefreshCw,
-  Workflow, X, Zap
+  AlertCircle, ArrowUp, GitBranch, ListChecks, Pencil, Plus, RefreshCw,
+  Trash2, Workflow, X, Zap
 } from "lucide-react";
 import { request } from "../api/client";
 import type { Project } from "../api/types";
@@ -201,6 +201,42 @@ export default function GoalsWorkflowPage() {
     finally { setSaving(false); }
   };
 
+  const deleteRule = async (rule: WorkflowRule) => {
+    if (!window.confirm(`确认删除工作流规则「${rule.name}」？`)) return;
+    setSaving(true);
+    try {
+      await request("/workflow-rules/" + encodeURIComponent(rule.id), { method: "DELETE" });
+      await loadProjectData(selectedId);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "删除规则失败"); }
+    finally { setSaving(false); }
+  };
+
+  const editGoal = async (goal: Goal) => {
+    const title = window.prompt("修改目标名称：", goal.title);
+    if (!title || !title.trim()) return;
+    const criteria = window.prompt("修改成功标准：", goal.success_criteria);
+    if (!criteria || !criteria.trim()) return;
+    setSaving(true);
+    try {
+      await request("/goals/" + encodeURIComponent(goal.id), {
+        method: "PATCH",
+        body: JSON.stringify({ title: title.trim(), success_criteria: criteria.trim() })
+      });
+      await loadProjectData(selectedId);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "修改目标失败"); }
+    finally { setSaving(false); }
+  };
+
+  const deleteGoal = async (goal: Goal) => {
+    if (!window.confirm(`确认删除目标「${goal.title}」？关联的非运行任务将保留但解除绑定。`)) return;
+    setSaving(true);
+    try {
+      await request("/goals/" + encodeURIComponent(goal.id), { method: "DELETE" });
+      await loadProjectData(selectedId);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "删除目标失败"); }
+    finally { setSaving(false); }
+  };
+
   const evaluateRules = async () => {
     if (!window.confirm("将评估该项目最近 50 条事件，并按已启用规则执行动作（可能创建任务或通知）。继续？")) return;
     setSaving(true);
@@ -246,7 +282,7 @@ export default function GoalsWorkflowPage() {
                   {goal.status !== "completed" && predecessorOptions.length > 0 && <div className="dependency-add"><select value={dependencySelections[goal.id] || ""} onChange={(event) => setDependencySelections((current) => ({ ...current, [goal.id]: event.target.value }))}><option value="">选择前置目标…</option>{predecessorOptions.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><button className="secondary-button compact" disabled={!dependencySelections[goal.id] || saving} onClick={() => void addDependency(goal)}>添加</button></div>}
                 </div>
                 {goal.completion_blockers.length > 0 && <div className="goal-blockers">完成门槛：{goal.completion_blockers.map((item) => item === "prerequisite_goals_incomplete" ? "前置目标未完成" : "关联任务未全部验收").join("、")}</div>}
-                <div className="goal-card-actions">{goal.status === "active" && <button className="text-button" onClick={() => void changeGoalStatus(goal, "paused")}>暂停</button>}{goal.status === "paused" && <button className="text-button" onClick={() => void changeGoalStatus(goal, "active")}>恢复</button>}{goal.status !== "completed" && <button className="secondary-button compact" disabled={!goal.can_complete || saving} onClick={() => void changeGoalStatus(goal, "completed")}>完成目标</button>}</div>
+                <div className="goal-card-actions">{goal.status === "active" && <button className="text-button" onClick={() => void changeGoalStatus(goal, "paused")}>暂停</button>}{goal.status === "paused" && <button className="text-button" onClick={() => void changeGoalStatus(goal, "active")}>恢复</button>}{goal.status !== "completed" && <button className="secondary-button compact" disabled={!goal.can_complete || saving} onClick={() => void changeGoalStatus(goal, "completed")}>完成目标</button>}<button className="text-button" disabled={saving} onClick={() => void editGoal(goal)}><Pencil size={13} />编辑</button><button className="text-button" disabled={saving} onClick={() => void deleteGoal(goal)}><Trash2 size={13} />删除</button></div>
               </article>;
             })}
             {!board?.goals.length && <div className="empty-state"><GitBranch size={25} /><strong>尚未定义目标</strong><p>创建目标后，可以为目标添加前置依赖。系统会阻止循环依赖和不满足完成条件的目标被标记为完成。</p></div>}
@@ -271,7 +307,7 @@ export default function GoalsWorkflowPage() {
             </form>}
             <div className="workflow-rule-list">
               {rules.map((rule) => <article className="workflow-rule-card" key={rule.id}>
-                <div className="workflow-rule-icon"><Zap size={18} /></div><div className="workflow-rule-main"><div><strong>{rule.name}</strong><span className={"status-tag " + (rule.enabled ? "tag-green" : "tag-neutral")}>{rule.enabled ? "已启用" : "已停用"}</span></div><p><code>{rule.event_prefix}</code> → {rule.action_kind === "create_task" ? "创建跟进任务" : "发送收件箱通知"}</p><small>已触发 {rule.triggered_count} 次 · 最大链深度 {rule.max_chain_depth} · 冷却 {rule.cooldown_seconds}s</small></div><button className="secondary-button compact" disabled={saving} onClick={() => void toggleRule(rule)}>{rule.enabled ? "停用" : "启用"}</button>
+                <div className="workflow-rule-icon"><Zap size={18} /></div><div className="workflow-rule-main"><div><strong>{rule.name}</strong><span className={"status-tag " + (rule.enabled ? "tag-green" : "tag-neutral")}>{rule.enabled ? "已启用" : "已停用"}</span></div><p><code>{rule.event_prefix}</code> → {rule.action_kind === "create_task" ? "创建跟进任务" : "发送收件箱通知"}</p><small>已触发 {rule.triggered_count} 次 · 最大链深度 {rule.max_chain_depth} · 冷却 {rule.cooldown_seconds}s</small></div><div style={{ display: "flex", gap: "6px" }}><button className="secondary-button compact" disabled={saving} onClick={() => void toggleRule(rule)}>{rule.enabled ? "停用" : "启用"}</button><button className="text-button" disabled={saving} onClick={() => void deleteRule(rule)}><Trash2 size={14} />删除</button></div>
               </article>)}
               {!rules.length && <div className="empty-state"><Workflow size={24} /><strong>尚未配置工作流规则</strong><p>添加事件前缀规则，系统会在显式评估时按约束执行。</p></div>}
             </div>

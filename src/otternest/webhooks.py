@@ -100,6 +100,21 @@ def disable_webhook(webhook_id: str, actor: Actor = Depends(authenticate), db: S
     return {"id": endpoint.id, "enabled": False}
 
 
+@router.delete("/webhooks/{webhook_id}")
+def delete_webhook(webhook_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    owner_only(actor)
+    endpoint = db.get(WebhookEndpoint, webhook_id)
+    if not endpoint:
+        raise HTTPException(404, "Webhook not found")
+    for delivery in db.scalars(select(WebhookDelivery).where(WebhookDelivery.endpoint_id == webhook_id)):
+        db.delete(delivery)
+    pid = endpoint.project_id
+    db.delete(endpoint)
+    emit(db, actor, "webhook.deleted", webhook_id, pid)
+    db.commit()
+    return {"id": webhook_id, "deleted": True}
+
+
 def signature(secret: str, timestamp: str, body: bytes) -> str:
     mac = hmac.new(secret.encode(), timestamp.encode("ascii") + b"." + body, hashlib.sha256).hexdigest()
     return "sha256=" + mac

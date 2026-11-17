@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity, AlertCircle, ArrowRight, Clock3, GitBranch, Info,
-  Plus, RefreshCw, ShieldCheck, Trash2, X
+  Pencil, Plus, RefreshCw, ShieldCheck, Trash2, X
 } from "lucide-react";
 import { request } from "../api/client";
 import TaskExecutionSafety from "./TaskExecutionSafety";
@@ -166,6 +166,47 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
     }
   };
 
+  const [editingTask, setEditingTask] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editInstruction, setEditInstruction] = useState("");
+  const [editAcceptance, setEditAcceptance] = useState("");
+  const [editRisk, setEditRisk] = useState<"R0" | "R1" | "R2" | "R3">("R1");
+  const [editPriority, setEditPriority] = useState("50");
+
+  const startEditTask = () => {
+    if (!task) return;
+    setEditTitle(task.title);
+    setEditInstruction(task.instruction);
+    setEditAcceptance(task.acceptance);
+    setEditRisk(task.risk);
+    setEditPriority(String(task.priority));
+    setEditingTask(true);
+  };
+
+  const saveEditTask = async () => {
+    if (!task) return;
+    setSaving(true); setError("");
+    try {
+      await request("/tasks/" + encodeURIComponent(task.id), {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          instruction: editInstruction.trim(),
+          acceptance: editAcceptance.trim(),
+          risk: editRisk,
+          priority: Number(editPriority) || 50
+        })
+      });
+      setEditingTask(false);
+      await load();
+      onChanged();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "修改任务失败");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const taskNode = (row:Task,role:"upstream"|"downstream") => (
     <div className="dag-task" key={row.id}>
       <div className="dag-task-title"><strong>{row.title}</strong><span className={"status-tag "+(statusTones[row.status]||"tag-neutral")}>{statusLabels[row.status]||row.status}</span></div>
@@ -201,6 +242,22 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
           <section className="task-detail-section"><h3>失败原因</h3><p className="task-detail-pre">{task.failure_reason||"暂无失败记录"}</p></section>
         </div>
 
+        {editingTask && (
+          <section className="task-detail-section task-detail-wide">
+            <div className="task-detail-section-head"><h3><Pencil size={15}/>编辑任务</h3><button className="icon-button" onClick={() => setEditingTask(false)}><X size={15}/></button></div>
+            <div className="form-panel" style={{ padding: 0, boxShadow: "none", border: "none" }}>
+              <div className="form-grid three">
+                <label>任务标题<input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required maxLength={240}/></label>
+                <label>风险等级<select value={editRisk} onChange={(e) => setEditRisk(e.target.value as "R0"|"R1"|"R2"|"R3")}><option value="R0">R0</option><option value="R1">R1</option><option value="R2">R2</option><option value="R3">R3</option></select></label>
+                <label>优先级<input type="number" min={0} max={100} value={editPriority} onChange={(e) => setEditPriority(e.target.value)}/></label>
+              </div>
+              <label>执行说明<textarea rows={3} value={editInstruction} onChange={(e) => setEditInstruction(e.target.value)}/></label>
+              <label>验收标准<textarea rows={2} value={editAcceptance} onChange={(e) => setEditAcceptance(e.target.value)}/></label>
+              <div className="form-actions"><button className="primary-button compact" disabled={saving || !editTitle.trim()} onClick={() => void saveEditTask()}>保存任务修改</button></div>
+            </div>
+          </section>
+        )}
+
         <section className="task-detail-section task-detail-wide">
           <div className="task-detail-section-head"><div><h3><GitBranch size={16}/>依赖关系 DAG</h3><p>箭头方向表示执行顺序：上游依赖 → 当前任务 → 下游任务。</p></div><span className={"status-tag "+(dependencyInfo?.satisfied?"tag-green":"tag-amber")}>{dependencyInfo?.satisfied?"上游依赖已满足":"仍有依赖未满足"}</span></div>
           <div className="dag-layout">
@@ -228,6 +285,11 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
       <div className="task-detail-footer">
         <span><Clock3 size={13}/>任务数据以 FastAPI 服务端为准</span>
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          {isOwner && task && !["running", "completed", "cancelled"].includes(task.status) && (
+            <button className="secondary-button compact" disabled={saving} onClick={startEditTask}>
+              <Pencil size={13}/>编辑任务
+            </button>
+          )}
           {isOwner && task && task.status !== "running" && (
             <button className="text-button" disabled={saving} onClick={() => void deleteTask()}>
               <Trash2 size={14}/>删除任务

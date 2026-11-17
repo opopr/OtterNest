@@ -143,6 +143,29 @@ def disable_remote(endpoint_id: str, actor: Actor = Depends(authenticate), db: S
     return {"id": e.id, "enabled": False}
 
 
+@router.delete("/a2a/remotes/{endpoint_id}")
+def delete_remote(endpoint_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    owner_only(actor)
+    e = db.get(A2ARemoteEndpoint, endpoint_id, with_for_update=True)
+    if e is None:
+        raise HTTPException(404, "A2A peer not found")
+    active = db.scalar(
+        select(A2ADelegation.id).where(
+            A2ADelegation.endpoint_id == endpoint_id,
+            A2ADelegation.status.notin_(["canceled", "failed", "completed"]),
+        )
+    )
+    if active:
+        raise Conflict("Cannot delete A2A remote with active delegations")
+    for d in db.scalars(select(A2ADelegation).where(A2ADelegation.endpoint_id == endpoint_id)):
+        db.delete(d)
+    pid = e.project_id
+    db.delete(e)
+    emit(db, actor, "a2a.remote_deleted", endpoint_id, pid)
+    db.commit()
+    return {"id": endpoint_id, "deleted": True}
+
+
 @router.post("/tasks/{task_id}/a2a/delegate", status_code=201)
 def queue_delegation(task_id: str, body: DelegationIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     """Only the owner explicitly authorizes a low-risk cross-system handoff."""

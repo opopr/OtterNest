@@ -90,8 +90,9 @@ class OtterNestMCPClient:
             raise MCPBridgeError("A non-empty failure summary is required")
         return self._call("POST", f"/tasks/{self._id(task_id)}/fail", payload={"epoch": epoch, "summary": summary})
 
-    def list_memories(self, project_id: str) -> list[dict]:
-        return self._call("GET", f"/projects/{self._id(project_id)}/memories")
+    def list_memories(self, project_id: str, query: str = "") -> list[dict]:
+        params = {"q": query.strip()} if query.strip() else None
+        return self._call("GET", f"/projects/{self._id(project_id)}/memories", params=params)
 
     def propose_memory(self, project_id: str, title: str, content: str, source: str, kind: str = "fact") -> dict:
         return self._call("POST", f"/projects/{self._id(project_id)}/memories", payload={
@@ -227,9 +228,9 @@ def make_mcp_server(client: OtterNestMCPClient):
         return client.report_failure(task_id, epoch, summary)
 
     @server.tool()
-    def list_project_memories(project_id: str) -> list[dict]:
-        """List published project memories visible to this Agent."""
-        return client.list_memories(project_id)
+    def list_project_memories(project_id: str, query: str = "") -> list[dict]:
+        """List or hybrid-vector-search published project memories visible to this Agent."""
+        return client.list_memories(project_id, query=query)
 
     @server.tool()
     def propose_project_memory(project_id: str, title: str, content: str, source: str, kind: str = "fact") -> dict:

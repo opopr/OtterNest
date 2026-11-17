@@ -29,10 +29,22 @@ class ProjectIn(BaseModel):
     priority: int = Field(default=50, ge=0, le=100)
 
 
+class ProjectUpdateIn(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    description: str | None = Field(default=None, max_length=3000)
+    priority: int | None = Field(default=None, ge=0, le=100)
+
+
 class GoalIn(BaseModel):
     title: str = Field(min_length=1, max_length=240)
     success_criteria: str = Field(min_length=1, max_length=5000)
     priority: int = Field(default=50, ge=0, le=100)
+
+
+class GoalUpdateIn(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=240)
+    success_criteria: str | None = Field(default=None, min_length=1, max_length=5000)
+    priority: int | None = Field(default=None, ge=0, le=100)
 
 
 def valid_capabilities(values: list[str]) -> list[str]:
@@ -93,6 +105,21 @@ class TaskIn(BaseModel):
     required_capabilities: list[str] = Field(default_factory=list, max_length=32)
 
     _validate_required = field_validator("required_capabilities")(valid_capabilities)
+
+
+class TaskUpdateIn(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=240)
+    instruction: str | None = Field(default=None, min_length=1, max_length=12000)
+    acceptance: str | None = Field(default=None, min_length=1, max_length=6000)
+    risk: Literal["R0", "R1", "R2", "R3"] | None = None
+    priority: int | None = Field(default=None, ge=0, le=100)
+    sensitivity: Literal["public", "internal", "confidential", "restricted"] | None = None
+    required_capabilities: list[str] | None = Field(default=None, max_length=32)
+
+    @field_validator("required_capabilities")
+    @classmethod
+    def _validate_optional_caps(cls, v: list[str] | None) -> list[str] | None:
+        return valid_capabilities(v) if v is not None else None
 
 
 class DependencyIn(BaseModel):
@@ -215,6 +242,112 @@ def create_goal(project_id: str, body: GoalIn, actor: Actor = Depends(authentica
 def goals(project_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     require_project(db, project_id, actor)
     return [as_dict(g, "id", "title", "success_criteria", "priority", "status") for g in db.scalars(select(Goal).where(Goal.project_id == project_id).order_by(Goal.priority.desc()))]
+
+
+@router.patch("/projects/{project_id}")
+def update_project(project_id: str, body: ProjectUpdateIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    owner_only(actor)
+    require_writable_system(db)
+    project = require_project(db, project_id, actor)
+    if body.name is not None:
+        project.name = body.name
+    if body.description is not None:
+        project.description = body.description
+    if body.priority is not None:
+        project.priority = body.priority
+    emit(db, actor, "project.updated", project_id, project_id)
+    db.commit()
+    return as_dict(project, "id", "name", "description", "status", "priority")
+
+
+@router.delete("/projects/{project_id}")
+def delete_project(project_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    owner_only(actor)
+    require_writable_system(db)
+    project = require_project(db, project_id, actor)
+    running_task = db.scalar(select(Task.id).where(Task.project_id == project_id, Task.status == "running"))
+    if running_task:
+        raise Conflict("Cannot delete project while it has running tasks")
+
+    from .models import (
+        A2AInboxMessage, A2ARemoteEndpoint, CommandPlan, CrossProjectShare, DecisionAutoPolicy,
+        Experiment, GoalDependency, GoalPlanDraft, ProjectCharter, Skill, SkillEvaluation,
+        TaskCheckpoint, TaskGrant, TaskSideEffect, WebhookDelivery, WebhookEndpoint,
+        WorkflowCursor, WorkflowRule, WorkflowRun,
+    )
+    task_ids = [t.id for t in db.scalars(select(Task).where(Task.project_id == project_id))]
+    if task_ids:
+        for dep in db.scalars(select(TaskDependency).where((TaskDependency.task_id.in_(task_ids)) | (TaskDependency.depends_on_id.in_(task_ids)))):
+            db.delete(dep)
+    goal_ids = [g.id for g in db.scalars(select(Goal).where(Goal.project_id == project_id))]
+    if goal_ids:
+        for gd in db.scalars(select(GoalDependency).where((GoalDependency.goal_id.in_(goal_ids)) | (GoalDependency.depends_on_id.in_(goal_ids)))):
+            db.delete(gd)
+    webhook_ids = [w.id for w in db.scalars(select(WebhookEndpoint).where(WebhookEndpoint.project_id == project_id))]
+    if webhook_ids:
+        for wd in db.scalars(select(WebhookDelivery).where(WebhookDelivery.endpoint_id.in_(webhook_ids))):
+            db.delete(wd)
+    rule_ids = [r.id for r in db.scalars(select(WorkflowRule).where(WorkflowRule.project_id == project_id))]
+    if rule_ids:
+        for wc in db.scalars(select(WorkflowCursor).where(WorkflowCursor.rule_id.in_(rule_ids))):
+            db.delete(wc)
+    for model in (
+        WorkflowRun, WorkflowRule,
+        SkillEvaluation, Skill, TaskCheckpoint, TaskSideEffect, TaskGrant, CommandPlan,
+        A2AInboxMessage, A2ADelegation, A2ARemoteEndpoint, Artifact, Task, Goal, GoalPlanDraft,
+        Membership, Memory, DecisionReview, DecisionDeliberation, DecisionRebuttal, DecisionAutoPolicy, Decision,
+        ProjectCharter, WebhookEndpoint, Experiment, Notification,
+    ):
+        for row in db.scalars(select(model).where(model.project_id == project_id)):
+            db.delete(row)
+    for share in db.scalars(select(CrossProjectShare).where((CrossProjectShare.source_project_id == project_id) | (CrossProjectShare.target_project_id == project_id))):
+        db.delete(share)
+    for ev in db.scalars(select(Event).where(Event.project_id == project_id)):
+        ev.project_id = None
+    db.delete(project)
+    emit(db, actor, "project.deleted", project_id)
+    db.commit()
+    return {"id": project_id, "deleted": True}
+
+
+@router.patch("/goals/{goal_id}")
+def update_goal(goal_id: str, body: GoalUpdateIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    owner_only(actor)
+    require_writable_system(db)
+    goal = db.scalar(select(Goal).where(Goal.id == goal_id).with_for_update())
+    if not goal:
+        raise HTTPException(404, "Goal not found")
+    if body.title is not None:
+        goal.title = body.title
+    if body.success_criteria is not None:
+        goal.success_criteria = body.success_criteria
+    if body.priority is not None:
+        goal.priority = body.priority
+    emit(db, actor, "goal.updated", goal.id, goal.project_id)
+    db.commit()
+    return as_dict(goal, "id", "project_id", "title", "success_criteria", "priority", "status")
+
+
+@router.delete("/goals/{goal_id}")
+def delete_goal(goal_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    owner_only(actor)
+    require_writable_system(db)
+    goal = db.scalar(select(Goal).where(Goal.id == goal_id).with_for_update())
+    if not goal:
+        raise HTTPException(404, "Goal not found")
+    running_task = db.scalar(select(Task.id).where(Task.goal_id == goal_id, Task.status == "running"))
+    if running_task:
+        raise Conflict("Cannot delete goal while it has running tasks")
+    from .models import GoalDependency
+    for gd in db.scalars(select(GoalDependency).where((GoalDependency.goal_id == goal_id) | (GoalDependency.depends_on_id == goal_id))):
+        db.delete(gd)
+    for t in db.scalars(select(Task).where(Task.goal_id == goal_id)):
+        t.goal_id = None
+    pid = goal.project_id
+    db.delete(goal)
+    emit(db, actor, "goal.deleted", goal_id, pid)
+    db.commit()
+    return {"id": goal_id, "deleted": True}
 
 
 @router.post("/agents", status_code=201)
@@ -805,6 +938,37 @@ def cancel_task(task_id: str, actor: Actor = Depends(authenticate), db: Session 
     row.lease_until = None
     row.version += 1
     emit(db, actor, "task.cancelled", task_id, row.project_id)
+    db.commit()
+    return task_public(row)
+
+
+@router.patch("/tasks/{task_id}")
+def update_task(task_id: str, body: TaskUpdateIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    owner_only(actor)
+    require_writable_system(db)
+    row = require_task(db, task_id, actor, lock=True)
+    if row.status in {"running", "completed", "cancelled"}:
+        raise Conflict(f"Cannot edit task in status '{row.status}'")
+    if body.title is not None:
+        row.title = body.title
+    if body.instruction is not None:
+        row.instruction = body.instruction
+    if body.acceptance is not None:
+        row.acceptance = body.acceptance
+    if body.risk is not None:
+        row.risk = body.risk
+        if body.risk == "R3":
+            row.approval_granted = False
+            if row.status == "ready":
+                row.status = "waiting_approval"
+    if body.priority is not None:
+        row.priority = body.priority
+    if body.sensitivity is not None:
+        row.sensitivity = body.sensitivity
+    if body.required_capabilities is not None:
+        row.required_capabilities = body.required_capabilities
+    row.version += 1
+    emit(db, actor, "task.updated", task_id, row.project_id)
     db.commit()
     return task_public(row)
 

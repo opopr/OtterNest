@@ -166,6 +166,17 @@ export default function ExternalInterfacesPage() {
     finally { setSaving(false); }
   };
 
+  const deleteWebhook = async (endpoint: WebhookEndpoint) => {
+    if (!window.confirm("确认彻底删除此 Webhook 及其投递历史？")) return;
+    setSaving(true); setError("");
+    try {
+      await request("/webhooks/" + encodeURIComponent(endpoint.id), { method: "DELETE" });
+      await loadConnections(projectId);
+      setNotice("Webhook 已删除。");
+    } catch (reason) { setError(errorMessage(reason)); }
+    finally { setSaving(false); }
+  };
+
   const createRemote = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!projectId || !remoteAgentId) return;
@@ -193,6 +204,17 @@ export default function ExternalInterfacesPage() {
       await request("/a2a/remotes/" + encodeURIComponent(endpoint.id) + "/disable", { method: "POST" });
       await loadConnections(projectId);
       setNotice("A2A 远端已禁用，请检查已有委托。");
+    } catch (reason) { setError(errorMessage(reason)); }
+    finally { setSaving(false); }
+  };
+
+  const deleteRemote = async (endpoint: A2ARemote) => {
+    if (!window.confirm("确认彻底删除此 A2A 远端连接？")) return;
+    setSaving(true); setError("");
+    try {
+      await request("/a2a/remotes/" + encodeURIComponent(endpoint.id), { method: "DELETE" });
+      await loadConnections(projectId);
+      setNotice("A2A 远端已删除。");
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setSaving(false); }
   };
@@ -302,7 +324,8 @@ export default function ExternalInterfacesPage() {
           {webhooks.map((hook) => <div className="external-endpoint" key={hook.id}>
             <div><strong>{hook.url}</strong><p>事件：<code>{hook.event_prefix}</code> · ID：{hook.id.slice(0, 8)}</p></div>
             <div className="external-endpoint-actions"><span className={"status-tag " + (hook.enabled ? "tag-green" : "tag-neutral")}>{hook.enabled ? "已启用" : "已禁用"}</span>
-              {hook.enabled && <button className="text-button" disabled={saving} onClick={() => void disableWebhook(hook)}>禁用</button>}</div>
+              {hook.enabled && <button className="text-button" disabled={saving} onClick={() => void disableWebhook(hook)}>禁用</button>}
+              <button className="text-button" disabled={saving} onClick={() => void deleteWebhook(hook)}>删除</button></div>
           </div>)}
           {!loading && webhooks.length === 0 && <div className="empty-mini">当前项目尚未登记 Webhook。</div>}
         </div>
@@ -328,7 +351,8 @@ export default function ExternalInterfacesPage() {
             <div><strong>{agents.find((agent) => agent.id === remote.agent_id)?.name || remote.agent_id.slice(0, 8)}</strong>
               <p>{remote.url}</p>{remote.remote_project_id && <p>远端项目：{remote.remote_project_id}</p>}</div>
             <div className="external-endpoint-actions"><span className={"status-tag " + (remote.enabled ? "tag-green" : "tag-neutral")}>{remote.enabled ? "已登记" : "已禁用"}</span>
-              {remote.enabled && <button className="text-button" disabled={saving} onClick={() => void disableRemote(remote)}>禁用</button>}</div>
+              {remote.enabled && <button className="text-button" disabled={saving} onClick={() => void disableRemote(remote)}>禁用</button>}
+              <button className="text-button" disabled={saving} onClick={() => void deleteRemote(remote)}>删除</button></div>
           </div>)}
           {!loading && remotes.length === 0 && <div className="empty-mini">当前项目尚未登记 A2A 远端。</div>}
         </div>

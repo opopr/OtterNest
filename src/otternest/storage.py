@@ -139,7 +139,7 @@ class LocalStorageBackend:
 
 
 class S3StorageBackend:
-    """S3 / MinIO compatible object storage backend using standard HTTPS."""
+    """S3 / MinIO compatible object storage backend using standard HTTPS + AWS SigV4."""
 
     def __init__(
         self,
@@ -150,35 +150,146 @@ class S3StorageBackend:
         region: str = "us-east-1",
     ):
         self.bucket = bucket
-        self.endpoint_url = (endpoint_url or "https://s3.amazonaws.com").rstrip("/")
+        self.endpoint_url = (endpoint_url or os.environ.get("OTTERNEST_S3_ENDPOINT") or "https://s3.amazonaws.com").rstrip("/")
         self.access_key = access_key or os.environ.get("OTTERNEST_S3_ACCESS_KEY", "")
         self.secret_key = secret_key or os.environ.get("OTTERNEST_S3_SECRET_KEY", "")
         self.region = region
+        self._multipart_keys: dict[str, str] = {}
+
+    def _has_credentials(self) -> bool:
+        return bool(self.access_key and self.secret_key)
+
+    def _object_url(self, key: str, query: str = "") -> str:
+        base = f"{self.endpoint_url}/{self.bucket}/{key.lstrip('/')}"
+        return f"{base}?{query}" if query else base
+
+    def _signed_headers(self, method: str, key: str, payload: bytes = b"", query: str = "") -> dict[str, str]:
+        import hmac
+        from datetime import datetime, timezone
+        from urllib.parse import urlsplit
+
+        now_dt = datetime.now(timezone.utc)
+        amz_date = now_dt.strftime("%Y%m%dT%H%M%SZ")
+        date_stamp = now_dt.strftime("%Y%m%d")
+        parsed = urlsplit(self.endpoint_url)
+        host = parsed.netloc
+        canonical_uri = f"/{self.bucket}/{key.lstrip('/')}"
+        payload_hash = hashlib.sha256(payload).hexdigest()
+
+        canonical_headers = f"host:{host}\nx-amz-content-sha256:{payload_hash}\nx-amz-date:{amz_date}\n"
+        signed_headers = "host;x-amz-content-sha256;x-amz-date"
+        canonical_request = f"{method}\n{canonical_uri}\n{query}\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
+
+        credential_scope = f"{date_stamp}/{self.region}/s3/aws4_request"
+        string_to_sign = f"AWS4-HMAC-SHA256\n{amz_date}\n{credential_scope}\n{hashlib.sha256(canonical_request.encode('utf-8')).hexdigest()}"
+
+        def _sign(k: bytes, msg: str) -> bytes:
+            return hmac.new(k, msg.encode("utf-8"), hashlib.sha256).digest()
+
+        k_date = _sign(("AWS4" + self.secret_key).encode("utf-8"), date_stamp)
+        k_region = _sign(k_date, self.region)
+        k_service = _sign(k_region, "s3")
+        k_signing = _sign(k_service, "aws4_request")
+        signature = hmac.new(k_signing, string_to_sign.encode("utf-8"), hashlib.sha256).hexdigest()
+
+        auth = f"AWS4-HMAC-SHA256 Credential={self.access_key}/{credential_scope}, SignedHeaders={signed_headers}, Signature={signature}"
+        return {
+            "Host": host,
+            "x-amz-date": amz_date,
+            "x-amz-content-sha256": payload_hash,
+            "Authorization": auth,
+        }
 
     def save(self, project_id: str, artifact_id: str, content: bytes) -> str:
         key = f"{project_id}/{artifact_id}"
         uri = f"s3://{self.bucket}/{key}"
-        # Store metadata mapping in local cache or directly via S3 endpoint
+        if not self._has_credentials():
+            return uri
+        import httpx
+        headers = self._signed_headers("PUT", key, content)
+        resp = httpx.put(self._object_url(key), content=content, headers=headers, timeout=60)
+        if resp.status_code not in (200, 201, 204):
+            raise StorageError(f"S3 PUT failed ({resp.status_code}): {resp.text[:200]}")
         return uri
 
     def load(self, uri: str) -> bytes:
-        if not uri.startswith(f"s3://{self.bucket}/"):
+        prefix = f"s3://{self.bucket}/"
+        if not uri.startswith(prefix):
             raise StorageError("Invalid S3 URI for configured bucket")
-        return b""
+        if not self._has_credentials():
+            return b""
+        import httpx
+        key = uri[len(prefix):]
+        headers = self._signed_headers("GET", key)
+        resp = httpx.get(self._object_url(key), headers=headers, timeout=60)
+        if resp.status_code != 200:
+            raise StorageError(f"S3 GET failed ({resp.status_code})")
+        return resp.content
 
     def delete(self, uri: str) -> None:
-        pass
+        prefix = f"s3://{self.bucket}/"
+        if not uri.startswith(prefix) or not self._has_credentials():
+            return
+        import httpx
+        key = uri[len(prefix):]
+        headers = self._signed_headers("DELETE", key)
+        httpx.delete(self._object_url(key), headers=headers, timeout=30)
 
     def initiate_multipart(self, project_id: str, artifact_id: str, filename: str) -> str:
-        import uuid
-        return str(uuid.uuid4())
+        key = f"{project_id}/{artifact_id}"
+        if not self._has_credentials():
+            import uuid
+            uid = str(uuid.uuid4())
+            self._multipart_keys[uid] = key
+            return uid
+        import httpx
+        import xml.etree.ElementTree as ET
+        headers = self._signed_headers("POST", key, b"", "uploads=")
+        resp = httpx.post(self._object_url(key, "uploads="), headers=headers, timeout=30)
+        if resp.status_code not in (200, 201):
+            raise StorageError(f"S3 InitiateMultipart failed ({resp.status_code})")
+        root = ET.fromstring(resp.text)
+        uid_el = root.find(".//{*}UploadId")
+        if uid_el is None or not uid_el.text:
+            raise StorageError("Missing UploadId in S3 response")
+        self._multipart_keys[uid_el.text] = key
+        return uid_el.text
 
     def upload_part(self, upload_id: str, part_number: int, content: bytes) -> dict[str, Any]:
-        return {"part_number": part_number, "sha256": hashlib.sha256(content).hexdigest(), "size": len(content)}
+        sha = hashlib.sha256(content).hexdigest()
+        if not self._has_credentials():
+            return {"part_number": part_number, "sha256": sha, "size": len(content), "etag": sha}
+        import httpx
+        key = self._multipart_keys.get(upload_id, upload_id)
+        query = f"partNumber={part_number}&uploadId={upload_id}"
+        headers = self._signed_headers("PUT", key, content, query)
+        resp = httpx.put(self._object_url(key, query), content=content, headers=headers, timeout=120)
+        if resp.status_code not in (200, 201):
+            raise StorageError(f"S3 UploadPart failed ({resp.status_code})")
+        etag = resp.headers.get("etag", "").strip('"')
+        return {"part_number": part_number, "sha256": sha, "size": len(content), "etag": etag}
 
     def complete_multipart(self, upload_id: str, parts: list[dict[str, Any]]) -> tuple[str, str, int]:
         total_size = sum(p.get("size", 0) for p in parts)
-        return f"s3://{self.bucket}/{upload_id}", "simulated-sha256", total_size
+        key = self._multipart_keys.pop(upload_id, upload_id)
+        uri = f"s3://{self.bucket}/{key}"
+        if not self._has_credentials():
+            return uri, "simulated-sha256", total_size
+        import httpx
+        ordered = sorted(parts, key=lambda p: p["part_number"])
+        xml_parts = "".join(
+            f"<Part><PartNumber>{p['part_number']}</PartNumber><ETag>\"{p.get('etag') or p.get('sha256', '')}\"</ETag></Part>"
+            for p in ordered
+        )
+        body = f"<CompleteMultipartUpload>{xml_parts}</CompleteMultipartUpload>".encode("utf-8")
+        query = f"uploadId={upload_id}"
+        headers = self._signed_headers("POST", key, body, query)
+        headers["Content-Type"] = "application/xml"
+        resp = httpx.post(self._object_url(key, query), content=body, headers=headers, timeout=60)
+        if resp.status_code not in (200, 201):
+            raise StorageError(f"S3 CompleteMultipart failed ({resp.status_code})")
+        combined_sha = hashlib.sha256("".join(p.get("sha256", "") for p in ordered).encode("utf-8")).hexdigest()
+        return uri, combined_sha, total_size
 
 
 _DEFAULT_BACKEND: StorageBackend | None = None

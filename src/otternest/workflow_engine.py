@@ -341,6 +341,24 @@ def toggle_workflow_rule(rule_id: str, actor: Actor = Depends(authenticate), db:
     return _rule_public(rule)
 
 
+@router.delete("/workflow-rules/{rule_id}")
+def delete_workflow_rule(rule_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    owner_only(actor)
+    rule = db.scalar(select(WorkflowRule).where(WorkflowRule.id == rule_id).with_for_update())
+    if rule is None:
+        raise HTTPException(404, "Workflow rule not found")
+    for run in db.scalars(select(WorkflowRun).where(WorkflowRun.rule_id == rule_id)):
+        db.delete(run)
+    cursor = db.get(WorkflowCursor, rule_id)
+    if cursor is not None:
+        db.delete(cursor)
+    pid = rule.project_id
+    db.delete(rule)
+    emit(db, actor, "workflow.rule_deleted", rule_id, pid)
+    db.commit()
+    return {"id": rule_id, "deleted": True}
+
+
 @router.get("/projects/{project_id}/workflow-runs")
 def list_workflow_runs(project_id: str, limit: int = 50, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     require_project(db, project_id, actor)
