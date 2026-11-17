@@ -17,6 +17,8 @@ import SkillsPage from "./pages/SkillsPage";
 import AccessPage from "./pages/AccessPage";
 import ArtifactsPage from "./pages/ArtifactsPage";
 import ExternalInterfacesPage from "./pages/ExternalInterfacesPage";
+import AccountSecurityPage from "./pages/AccountSecurityPage";
+import ProjectPortabilityPage from "./pages/ProjectPortabilityPage";
 
 function AuthGate() {
   const { checking, isAuthenticated } = useAuth();
@@ -34,6 +36,8 @@ function AuthGate() {
           <Route path="/command" element={<CommandCenterPage />} />
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/interfaces" element={<ExternalInterfacesPage />} />
+          <Route path="/account-security" element={<AccountSecurityPage />} />
+          <Route path="/project-portability" element={<ProjectPortabilityPage />} />
           <Route path="/runtimes" element={<RuntimeMonitorPage />} />
           <Route path="/governance" element={<GovernancePage />} />
           <Route path="/goals-workflows" element={<GoalsWorkflowPage />} />
