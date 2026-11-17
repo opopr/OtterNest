@@ -11,13 +11,13 @@
 | Owner 账号安全 | `/auth/account`、`/auth/password`、`/auth/2fa/setup`、`/auth/2fa/enable`、`/auth/2fa/recovery-codes`、`/auth/2fa/disable`、`/auth/logout-all`、`/auth/events` | **账号安全** `/account-security` | 只有所有者可用；秘密仅一次显示；改密吊销会话后要求重新登录；Owner Token 轮换仍属于服务端运维 |
 | 项目可携带包 | `GET /projects/{project_id}/export`、`POST /projects/import/preview`、`POST /projects/import` | **项目导入导出** `/project-portability` | 后端校验哈希及引用；仅创建新的暂停项目；不包含成果二进制与密钥 |
 | Webhook、A2A 远端登记 | `/projects/{project_id}/webhooks`、`/webhooks/{webhook_id}/disable`、`/projects/{project_id}/a2a/remotes`、`/a2a/remotes/{endpoint_id}/disable` | 上轮 **外部接口** `/interfaces` | 仅注册/禁用；不等于外部连通、远端身份验证或 Worker 正常 |
+| A2A 任务委托生命周期 | 新增 `GET /projects/{project_id}/a2a/delegations`、`GET /tasks/{task_id}/a2a/delegation`；复用现有 `POST /tasks/{task_id}/a2a/delegate`、`/cancel`、`/release`、`/reconcile` | **外部接口**项目级最近 200 条委托历史；**任务详情**远端委托操作 | 只允许 R0/R1 就绪任务；发送未知状态禁止重发；取消不等于远端确认取消；已终止且阻塞才可解除绑定 |
+| 任务副作用人工对账 | `GET /tasks/{task_id}/side-effects`、`POST /side-effects/{effect_id}/reconcile` | **任务详情**副作用台账、人工核实结果、证据备注 | `POST /tasks/{task_id}/side-effects` 登记和 `POST /side-effects/{effect_id}/report` 报告仍只能由有租约的执行 Agent 调用，管理员不得冒用 |
 
 ## 尚缺完整 React 操作入口：优先级清单
 
 | 优先级 | 域 | 后端有但新版 React 不完整的 API / 业务 | 推荐补齐位置 |
 |---|---|---|---|
-| P0 | A2A 任务委托 | `POST /tasks/{task_id}/a2a/delegate`、`GET /a2a/delegations/{delegation_id}`、`POST /a2a/delegations/{delegation_id}/cancel`、`/release`、`/reconcile` | 外部接口中的「委托管理」或任务详情的远端执行面板；把已登记/已投递/已执行/未知状态严格区分 |
-| P0 | 任务副作用台账 | `POST /tasks/{task_id}/side-effects`、`GET /tasks/{task_id}/side-effects`、`POST /side-effects/{effect_id}/report`、`/reconcile` | 任务详情，带副作用性质及结果“未知时禁止盲目重试”的治理提示 |
 | P1 | 检查点与故障交接 | `POST/GET /tasks/{task_id}/checkpoints`、`POST /checkpoints/{checkpoint_id}/verify`、`POST /tasks/{task_id}/revoke-lease`、`GET /tasks/{task_id}/handoff` | 任务详情中的“执行连续性”标签页；管理员可以核验、撤租约、查看交接包，不能伪造 Runner 已完成 |
 | P1 | 决策审核与证据 | `POST /decisions/{decision_id}/reviews`、`POST /decisions/{decision_id}/evidence/inspect` | 审批与治理；现有页面主要展示复核、协商与最终决议，尚缺评审提交和证据链检查 |
 | P1 | 第二轮协商策略 | `POST/GET /decisions/{decision_id}/deliberation/auto-policy`、`POST /decisions/{decision_id}/deliberation/rebuttals` | 审批与治理，新增自动继续名单与反驳意见管理，服务端仍裁定参与和权限 |
@@ -38,5 +38,13 @@
 1. 每个新增 React 动作必须调用真实现有后端 API，而非只提供表单或静态演示。
 2. 所有者/Agent 权限、项目边界、一次性密钥展示、外部 URL allowlist 由后端验证；前端只能做次级提示。
 3. 破坏性操作必须明确二次确认；对恢复、远端副作用和未知执行状态不得自动重试。
-4. 完成的顺序建议：**任务副作用 + A2A 委托 → 检查点/交接 → 决策审核 → 单项目简报与知识检索**。
+4. 完成的顺序建议：**检查点/交接 → 决策审核 → 单项目简报与知识检索 → 接入端真实联调**。
 5. 每批上线验证 `frontend`、`unit`、`postgres` CI；真实 Oracle 主机、Worker 和三方服务另做现场验收。
+
+
+## 本轮验收说明
+
+- A2A 新增两个 **只读、所有者专用** 的历史与精确任务查询接口，不直接发送外部网络请求，不提供重试按钮。
+- 项目历史取最近 200 条；任务详情按任务 ID 精确查询，不受历史窗口限制。
+- 前端副作用对账需要选择明确结果、填写至少 5 字符的权威外部核查依据、二次确认，服务器再次校验所有者身份。
+- 新界面不能证明 Oracle 实机已接通 A2A Worker，也不能替代真实外部系统对账。
