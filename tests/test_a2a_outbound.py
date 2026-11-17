@@ -77,6 +77,32 @@ def a2a_result(request, *, state="working", artifacts=None, remote_id="remote-47
     return httpx.Response(200, json={"jsonrpc": "2.0", "id": request["id"], "result": task})
 
 
+def test_delegation_history_is_owner_only_bounded_and_project_scoped(env, owner_headers, monkeypatch):
+    project_a, agent_a, peer_a, task_a = setup_remote(env, owner_headers, monkeypatch)
+    project_b, _, peer_b, task_b = setup_remote(env, owner_headers, monkeypatch)
+    queued_a = delegate(env, owner_headers, task_a, peer_a)
+    queued_b = delegate(env, owner_headers, task_b, peer_b)
+    assert queued_a.status_code == 201 and queued_b.status_code == 201
+
+    url = f"/api/v1/projects/{project_a}/a2a/delegations"
+    response = env.get(url, headers=owner_headers)
+    assert response.status_code == 200, response.text
+    history = response.json()
+    assert len(history) == 1
+    assert history[0]["id"] == queued_a.json()["id"]
+    assert history[0]["task_id"] == task_a["id"]
+    assert history[0]["status"] == "pending"
+    assert queued_b.json()["id"] not in [row["id"] for row in history]
+    assert "message_id" not in history[0]
+
+    agent_headers = {"Authorization": "Bearer " + agent_a["token"]}
+    assert env.get(url, headers=agent_headers).status_code == 403
+    assert env.get(url, headers=owner_headers, params={"limit": 0}).status_code == 422
+    assert env.get(url, headers=owner_headers, params={"limit": 201}).status_code == 422
+    assert len(env.get(url, headers=owner_headers, params={"limit": 1}).json()) == 1
+    assert env.get(f"/api/v1/projects/{project_b}/a2a/delegations", headers=owner_headers).json()[0]["id"] == queued_b.json()["id"]
+
+
 def test_outbound_dispatch_remote_complete_requires_owner_review(env, owner_headers, monkeypatch):
     project, remote, peer, task = setup_remote(env, owner_headers, monkeypatch)
     queued = delegate(env, owner_headers, task, peer)
