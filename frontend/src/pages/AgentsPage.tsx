@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  Bot, Copy, Cpu, KeyRound, Plus, Power, RefreshCw, RotateCcw, ShieldCheck,
+  Bot, Copy, Cpu, Edit3, KeyRound, Plus, Power, RefreshCw, RotateCcw, ShieldCheck,
   Terminal, Trash2, X, XCircle
 } from "lucide-react";
 import { request } from "../api/client";
@@ -33,6 +33,11 @@ export default function AgentsPage() {
   const [createdToken, setCreatedToken] = useState("");
   const [runtimeToken, setRuntimeToken] = useState<RuntimeToken | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState("");
+  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPlatform, setEditPlatform] = useState("");
+  const [editExecutionMode, setEditExecutionMode] = useState<Agent["execution_mode"]>("manual");
+  const [editCapabilities, setEditCapabilities] = useState("");
   const [runtimes, setRuntimes] = useState<Runtime[]>([]);
   const [showRuntimeForm, setShowRuntimeForm] = useState(false);
   const [runtimeLabel, setRuntimeLabel] = useState("");
@@ -95,6 +100,51 @@ export default function AgentsPage() {
       await loadAgents();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "创建 Agent 失败");
+    } finally { setSaving(false); }
+  };
+
+  const startEditAgent = (agent: Agent) => {
+    setEditingAgent(agent);
+    setEditName(agent.name);
+    setEditPlatform(agent.platform);
+    setEditExecutionMode(agent.execution_mode);
+    setEditCapabilities(agent.declared_capabilities.join(", "));
+  };
+
+  const updateAgent = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editingAgent) return;
+    setSaving(true);
+    setError("");
+    try {
+      const caps = editCapabilities.split(",").map((item) => item.trim()).filter(Boolean);
+      await request<Agent>("/agents/" + encodeURIComponent(editingAgent.id), {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: editName.trim(),
+          platform: editPlatform.trim(),
+          execution_mode: editExecutionMode,
+          capabilities: caps,
+        })
+      });
+      setEditingAgent(null);
+      await loadAgents();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "更新 Agent 失败");
+    } finally { setSaving(false); }
+  };
+
+  const rotateAgentToken = async (agent: Agent) => {
+    if (!window.confirm(`确认重新生成并轮换 Agent「${agent.name}」的主令牌？旧令牌将立即失效！`)) return;
+    setSaving(true);
+    setError("");
+    try {
+      const res = await request<{ id: string; token: string }>("/agents/" + encodeURIComponent(agent.id) + "/token", {
+        method: "POST"
+      });
+      setCreatedToken(res.token);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "重新生成令牌失败");
     } finally { setSaving(false); }
   };
 
@@ -252,6 +302,22 @@ export default function AgentsPage() {
         </form>
       )}
 
+      {editingAgent && (
+        <form className="panel form-panel" onSubmit={updateAgent}>
+          <div className="panel-heading"><div className="panel-title"><Edit3 size={17} /><h3>编辑 Agent：{editingAgent.name}</h3></div><button type="button" className="icon-button" onClick={() => setEditingAgent(null)}><X size={17} /></button></div>
+          <div className="form-grid three">
+            <label>Agent 名称<input value={editName} onChange={(event) => setEditName(event.target.value)} required maxLength={120} /></label>
+            <label>平台 / 环境<input value={editPlatform} onChange={(event) => setEditPlatform(event.target.value)} required maxLength={80} /></label>
+            <label>执行方式<select value={editExecutionMode} onChange={(event) => setEditExecutionMode(event.target.value as Agent["execution_mode"])}><option value="manual">手动</option><option value="polling">轮询 Runner</option><option value="remote">远程接入</option></select></label>
+          </div>
+          <label>能力声明（逗号分隔）<input value={editCapabilities} onChange={(event) => setEditCapabilities(event.target.value)} placeholder="python, browser, filesystem" /></label>
+          <div className="form-actions" style={{ display: "flex", gap: "8px" }}>
+            <button className="primary-button compact" disabled={saving}>{saving ? "保存中…" : "保存修改"}</button>
+            <button type="button" className="secondary-button compact" onClick={() => setEditingAgent(null)}>取消</button>
+          </div>
+        </form>
+      )}
+
       <div className="governance-tabs">
         <button className={tab === "active" ? "selected" : ""} onClick={() => setTab("active")}>
           <Bot size={16} />已登记 Agent <span>{activeAgents.length}</span>
@@ -288,6 +354,12 @@ export default function AgentsPage() {
               <div className="card-action-row">
                 <button className="secondary-button compact agent-detail-button flex-1" onClick={() => setSelectedAgentId((current) => current === agent.id ? "" : agent.id)}>
                   <Cpu size={14} />{selectedAgentId === agent.id ? "收起" : "环境与能力"}
+                </button>
+                <button className="secondary-button compact" disabled={saving} onClick={() => startEditAgent(agent)} title="编辑基本信息">
+                  <Edit3 size={14} />编辑
+                </button>
+                <button className="secondary-button compact" disabled={saving || !agent.enabled} onClick={() => void rotateAgentToken(agent)} title="重置/重新生成主令牌">
+                  <KeyRound size={14} />重置Token
                 </button>
                 {agent.enabled ? (
                   <button className="secondary-button compact" disabled={saving} onClick={() => void disableAgent(agent)} title="停用">

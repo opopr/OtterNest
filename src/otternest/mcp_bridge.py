@@ -99,6 +99,31 @@ class OtterNestMCPClient:
             "title": title, "content": content, "source": source, "kind": kind,
         })
 
+    def create_task(
+        self,
+        project_id: str,
+        title: str,
+        instruction: str,
+        acceptance: str,
+        *,
+        goal_id: str | None = None,
+        risk: str = "R1",
+        priority: int = 50,
+        sensitivity: str = "internal",
+        target_agent_id: str | None = None,
+    ) -> dict:
+        payload = {
+            "title": title,
+            "instruction": instruction,
+            "acceptance": acceptance,
+            "goal_id": goal_id,
+            "risk": risk,
+            "priority": priority,
+            "sensitivity": sensitivity,
+            "target_agent_id": target_agent_id,
+        }
+        return self._call("POST", f"/projects/{self._id(project_id)}/tasks", payload=payload)
+
     def list_skills(self, project_id: str) -> list[dict]:
         return self._call("GET", f"/projects/{self._id(project_id)}/skills")
 
@@ -236,6 +261,31 @@ def make_mcp_server(client: OtterNestMCPClient):
     def propose_project_memory(project_id: str, title: str, content: str, source: str, kind: str = "fact") -> dict:
         """Propose a memory for human publication; does not bypass moderation."""
         return client.propose_memory(project_id, title, content, source, kind)
+
+    @server.tool()
+    def create_project_task(
+        project_id: str,
+        title: str,
+        instruction: str,
+        acceptance: str,
+        target_agent_id: str | None = None,
+        goal_id: str | None = None,
+        risk: str = "R1",
+        priority: int = 50,
+        sensitivity: str = "internal",
+    ) -> dict:
+        """Create a new task in an authorized project from Agent / MCP client."""
+        return client.create_task(
+            project_id=project_id,
+            title=title,
+            instruction=instruction,
+            acceptance=acceptance,
+            target_agent_id=target_agent_id,
+            goal_id=goal_id,
+            risk=risk,
+            priority=priority,
+            sensitivity=sensitivity,
+        )
 
     @server.tool()
     def list_project_skills(project_id: str) -> list[dict]:

@@ -67,6 +67,18 @@ class AgentIn(CapabilityList):
     execution_mode: Literal["manual", "polling", "remote"] = "manual"
 
 
+class AgentUpdateIn(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    platform: str | None = Field(default=None, min_length=1, max_length=80)
+    execution_mode: Literal["manual", "polling", "remote"] | None = None
+    capabilities: list[str] | None = Field(default=None, max_length=32)
+
+    @field_validator("capabilities")
+    @classmethod
+    def _validate_opt_caps(cls, v: list[str] | None) -> list[str] | None:
+        return valid_capabilities(v) if v is not None else None
+
+
 class RuntimeIn(BaseModel):
     label: str = Field(min_length=1, max_length=120)
     environment: str = Field(min_length=1, max_length=160)
@@ -104,6 +116,7 @@ class TaskIn(BaseModel):
     sensitivity: Literal["public", "internal", "confidential", "restricted"] = "internal"
     dependency_ids: list[str] = Field(default_factory=list, max_length=64)
     required_capabilities: list[str] = Field(default_factory=list, max_length=32)
+    target_agent_id: str | None = None
 
     _validate_required = field_validator("required_capabilities")(valid_capabilities)
 
@@ -383,6 +396,51 @@ def agents(include_deleted: bool = False, actor: Actor = Depends(authenticate), 
     if not include_deleted:
         query = query.where(Agent.deleted_at.is_(None))
     return [as_dict(a, "id", "name", "platform", "execution_mode", "enabled", "declared_capabilities", "verified_capabilities", "deleted_at") for a in db.scalars(query)]
+
+
+@router.patch("/agents/{agent_id}")
+def update_agent(agent_id: str, body: AgentUpdateIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    """Update agent basic info (name, platform, execution_mode, declared capabilities)."""
+    owner_only(actor)
+    agent = db.scalar(select(Agent).where(Agent.id == agent_id).with_for_update())
+    if agent is None:
+        raise HTTPException(404, "Agent not found")
+    if agent.deleted_at is not None:
+        raise Conflict("Cannot update an agent in the recycle bin")
+    
+    if body.name is not None:
+        agent.name = body.name
+    if body.platform is not None:
+        agent.platform = body.platform
+    if body.execution_mode is not None:
+        agent.execution_mode = body.execution_mode
+    if body.capabilities is not None:
+        agent.declared_capabilities = body.capabilities
+        # Ensure verified capabilities do not exceed updated declared capabilities
+        agent.verified_capabilities = [c for c in agent.verified_capabilities if c in body.capabilities]
+    
+    emit(db, actor, "agent.updated", agent.id, payload={
+        "name": agent.name, "platform": agent.platform, "execution_mode": agent.execution_mode
+    })
+    db.commit()
+    return as_dict(agent, "id", "name", "platform", "execution_mode", "enabled", "declared_capabilities", "verified_capabilities", "deleted_at")
+
+
+@router.post("/agents/{agent_id}/token")
+def rotate_agent_token(agent_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    """Rotate an agent's primary credential. Returns the new token once."""
+    owner_only(actor)
+    agent = db.scalar(select(Agent).where(Agent.id == agent_id).with_for_update())
+    if agent is None or agent.deleted_at is not None:
+        raise HTTPException(404, "Agent not found or is in recycle bin")
+    if not agent.enabled:
+        raise Conflict("Cannot rotate token for disabled agent")
+    
+    new_token = new_agent_token()
+    agent.token_hash = hash_token(new_token)
+    emit(db, actor, "agent.token_rotated", agent.id)
+    db.commit()
+    return {"id": agent.id, "token": new_token}
 
 
 @router.put("/agents/{agent_id}/verified-capabilities")
@@ -671,9 +729,9 @@ def remove_member(
 
 @router.post("/projects/{project_id}/tasks", status_code=201)
 def create_task(project_id: str, body: TaskIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
-    owner_only(actor)
     require_writable_system(db)
-    project = require_project(db, project_id, actor)
+    # Require project membership (role manager or worker) or owner
+    project = require_project(db, project_id, actor, roles=("manager", "worker", "reviewer", "advisor") if not actor.is_owner else None)
     if project.status != "active":
         raise Conflict("Project is not active")
     validate_goal(db, project_id, body.goal_id)
@@ -690,7 +748,8 @@ def create_task(project_id: str, body: TaskIn, actor: Actor = Depends(authentica
     task = Task(project_id=project_id, goal_id=body.goal_id, title=body.title,
                 instruction=body.instruction, acceptance=body.acceptance,
                 priority=body.priority, risk=body.risk, sensitivity=body.sensitivity,
-                required_capabilities=body.required_capabilities)
+                required_capabilities=body.required_capabilities,
+                target_agent_id=body.target_agent_id)
     db.add(task)
     db.flush()
     for predecessor_id in predecessor_ids:
