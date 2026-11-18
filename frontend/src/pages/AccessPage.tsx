@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { AlertCircle, KeyRound, Plus, RefreshCw, ShieldCheck, Trash2, X } from "lucide-react";
 import { request } from "../api/client";
 import type { Project, Task } from "../api/types";
+import { useDialog } from "../components/AppDialog";
 import ProjectSelect from "../components/ProjectSelect";
 
 interface Member {
@@ -40,6 +41,7 @@ export default function AccessPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const dialog = useDialog();
 
   const selectedProject = useMemo(() => projects.find((item) => item.id === selectedProjectId) || null, [projects, selectedProjectId]);
   const selectedTask = useMemo(() => tasks.find((item) => item.id === selectedTaskId) || null, [tasks, selectedTaskId]);
@@ -102,7 +104,13 @@ export default function AccessPage() {
   };
 
   const revokeGrant = async (grant: TaskGrant) => {
-    if (!window.confirm("确认撤销该任务的临时授权？已撤销授权不会自动恢复。")) return;
+    const confirmed = await dialog.confirm({
+      title: "撤销任务临时授权",
+      message: "确认撤销该任务的临时授权？已撤销授权不会自动恢复。",
+      confirmText: "确认撤销",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     setSaving(true);
     try {
       await request("/tasks/" + encodeURIComponent(grant.task_id) + "/grants/" + encodeURIComponent(grant.id) + "/revoke", { method: "POST" });

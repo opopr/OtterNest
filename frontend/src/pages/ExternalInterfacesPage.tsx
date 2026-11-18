@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { getApiOrigin, request } from "../api/client";
 import type { Agent, Project } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
+import { useDialog } from "../components/AppDialog";
 import ProjectSelect from "../components/ProjectSelect";
 import TaskDetailPanel from "../components/TaskDetailPanel";
 
@@ -60,6 +61,7 @@ const errorMessage = (reason: unknown) => reason instanceof Error ? reason.messa
 
 export default function ExternalInterfacesPage() {
   const { user } = useAuth();
+  const dialog = useDialog();
   const isOwner = user?.kind === "owner";
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState("");
@@ -156,7 +158,7 @@ export default function ExternalInterfacesPage() {
   };
 
   const disableWebhook = async (endpoint: WebhookEndpoint) => {
-    if (!window.confirm("禁用此 Webhook？待投递事件可能不再发送。")) return;
+    if (!(await dialog.confirm({ title: "确认禁用 Webhook", message: "禁用此 Webhook？待投递事件可能不再发送。", confirmText: "确认禁用", tone: "warning" }))) return;
     setSaving(true); setError("");
     try {
       await request("/webhooks/" + encodeURIComponent(endpoint.id) + "/disable", { method: "POST" });
@@ -167,7 +169,7 @@ export default function ExternalInterfacesPage() {
   };
 
   const deleteWebhook = async (endpoint: WebhookEndpoint) => {
-    if (!window.confirm("确认彻底删除此 Webhook 及其投递历史？")) return;
+    if (!(await dialog.confirm({ title: "确认删除 Webhook", message: "确认彻底删除此 Webhook 及其投递历史？", confirmText: "彻底删除", tone: "danger" }))) return;
     setSaving(true); setError("");
     try {
       await request("/webhooks/" + encodeURIComponent(endpoint.id), { method: "DELETE" });
@@ -198,7 +200,7 @@ export default function ExternalInterfacesPage() {
   };
 
   const disableRemote = async (endpoint: A2ARemote) => {
-    if (!window.confirm("禁用此 A2A 远端？已有委托需要单独核查。")) return;
+    if (!(await dialog.confirm({ title: "确认禁用 A2A 远端", message: "禁用此 A2A 远端？已有委托需要单独核查。", confirmText: "确认禁用", tone: "warning" }))) return;
     setSaving(true); setError("");
     try {
       await request("/a2a/remotes/" + encodeURIComponent(endpoint.id) + "/disable", { method: "POST" });
@@ -209,7 +211,7 @@ export default function ExternalInterfacesPage() {
   };
 
   const deleteRemote = async (endpoint: A2ARemote) => {
-    if (!window.confirm("确认彻底删除此 A2A 远端连接？")) return;
+    if (!(await dialog.confirm({ title: "确认删除 A2A 远端", message: "确认彻底删除此 A2A 远端连接？", confirmText: "彻底删除", tone: "danger" }))) return;
     setSaving(true); setError("");
     try {
       await request("/a2a/remotes/" + encodeURIComponent(endpoint.id), { method: "DELETE" });
@@ -259,31 +261,31 @@ export default function ExternalInterfacesPage() {
       <section className="panel external-protocol">
         <div className="external-protocol-head">
           <Activity size={20} />
-          <span className={`status-tag ${capabilities && Object.values(capabilities.executors).some((e) => e.available) ? "tag-green" : "tag-amber"}`}>
-            {capabilities && Object.values(capabilities.executors).some((e) => e.available) ? "已就绪" : "待配置密钥/环境"}
+          <span className={`status-tag ${Object.values(capabilities?.executors ?? {}).some((e) => e?.available) ? "tag-green" : "tag-amber"}`}>
+            {Object.values(capabilities?.executors ?? {}).some((e) => e?.available) ? "已就绪" : "待配置密钥/环境"}
           </span>
         </div>
         <h3>外部 AI 执行器</h3>
         <p>已内置 OpenAI Worker、Codex CLI、Google Gemini Worker (<code>otternest-gemini-worker</code>) 与 Muse 适配器 (<code>otternest-muse-worker</code>)。</p>
-        {capabilities && <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px", fontSize: "12px" }}>
-          <span className={`status-tag ${capabilities.executors.openai_worker.available ? "tag-green" : "tag-amber"}`}>OpenAI {capabilities.executors.openai_worker.available ? "✓" : "未配置"}</span>
-          <span className={`status-tag ${capabilities.executors.codex_worker.available ? "tag-green" : "tag-amber"}`}>Codex {capabilities.executors.codex_worker.available ? "✓" : "未安装"}</span>
-          <span className={`status-tag ${capabilities.executors.gemini_worker.available ? "tag-green" : "tag-amber"}`}>Gemini {capabilities.executors.gemini_worker.available ? "✓" : "未配置"}</span>
-          <span className={`status-tag ${capabilities.executors.muse_adapter.available ? "tag-green" : "tag-amber"}`}>Muse {capabilities.executors.muse_adapter.available ? "✓" : "未配置"}</span>
+        {capabilities?.executors && <div className="tag-wrap-list">
+          <span className={`status-tag ${capabilities.executors.openai_worker?.available ? "tag-green" : "tag-amber"}`}>OpenAI {capabilities.executors.openai_worker?.available ? "✓" : "未配置"}</span>
+          <span className={`status-tag ${capabilities.executors.codex_worker?.available ? "tag-green" : "tag-amber"}`}>Codex {capabilities.executors.codex_worker?.available ? "✓" : "未安装"}</span>
+          <span className={`status-tag ${capabilities.executors.gemini_worker?.available ? "tag-green" : "tag-amber"}`}>Gemini {capabilities.executors.gemini_worker?.available ? "✓" : "未配置"}</span>
+          <span className={`status-tag ${capabilities.executors.muse_adapter?.available ? "tag-green" : "tag-amber"}`}>Muse {capabilities.executors.muse_adapter?.available ? "✓" : "未配置"}</span>
         </div>}
         <Link to="/agents" className="secondary-button compact">Agent 管理<ArrowUpRight size={14} /></Link>
       </section>
     </div>
 
-    {capabilities && <section className="panel external-project-selector" style={{ gap: "12px", flexWrap: "wrap" }}>
+    {(capabilities?.storage || capabilities?.vector_search || capabilities?.kms) && <section className="panel external-project-selector infra-banner">
       <div>
         <strong>底层基础设施引擎</strong>
         <p>对象存储、混合向量检索与 KMS 信封加密已在控制面激活。</p>
       </div>
-      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
-        <span className="status-tag tag-green">存储: {capabilities.storage.backend.toUpperCase()} (分块上传已启用)</span>
-        <span className="status-tag tag-green">向量检索: {capabilities.vector_search.mode} ({capabilities.vector_search.embedding_dim}d)</span>
-        <span className="status-tag tag-green">KMS 密钥源: {capabilities.kms.key_source}</span>
+      <div className="flex-row-gap">
+        {capabilities.storage?.backend && <span className="status-tag tag-green">存储: {capabilities.storage.backend.toUpperCase()} ({capabilities.storage.multipart_enabled ? "分块上传已启用" : "标准上传"})</span>}
+        {capabilities.vector_search?.mode && <span className="status-tag tag-green">向量检索: {capabilities.vector_search.mode} ({capabilities.vector_search.embedding_dim ?? "—"}d)</span>}
+        {capabilities.kms?.key_source && <span className="status-tag tag-green">KMS 密钥源: {capabilities.kms.key_source}</span>}
       </div>
     </section>}
 
@@ -382,13 +384,31 @@ export default function ExternalInterfacesPage() {
     </section>
 
     <section className="panel external-guide">
-      <div className="panel-heading"><div className="panel-title"><Bot size={17} /><h3>第三方平台接入状态</h3></div></div>
+      <div className="panel-heading"><div className="panel-title"><Bot size={17} /><h3>第三方执行器配置状态</h3></div></div>
       <div className="external-provider-grid">
-        <div><strong>OpenAI-compatible 模型 API</strong><span className="status-tag tag-amber">需独立 API Key</span><p>在独立 Worker 环境配置模型服务地址、模型名及密钥。订阅不等于 API 额度。</p></div>
-        <div><strong>Codex CLI</strong><span className="status-tag tag-amber">需执行节点登录</span><p>已具备 CLI Worker 适配器；须在受信任的 WSL/Linux 执行节点验证账号及真实任务。</p></div>
-        <div><strong>Google AI / Muse</strong><span className="status-tag tag-neutral">未直接接通</span><p>目前不具备自动使用个人订阅的连接器，不能仅凭平台注册信息判断已联机。</p></div>
+        <div>
+          <strong>OpenAI-compatible 模型 API</strong>
+          <span className={`status-tag ${capabilities?.executors?.openai_worker?.available ? "tag-green" : "tag-amber"}`}>
+            {capabilities?.executors?.openai_worker?.available ? "服务端已配置" : "需独立 API Key"}
+          </span>
+          <p>入口 <code>{capabilities?.executors?.openai_worker?.entrypoint || "otternest-openai-worker"}</code>；在独立 Worker 环境配置模型服务地址、模型名及密钥。</p>
+        </div>
+        <div>
+          <strong>Codex CLI</strong>
+          <span className={`status-tag ${capabilities?.executors?.codex_worker?.available ? "tag-green" : "tag-amber"}`}>
+            {capabilities?.executors?.codex_worker?.available ? "CLI 已检测到" : "需执行节点登录"}
+          </span>
+          <p>入口 <code>{capabilities?.executors?.codex_worker?.entrypoint || "otternest-codex-worker"}</code>；须在受信任的 WSL/Linux 执行节点验证账号及真实任务。</p>
+        </div>
+        <div>
+          <strong>Google Gemini / Muse 适配器</strong>
+          <span className={`status-tag ${capabilities?.executors?.gemini_worker?.available || capabilities?.executors?.muse_adapter?.available ? "tag-green" : "tag-amber"}`}>
+            {capabilities?.executors?.gemini_worker?.available ? "Gemini 已配置" : capabilities?.executors?.muse_adapter?.available ? "Muse 已配置" : "待配置 API / 凭据"}
+          </span>
+          <p>已内置 <code>{capabilities?.executors?.gemini_worker?.entrypoint || "otternest-gemini-worker"}</code> 与 <code>{capabilities?.executors?.muse_adapter?.entrypoint || "otternest-muse-worker"}</code>，需在执行节点提供对应 API Key 或适配器端点。</p>
+        </div>
       </div>
-      <p className="form-hint">本页展示的是数据库中的登记状态与后端能力，不是第三方平台实时联网探测；服务可用性仍需端到端验证。</p>
+      <p className="form-hint">本页展示的是数据库中的登记状态与后端能力探测，最终端到端可用性仍需实际派发任务验证。</p>
     </section>
     {selectedTaskId && projectId && <TaskDetailPanel
       selection={{ id: selectedTaskId, projectId, projectName: projects.find((p) => p.id === projectId)?.name || "当前项目" }}

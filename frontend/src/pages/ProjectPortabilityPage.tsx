@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { request } from "../api/client";
 import type { Project } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
+import { useDialog } from "../components/AppDialog";
 import ProjectSelect from "../components/ProjectSelect";
 import "./AdminGaps.css";
 
@@ -54,6 +55,7 @@ export default function ProjectPortabilityPage() {
   const [newName, setNewName] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
+  const dialog = useDialog();
 
   const refresh = useCallback(async () => {
     if (!isOwner) { setLoading(false); return; }
@@ -125,7 +127,12 @@ export default function ProjectPortabilityPage() {
   const restore = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!bundle || !preview || !confirmed || !newName.trim()) return;
-    if (!window.confirm("确认将经预检的项目包恢复成一个新项目？不会覆盖现有项目；恢复后处于暂停状态。")) return;
+    const ok = await dialog.confirm({
+      title: "确认恢复项目包",
+      message: "确认将经预检的项目包恢复成一个新项目？不会覆盖现有项目；恢复后默认处于暂停状态。",
+      confirmText: "确认创建新项目",
+    });
+    if (!ok) return;
     setBusy(true); setError(""); setSuccess("");
     try {
       const imported = await request<ImportResult>("/projects/import", {

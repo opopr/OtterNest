@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { request } from "../api/client";
 import type { DailyBriefing, PortfolioMetrics, Project } from "../api/types";
+import { useDialog } from "../components/AppDialog";
 import ProjectSelect from "../components/ProjectSelect";
 
 interface NotificationItem {
@@ -60,6 +61,7 @@ export default function PortfolioPage() {
   const [targetId, setTargetId] = useState("");
   const [hypothesis, setHypothesis] = useState("");
   const [runDrafts, setRunDrafts] = useState<Record<string, { baseline: string; candidate: string; samples: string; notes: string }>>({});
+  const dialog = useDialog();
 
   const loadOverview = useCallback(async () => {
     setLoading(true);
@@ -146,13 +148,20 @@ export default function PortfolioPage() {
   };
 
   const resolveExperiment = async (experiment: Experiment, action: "promote" | "rollback") => {
-    const note = window.prompt(action === "promote" ? "填写采纳说明（至少 5 个字符）" : "填写回滚原因（至少 5 个字符）");
-    if (!note || note.trim().length < 5) return;
-    if (!window.confirm(action === "promote" ? "确认采纳该实验结果？" : "确认回滚该实验？")) return;
+    const note = await dialog.prompt({
+      title: action === "promote" ? "采纳实验结果" : "回滚实验",
+      message: `实验假设：${experiment.hypothesis}`,
+      label: action === "promote" ? "采纳说明（至少 5 个字符）" : "回滚原因（至少 5 个字符）",
+      multiline: true,
+      required: true,
+      minLength: 5,
+      confirmText: action === "promote" ? "确认采纳" : "确认回滚",
+    });
+    if (!note) return;
     setSaving(true);
     try {
       await request<Experiment>("/experiments/" + encodeURIComponent(experiment.id) + "/" + action, {
-        method: "POST", body: JSON.stringify({ note: note.trim() })
+        method: "POST", body: JSON.stringify({ note })
       });
       await loadExperiments(experiment.project_id);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "实验状态更新失败"); }
@@ -160,7 +169,12 @@ export default function PortfolioPage() {
   };
 
   const runSchedule = async () => {
-    if (!window.confirm("将按项目优先级与等待时间执行一次公平调度，并可能为 Agent 分配任务。是否继续？")) return;
+    const confirmed = await dialog.confirm({
+      title: "执行跨项目公平调度",
+      message: "将按项目优先级与等待时间执行一次公平调度，并可能为 Agent 分配任务。是否继续？",
+      confirmText: "确认执行调度",
+    });
+    if (!confirmed) return;
     setSaving(true);
     setError("");
     try {

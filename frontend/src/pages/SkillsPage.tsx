@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { request } from "../api/client";
 import type { Project } from "../api/types";
+import { useDialog } from "../components/AppDialog";
 import ProjectSelect from "../components/ProjectSelect";
 
 interface Skill {
@@ -44,6 +45,7 @@ export default function SkillsPage() {
   const [version, setVersion] = useState("1.0.0");
   const [content, setContent] = useState("");
   const [source, setSource] = useState("");
+  const dialog = useDialog();
 
   const selectedProject = useMemo(() => projects.find((item) => item.id === selectedId) || null, [projects, selectedId]);
 
@@ -96,7 +98,12 @@ export default function SkillsPage() {
   };
 
   const publishSkill = async (skill: Skill) => {
-    if (!window.confirm("确认发布 Skill「" + skill.name + "」？发布后该项目的 Agent 才能读取它。")) return;
+    const confirmed = await dialog.confirm({
+      title: "发布 Skill",
+      message: `确认发布 Skill「${skill.name}」？发布后该项目的 Agent 才能读取它。`,
+      confirmText: "确认发布",
+    });
+    if (!confirmed) return;
     setSaving(true);
     try {
       await request("/skills/" + encodeURIComponent(skill.id) + "/publish", { method: "POST" });
@@ -106,14 +113,33 @@ export default function SkillsPage() {
   };
 
   const evaluateSkill = async (skill: Skill) => {
-    const verdict = window.prompt("评价结果：输入 pass、fail 或 concern", "pass");
-    if (!verdict || !["pass", "fail", "concern"].includes(verdict.trim())) return;
-    const notes = window.prompt("评价说明（至少 5 个字符）");
-    if (!notes || notes.trim().length < 5) return;
+    const verdict = await dialog.prompt({
+      title: `评价 Skill「${skill.name}」`,
+      message: "请选择该 Skill 的评估结论，下一步将填写详细说明。",
+      label: "评价结论",
+      defaultValue: "pass",
+      choices: [
+        { value: "pass", label: "通过 (pass)" },
+        { value: "concern", label: "有疑虑 (concern)" },
+        { value: "fail", label: "未通过 (fail)" },
+      ],
+      confirmText: "下一步",
+    });
+    if (!verdict) return;
+    const notes = await dialog.prompt({
+      title: `填写评价说明（${verdictLabel[verdict] || verdict}）`,
+      label: "评价说明（至少 5 个字符）",
+      placeholder: "记录执行表现、边界问题或适用条件…",
+      multiline: true,
+      required: true,
+      minLength: 5,
+      confirmText: "提交评价",
+    });
+    if (!notes) return;
     setSaving(true);
     try {
       await request<SkillEvaluation>("/skills/" + encodeURIComponent(skill.id) + "/evaluations", {
-        method: "POST", body: JSON.stringify({ verdict: verdict.trim(), notes: notes.trim(), task_id: null })
+        method: "POST", body: JSON.stringify({ verdict, notes, task_id: null })
       });
       await loadSkills(selectedId);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Skill 评价失败"); }
@@ -121,13 +147,21 @@ export default function SkillsPage() {
   };
 
   const archiveSkill = async (skill: Skill) => {
-    const reason = window.prompt("填写归档原因（至少 5 个字符）");
-    if (!reason || reason.trim().length < 5) return;
-    if (!window.confirm("确认归档该 Skill？归档不会删除历史评价。")) return;
+    const reason = await dialog.prompt({
+      title: `归档 Skill「${skill.name}」`,
+      message: "归档后该 Skill 不再提供给 Agent，但会保留历史评价记录。",
+      label: "归档原因（至少 5 个字符）",
+      placeholder: "说明归档或替代原因…",
+      multiline: true,
+      required: true,
+      minLength: 5,
+      confirmText: "确认归档",
+    });
+    if (!reason) return;
     setSaving(true);
     try {
       await request("/skills/" + encodeURIComponent(skill.id) + "/archive", {
-        method: "POST", body: JSON.stringify({ reason: reason.trim() })
+        method: "POST", body: JSON.stringify({ reason })
       });
       await loadSkills(selectedId);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "归档 Skill 失败"); }

@@ -1,6 +1,7 @@
 """REST API backed by the same transactional domain services future MCP/A2A need."""
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import os
@@ -291,6 +292,9 @@ def delete_project(project_id: str, actor: Actor = Depends(authenticate), db: Se
     if rule_ids:
         for wc in db.scalars(select(WorkflowCursor).where(WorkflowCursor.rule_id.in_(rule_ids))):
             db.delete(wc)
+    artifact_uris = [
+        a.uri for a in db.scalars(select(Artifact).where(Artifact.project_id == project_id)) if a.uri
+    ]
     for model in (
         WorkflowRun, WorkflowRule,
         SkillEvaluation, Skill, TaskCheckpoint, TaskSideEffect, TaskGrant, CommandPlan,
@@ -307,6 +311,14 @@ def delete_project(project_id: str, actor: Actor = Depends(authenticate), db: Se
     db.delete(project)
     emit(db, actor, "project.deleted", project_id)
     db.commit()
+    if artifact_uris:
+        from .storage import get_storage_backend
+        backend = get_storage_backend()
+        for uri in artifact_uris:
+            try:
+                backend.delete(uri)
+            except Exception:
+                pass
     return {"id": project_id, "deleted": True}
 
 
@@ -708,19 +720,28 @@ def task_public(t: Task) -> dict:
 def _read_artifact_content(artifact: Artifact) -> bytes:
     if artifact.deleted_at is not None:
         raise HTTPException(410, "Artifact content was garbage-collected")
-    base = Path(os.environ.get("OTTERNEST_ARTIFACT_DIR", "./var/artifacts")).resolve()
-    project_root = (base / artifact.project_id).resolve()
-    try:
-        path = Path(artifact.uri).resolve(strict=True)
-        if not project_root.is_relative_to(base) or not path.is_relative_to(project_root) or not path.is_file():
-            raise HTTPException(404, "Artifact content is unavailable")
-        if path.stat().st_size > 5 * 1024 * 1024:
-            raise HTTPException(413, "Artifact exceeds the supported 5 MiB limit")
-        content = path.read_bytes()
-    except HTTPException:
-        raise
-    except (OSError, RuntimeError, ValueError):
-        raise HTTPException(410, "Artifact content is missing from local storage") from None
+    if artifact.uri.startswith("s3://"):
+        from .storage import StorageError, get_storage_backend
+        try:
+            content = get_storage_backend().load(artifact.uri)
+        except StorageError as exc:
+            raise HTTPException(410, str(exc)) from None
+        except Exception:
+            raise HTTPException(410, "Artifact content is missing from object storage") from None
+    else:
+        base = Path(os.environ.get("OTTERNEST_ARTIFACT_DIR", "./var/artifacts")).resolve()
+        project_root = (base / artifact.project_id).resolve()
+        try:
+            path = Path(artifact.uri).resolve(strict=True)
+            if not project_root.is_relative_to(base) or not path.is_relative_to(project_root) or not path.is_file():
+                raise HTTPException(404, "Artifact content is unavailable")
+            if path.stat().st_size > 5 * 1024 * 1024:
+                raise HTTPException(413, "Artifact exceeds the supported 5 MiB limit")
+            content = path.read_bytes()
+        except HTTPException:
+            raise
+        except (OSError, RuntimeError, ValueError):
+            raise HTTPException(410, "Artifact content is missing from local storage") from None
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(413, "Artifact exceeds the supported 5 MiB limit")
     if not hmac.compare_digest(hashlib.sha256(content).hexdigest(), artifact.checksum):
@@ -988,6 +1009,9 @@ def delete_task(task_id: str, actor: Actor = Depends(authenticate), db: Session 
     from .models import A2AInboxMessage, CommandPlan, SkillEvaluation, TaskCheckpoint, TaskGrant, TaskSideEffect
     for dep in db.scalars(select(TaskDependency).where((TaskDependency.task_id == task_id) | (TaskDependency.depends_on_id == task_id))):
         db.delete(dep)
+    artifact_uris = [
+        a.uri for a in db.scalars(select(Artifact).where(Artifact.task_id == task_id)) if a.uri
+    ]
     for model in (TaskCheckpoint, TaskSideEffect, TaskGrant, CommandPlan, A2AInboxMessage, A2ADelegation, Artifact):
         for child in db.scalars(select(model).where(model.task_id == task_id)):
             db.delete(child)
@@ -998,6 +1022,14 @@ def delete_task(task_id: str, actor: Actor = Depends(authenticate), db: Session 
     db.delete(row)
     emit(db, actor, "task.deleted", task_id, project_id)
     db.commit()
+    if artifact_uris:
+        from .storage import get_storage_backend
+        backend = get_storage_backend()
+        for uri in artifact_uris:
+            try:
+                backend.delete(uri)
+            except Exception:
+                pass
     return {"id": task_id, "deleted": True}
 
 
@@ -1301,11 +1333,11 @@ class UpdateApplyIn(BaseModel):
 
 
 @router.get("/system/update/check")
-def system_update_check(fetch: bool = True, actor: Actor = Depends(authenticate)):
+async def system_update_check(fetch: bool = True, actor: Actor = Depends(authenticate)):
     owner_only(actor)
     from .updater import UpdateError, check_for_updates
     try:
-        return check_for_updates(fetch=fetch)
+        return await asyncio.to_thread(check_for_updates, fetch=fetch)
     except UpdateError as exc:
         raise HTTPException(400, str(exc)) from None
 

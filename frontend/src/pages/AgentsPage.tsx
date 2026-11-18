@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { request } from "../api/client";
 import type { Agent } from "../api/types";
+import { useDialog } from "../components/AppDialog";
 
 interface Runtime {
   id: string;
@@ -21,6 +22,7 @@ interface Runtime {
 interface RuntimeToken { id: string; agent_id: string; token: string; }
 
 export default function AgentsPage() {
+  const dialog = useDialog();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -114,7 +116,7 @@ export default function AgentsPage() {
 
   const issueRuntimeToken = async (runtime: Runtime) => {
     if (!selectedAgent) return;
-    if (!window.confirm("为该 Runtime 签发或轮换独立凭据？旧凭据会立即失效。")) return;
+    if (!(await dialog.confirm({ title: "签发 / 轮换 Runtime 凭据", message: "为该 Runtime 签发或轮换独立凭据？旧凭据会立即失效。", confirmText: "确认签发", tone: "warning" }))) return;
     setSaving(true);
     try {
       const result = await request<RuntimeToken>("/agents/" + encodeURIComponent(selectedAgent.id) + "/runtimes/" + encodeURIComponent(runtime.id) + "/token", { method: "POST" });
@@ -125,7 +127,7 @@ export default function AgentsPage() {
   };
 
   const disableRuntime = async (runtime: Runtime) => {
-    if (!selectedAgent || !window.confirm("确认禁用该 Runtime？它将不能再提交心跳。")) return;
+    if (!selectedAgent || !(await dialog.confirm({ title: "确认禁用 Runtime", message: "确认禁用该 Runtime？它将不能再提交心跳。", confirmText: "确认禁用", tone: "warning" }))) return;
     setSaving(true);
     try {
       await request("/agents/" + encodeURIComponent(selectedAgent.id) + "/runtimes/" + encodeURIComponent(runtime.id) + "/disable", { method: "POST" });
@@ -141,7 +143,7 @@ export default function AgentsPage() {
       setError("只能核验 Agent 已声明的能力。");
       return;
     }
-    if (!window.confirm("确认保存能力核验结果？这表示你已在外部验证这些能力确实可用。")) return;
+    if (!(await dialog.confirm({ title: "保存能力核验", message: "确认保存能力核验结果？这表示你已在外部验证这些能力确实可用。", confirmText: "保存核验" }))) return;
     setSaving(true);
     try {
       await request("/agents/" + encodeURIComponent(selectedAgent.id) + "/verified-capabilities", {
@@ -153,7 +155,7 @@ export default function AgentsPage() {
   };
 
   const disableAgent = async (agent: Agent) => {
-    if (!window.confirm(`确认停用 Agent「${agent.name}」？它将无法继续领取新任务或鉴权。`)) return;
+    if (!(await dialog.confirm({ title: "停用 Agent", message: `确认停用 Agent「${agent.name}」？它将无法继续领取新任务或鉴权。`, confirmText: "确认停用", tone: "warning" }))) return;
     setSaving(true);
     try {
       await request("/agents/" + encodeURIComponent(agent.id) + "/disable", { method: "POST" });
@@ -172,7 +174,7 @@ export default function AgentsPage() {
   };
 
   const deleteAgent = async (agent: Agent) => {
-    if (!window.confirm(`确认删除 Agent「${agent.name}」并移入回收站？它将被立即停用，稍后可在回收站恢复。`)) return;
+    if (!(await dialog.confirm({ title: "移入回收站", message: `确认删除 Agent「${agent.name}」并移入回收站？它将被立即停用，稍后可在回收站恢复。`, confirmText: "移入回收站", tone: "warning" }))) return;
     setSaving(true);
     try {
       await request("/agents/" + encodeURIComponent(agent.id), { method: "DELETE" });
@@ -192,7 +194,7 @@ export default function AgentsPage() {
   };
 
   const permanentDeleteAgent = async (agent: Agent) => {
-    if (!window.confirm(`警告：确认彻底永久删除 Agent「${agent.name}」？此操作不可恢复。`)) return;
+    if (!(await dialog.confirm({ title: "永久删除 Agent", message: `警告：确认彻底永久删除 Agent「${agent.name}」？此操作不可恢复。`, confirmText: "永久删除", tone: "danger" }))) return;
     setSaving(true);
     try {
       await request("/agents/" + encodeURIComponent(agent.id) + "/permanent", { method: "DELETE" });
@@ -283,8 +285,8 @@ export default function AgentsPage() {
             </div>
             <small className="agent-id">ID · {agent.id}</small>
             {tab === "active" ? (
-              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "8px" }}>
-                <button className="secondary-button compact agent-detail-button" style={{ flex: 1 }} onClick={() => setSelectedAgentId((current) => current === agent.id ? "" : agent.id)}>
+              <div className="card-action-row">
+                <button className="secondary-button compact agent-detail-button flex-1" onClick={() => setSelectedAgentId((current) => current === agent.id ? "" : agent.id)}>
                   <Cpu size={14} />{selectedAgentId === agent.id ? "收起" : "环境与能力"}
                 </button>
                 {agent.enabled ? (
@@ -301,8 +303,8 @@ export default function AgentsPage() {
                 </button>
               </div>
             ) : (
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
-                <button className="primary-button compact" style={{ flex: 1 }} disabled={saving} onClick={() => void restoreAgent(agent)}>
+              <div className="card-action-row-lg">
+                <button className="primary-button compact flex-1" disabled={saving} onClick={() => void restoreAgent(agent)}>
                   <RotateCcw size={14} />恢复
                 </button>
                 <button className="text-button" disabled={saving} onClick={() => void permanentDeleteAgent(agent)}>

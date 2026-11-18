@@ -4,6 +4,7 @@ import {
   Pencil, Plus, RefreshCw, ShieldCheck, Trash2, X
 } from "lucide-react";
 import { request } from "../api/client";
+import { useDialog } from "./AppDialog";
 import TaskExecutionSafety from "./TaskExecutionSafety";
 import TaskContinuityPanel from "./TaskContinuityPanel";
 import type { Task } from "../api/types";
@@ -54,6 +55,7 @@ const formatTime = (value?: string | null) => value ? new Date(value).toLocaleSt
 const shortId = (value: string) => value.length > 16 ? value.slice(0,8)+"…"+value.slice(-5) : value;
 
 export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Props) {
+  const dialog = useDialog();
   const [task,setTask] = useState<TaskDetail|null>(null);
   const [graph,setGraph] = useState<TaskGraph|null>(null);
   const [dependencyInfo,setDependencyInfo] = useState<DependencyInfo|null>(null);
@@ -126,7 +128,12 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
   const addDependency = async () => {
     if(!task||!candidateId)return;
     const predecessor = graph?.tasks.find(row=>row.id===candidateId);
-    if(!window.confirm("确认让当前任务等待「"+(predecessor?.title||candidateId)+"」完成后再执行？服务端仍会检查循环依赖和任务状态。"))return;
+    const confirmed = await dialog.confirm({
+      title: "添加任务依赖",
+      message: "确认让当前任务等待「"+(predecessor?.title||candidateId)+"」完成后再执行？服务端仍会检查循环依赖和任务状态。",
+      confirmText: "添加依赖"
+    });
+    if(!confirmed)return;
     setSaving(true);setError("");
     try{
       await request("/tasks/"+encodeURIComponent(task.id)+"/dependencies",{
@@ -142,7 +149,13 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
   const removeDependency = async (predecessorId:string) => {
     if(!task)return;
     const predecessor = graph?.tasks.find(row=>row.id===predecessorId);
-    if(!window.confirm("确认移除对「"+(predecessor?.title||predecessorId)+"」的依赖？这可能使任务提前进入可执行状态。"))return;
+    const confirmed = await dialog.confirm({
+      title: "移除任务依赖",
+      message: "确认移除对「"+(predecessor?.title||predecessorId)+"」的依赖？这可能使任务提前进入可执行状态。",
+      confirmText: "确认移除",
+      tone: "warning"
+    });
+    if(!confirmed)return;
     setSaving(true);setError("");
     try{
       await request("/tasks/"+encodeURIComponent(task.id)+"/dependencies/"+encodeURIComponent(predecessorId),{method:"DELETE"});
@@ -153,7 +166,14 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
   };
 
   const deleteTask = async () => {
-    if (!task || !window.confirm(`确认删除任务「${task.title}」？此操作不可撤销。`)) return;
+    if (!task) return;
+    const confirmed = await dialog.confirm({
+      title: "删除任务",
+      message: `确认删除任务「${task.title}」？此操作不可撤销。`,
+      confirmText: "永久删除",
+      tone: "danger"
+    });
+    if (!confirmed) return;
     setSaving(true); setError("");
     try {
       await request("/tasks/" + encodeURIComponent(task.id), { method: "DELETE" });
@@ -245,7 +265,7 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
         {editingTask && (
           <section className="task-detail-section task-detail-wide">
             <div className="task-detail-section-head"><h3><Pencil size={15}/>编辑任务</h3><button className="icon-button" onClick={() => setEditingTask(false)}><X size={15}/></button></div>
-            <div className="form-panel" style={{ padding: 0, boxShadow: "none", border: "none" }}>
+            <div className="form-panel form-panel-flat">
               <div className="form-grid three">
                 <label>任务标题<input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required maxLength={240}/></label>
                 <label>风险等级<select value={editRisk} onChange={(e) => setEditRisk(e.target.value as "R0"|"R1"|"R2"|"R3")}><option value="R0">R0</option><option value="R1">R1</option><option value="R2">R2</option><option value="R3">R3</option></select></label>
@@ -284,7 +304,7 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
       </>}
       <div className="task-detail-footer">
         <span><Clock3 size={13}/>任务数据以 FastAPI 服务端为准</span>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+        <div className="flex-row-gap">
           {isOwner && task && !["running", "completed", "cancelled"].includes(task.status) && (
             <button className="secondary-button compact" disabled={saving} onClick={startEditTask}>
               <Pencil size={13}/>编辑任务

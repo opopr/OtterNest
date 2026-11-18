@@ -6,6 +6,7 @@ import {
 import { Link } from "react-router-dom";
 import { request } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
+import { useDialog } from "../components/AppDialog";
 
 interface RuntimeRow {
  id:string; agent_id:string; label:string; environment:string; enabled:boolean;
@@ -21,6 +22,7 @@ const formatTime=(value:string|null)=>value?new Date(value).toLocaleString("zh-C
 
 export default function RuntimeMonitorPage(){
  const {user}=useAuth();
+ const dialog=useDialog();
  const isOwner=user?.kind==="owner";
  const [rows,setRows]=useState<RuntimeRow[]>([]);
  const [loading,setLoading]=useState(true);
@@ -59,7 +61,7 @@ export default function RuntimeMonitorPage(){
  },[rows,filter,query]);
 
  const rotateToken=async(row:RuntimeRow)=>{
-  if(!window.confirm("为「"+row.label+"」轮换独立 Runtime 凭据？旧凭据将立即失效，必须同步更新对应 Runner 的配置。"))return;
+  if(!(await dialog.confirm({title:"轮换 Runtime 凭据",message:"为「"+row.label+"」轮换独立 Runtime 凭据？旧凭据将立即失效，必须同步更新对应 Runner 的配置。",confirmText:"确认轮换",tone:"warning"})))return;
   setSaving(true);setError("");
   try{
    const token=await request<RuntimeToken>("/agents/"+encodeURIComponent(row.agent_id)+"/runtimes/"+encodeURIComponent(row.id)+"/token",{method:"POST"});
@@ -70,7 +72,7 @@ export default function RuntimeMonitorPage(){
  };
 
  const disableRuntime=async(row:RuntimeRow)=>{
-  if(!window.confirm("确认禁用 Runtime「"+row.label+"」？它将不能再提交心跳。该操作不会自动终止外部机器上的进程。"))return;
+  if(!(await dialog.confirm({title:"禁用 Runtime",message:"确认禁用 Runtime「"+row.label+"」？它将不能再提交心跳。该操作不会自动终止外部机器上的进程。",confirmText:"确认禁用",tone:"warning"})))return;
   setSaving(true);setError("");
   try{
    await request("/agents/"+encodeURIComponent(row.agent_id)+"/runtimes/"+encodeURIComponent(row.id)+"/disable",{method:"POST"});

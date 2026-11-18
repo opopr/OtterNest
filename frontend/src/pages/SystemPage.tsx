@@ -5,6 +5,8 @@ import {
 } from "lucide-react";
 import { getApiOrigin, healthRequest, request } from "../api/client";
 import type { Project, SystemMode } from "../api/types";
+import { useSystemMode } from "../auth/SystemModeProvider";
+import { useDialog } from "../components/AppDialog";
 import ProjectSelect from "../components/ProjectSelect";
 
 interface ProjectEvent {
@@ -28,6 +30,7 @@ interface ConnectionDiagnostics {
 }
 interface UpdateCheckResult {
   enabled: boolean;
+  git_available?: boolean;
   branch: string;
   target_ref: string;
   current_commit: string;
@@ -64,6 +67,8 @@ const eventLabel: Record<string, string> = {
 };
 
 export default function SystemPage() {
+  const dialog = useDialog();
+  const { refreshSystemMode } = useSystemMode();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [systemMode, setSystemMode] = useState<SystemMode | null>(null);
@@ -81,11 +86,13 @@ export default function SystemPage() {
   const [connectionCheckedAt, setConnectionCheckedAt] = useState("");
   const [updateCheck, setUpdateCheck] = useState<UpdateCheckResult | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatusResult | null>(null);
+  const [updateError, setUpdateError] = useState("");
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [applyingUpdate, setApplyingUpdate] = useState(false);
 
   const checkForUpdates = useCallback(async (fetchRemote = true) => {
     setCheckingUpdate(true);
+    setUpdateError("");
     try {
       const [info, status] = await Promise.all([
         request<UpdateCheckResult>("/system/update/check?fetch=" + (fetchRemote ? "true" : "false")),
@@ -94,16 +101,24 @@ export default function SystemPage() {
       setUpdateCheck(info);
       setUpdateStatus(status);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "检查更新失败");
+      setUpdateError(reason instanceof Error ? reason.message : "检查更新失败");
     } finally {
       setCheckingUpdate(false);
     }
   }, []);
 
   const applySelfUpdate = async (force = false) => {
-    if (!force && !window.confirm("确认执行一键更新？将自动拉取最新代码、执行数据库迁移、重新构建前端并重启服务。")) return;
+    const confirmed = await dialog.confirm({
+      title: force ? "强制执行更新" : "确认一键更新",
+      message: force
+        ? "当前仍有运行中任务，强制继续更新可能会中断正在执行的任务进程。确认继续？"
+        : "确认执行一键更新？将自动拉取最新代码、执行数据库迁移、重新构建前端并重启服务。",
+      confirmText: force ? "强制更新" : "开始更新",
+      tone: "warning"
+    });
+    if (!confirmed) return;
     setApplyingUpdate(true);
-    setError("");
+    setUpdateError("");
     try {
       const res = await request<UpdateStatusResult>("/system/update/apply", {
         method: "POST",
@@ -113,12 +128,18 @@ export default function SystemPage() {
     } catch (reason) {
       const msg = reason instanceof Error ? reason.message : "触发更新失败";
       if (!force && msg.includes("running tasks")) {
-        if (window.confirm(msg + "\n\n是否强制继续更新？")) {
+        const forceConfirm = await dialog.confirm({
+          title: "存在运行中的任务",
+          message: msg + "\n\n是否强制继续更新？",
+          confirmText: "强制继续",
+          tone: "danger"
+        });
+        if (forceConfirm) {
           await applySelfUpdate(true);
           return;
         }
       } else {
-        setError(msg);
+        setUpdateError(msg);
       }
     } finally {
       setApplyingUpdate(false);
@@ -219,7 +240,13 @@ export default function SystemPage() {
       return;
     }
     const description = mode === "normal" ? "恢复正常运行" : mode === "degraded" ? "切换到降级运行" : "切换到只读保护";
-    if (!window.confirm("确认" + description + "？该设置会改变全局写操作策略。")) return;
+    const confirmed = await dialog.confirm({
+      title: "确认更改全局保护模式",
+      message: "确认" + description + "？该设置会改变全局写操作策略。",
+      confirmText: "确认切换",
+      tone: mode === "normal" ? "default" : "warning"
+    });
+    if (!confirmed) return;
     setSaving(true);
     setError("");
     try {
@@ -227,6 +254,7 @@ export default function SystemPage() {
         method: "PUT", body: JSON.stringify({ mode, reason: modeReason.trim() })
       });
       setSystemMode(result);
+      await refreshSystemMode();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "系统保护模式更新失败"); }
     finally { setSaving(false); }
   };
@@ -236,7 +264,12 @@ export default function SystemPage() {
       setError("项目状态变更原因至少需要 5 个字符。");
       return;
     }
-    if (!window.confirm("确认将项目「" + (selectedProject?.name || "") + "」切换为" + projectStatusLabel[projectStatus] + "？")) return;
+    const confirmed = await dialog.confirm({
+      title: "确认调整项目运行状态",
+      message: "确认将项目「" + (selectedProject?.name || "") + "」切换为" + projectStatusLabel[projectStatus] + "？",
+      confirmText: "确认变更"
+    });
+    if (!confirmed) return;
     setSaving(true);
     try {
       await request<ProjectStatusResult>("/projects/" + encodeURIComponent(selectedId) + "/status", {
@@ -300,25 +333,31 @@ export default function SystemPage() {
       <section className="panel">
         <div className="panel-heading">
           <div className="panel-title"><DownloadCloud size={17} /><h3>系统版本与一键更新</h3></div>
-          <div className="heading-actions" style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            {updateCheck && <span className={"status-tag " + (updateCheck.update_available ? "tag-amber" : "tag-green")}>
-              {updateCheck.update_available ? `发现 ${updateCheck.behind_count} 个新提交` : "已是最新版本"}
-            </span>}
+          <div className="heading-actions flex-row-gap">
+            {updateCheck && updateCheck.git_available !== false && (
+              <span className={"status-tag " + (updateCheck.update_available ? "tag-amber" : "tag-green")}>
+                {updateCheck.update_available ? `发现 ${updateCheck.behind_count} 个新提交` : "已是最新版本"}
+              </span>
+            )}
             <button className="secondary-button compact" onClick={() => void checkForUpdates(true)} disabled={checkingUpdate || updateStatus?.state === "running"}>
               <RefreshCw size={14} className={checkingUpdate ? "spin" : ""} />检查更新
             </button>
             <button
               className="primary-button compact"
               onClick={() => void applySelfUpdate(false)}
-              disabled={applyingUpdate || updateStatus?.state === "running" || !updateCheck?.enabled}
+              disabled={applyingUpdate || updateStatus?.state === "running" || !updateCheck?.enabled || updateCheck?.git_available === false}
               title={!updateCheck?.enabled ? "需在服务端配置 OTTERNEST_ENABLE_WEB_UPDATE=true" : ""}
             >
               <DownloadCloud size={14} />{updateStatus?.state === "running" ? "更新执行中…" : "一键更新并重启"}
             </button>
           </div>
         </div>
-        {updateCheck && (
-          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", fontSize: "13px", marginBottom: "10px" }}>
+        {updateError && <div className="connection-help mb-10">当前环境未启用 Git 在线更新检测：{updateError}</div>}
+        {updateCheck && updateCheck.git_available === false && (
+          <div className="connection-help mb-10">当前后端运行在无 <code>.git</code> 目录的打包/容器环境中，在线代码更新不可用。</div>
+        )}
+        {updateCheck && updateCheck.git_available !== false && (
+          <div className="update-meta-row">
             <span>分支：<code>{updateCheck.branch}</code></span>
             <span>当前版本：<code>{updateCheck.current_commit}</code></span>
             <span>远端版本：<code>{updateCheck.remote_commit}</code></span>
@@ -326,23 +365,23 @@ export default function SystemPage() {
             <span>自动重启：{updateCheck.restart_command_configured ? "已配置" : "未配置（仅拉取/迁移/构建）"}</span>
           </div>
         )}
-        {updateCheck && !updateCheck.enabled && (
-          <div className="connection-help" style={{ marginBottom: "10px" }}>
+        {updateCheck && updateCheck.git_available !== false && !updateCheck.enabled && (
+          <div className="connection-help mb-10">
             网页一键更新当前处于关闭状态。如需在页面直接更新，请在服务端环境变量中配置 <code>OTTERNEST_ENABLE_WEB_UPDATE=true</code>（以及可选的 <code>OTTERNEST_RESTART_COMMAND</code>）。
           </div>
         )}
-        {updateCheck && updateCheck.recent_commits.length > 0 && (
-          <pre className="json-preview" style={{ marginBottom: "10px" }}>{updateCheck.recent_commits.join("\n")}</pre>
+        {updateCheck && Array.isArray(updateCheck.recent_commits) && updateCheck.recent_commits.length > 0 && (
+          <pre className="json-preview mb-10">{updateCheck.recent_commits.join("\n")}</pre>
         )}
         {updateStatus && updateStatus.state !== "idle" && (
-          <div style={{ marginTop: "8px" }}>
-            <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px" }}>
+          <div className="update-status-box">
+            <div className="update-status-head">
               <span className={"status-tag " + (updateStatus.state === "succeeded" ? "tag-green" : updateStatus.state === "running" ? "tag-amber" : "tag-neutral")}>
                 {updateStatus.state === "running" ? `执行中：${updateStatus.step}` : updateStatus.state === "succeeded" ? "更新成功" : "更新失败"}
               </span>
-              {updateStatus.error && <span style={{ color: "#b91c1c", fontSize: "12px" }}>{updateStatus.error}</span>}
+              {updateStatus.error && <span className="update-error-text">{updateStatus.error}</span>}
             </div>
-            {updateStatus.logs.length > 0 && <pre className="json-preview">{updateStatus.logs.join("\n")}</pre>}
+            {Array.isArray(updateStatus.logs) && updateStatus.logs.length > 0 && <pre className="json-preview">{updateStatus.logs.join("\n")}</pre>}
           </div>
         )}
       </section>

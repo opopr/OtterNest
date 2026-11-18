@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { AlertTriangle, ArrowUpRight, CheckCircle2, Link2, RefreshCw, ShieldCheck, ShieldAlert } from "lucide-react";
 import { Link } from "react-router-dom";
 import { request } from "../api/client";
+import { useDialog } from "./AppDialog";
 import "./TaskExecutionSafety.css";
 
 interface SideEffect {
@@ -68,6 +69,7 @@ const errorText = (reason: unknown) => reason instanceof Error ? reason.message 
 const when = (value: string) => new Date(value).toLocaleString("zh-CN", { hour12: false });
 
 export default function TaskExecutionSafety({ taskId, projectId, taskStatus, taskRisk, isOwner, onChanged }: Props) {
+  const dialog = useDialog();
   const [effects, setEffects] = useState<SideEffect[]>([]);
   const [endpoints, setEndpoints] = useState<RemoteEndpoint[]>([]);
   const [delegation, setDelegation] = useState<Delegation | null>(null);
@@ -123,59 +125,94 @@ export default function TaskExecutionSafety({ taskId, projectId, taskStatus, tas
     setNotice("");
   };
 
-  const reconcileEffect = (event: FormEvent<HTMLFormElement>) => {
+  const reconcileEffect = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!effectId || !outcome || evidenceNote.trim().length < 5) return;
     const effect = effects.find((item) => item.id === effectId);
     if (!effect) return;
     const action = outcome === "verified_executed" ? "确已执行" : "确认未执行";
-    if (!window.confirm("确认已通过外部系统的权威记录查证“" + effect.target_system + "”的结果为【" + action + "】？\n\n该结论会写入审计台账，不能仅凭 OtterNest 超时或没有回包判断。")) return;
-    void mutate(
+    const confirmed = await dialog.confirm({
+      title: "提交外部副作用对账",
+      message: "确认已通过外部系统的权威记录查证“" + effect.target_system + "”的结果为【" + action + "】？\n\n该结论会写入审计台账，不能仅凭 OtterNest 超时或没有回包判断。",
+      confirmText: "确认写入台账",
+      tone: "warning"
+    });
+    if (!confirmed) return;
+    const ok = await mutate(
       () => request("/side-effects/" + encodeURIComponent(effect.id) + "/reconcile", {
         method: "POST", body: JSON.stringify({ status: outcome, note: evidenceNote.trim() })
       }),
       "人工对账结论已记录。"
-    ).then((ok) => { if (ok) { setEffectId(""); setOutcome(""); setEvidenceNote(""); } });
+    );
+    if (ok) { setEffectId(""); setOutcome(""); setEvidenceNote(""); }
   };
 
-  const queueDelegation = () => {
+  const queueDelegation = async () => {
     if (!endpointId) return;
     const peer = endpoints.find((item) => item.id === endpointId);
-    if (!peer || !window.confirm("确认将此任务交给外部 A2A Agent？\n\n远端：" + peer.url + "\n\n后端会验证项目状态、任务风险、Agent 资格和凭据。请求提交后不能当作尚未发送而直接重试。")) return;
-    void mutate(
+    if (!peer) return;
+    const confirmed = await dialog.confirm({
+      title: "发起 A2A 远端委托",
+      message: "确认将此任务交给外部 A2A Agent？\n\n远端：" + peer.url + "\n\n后端会验证项目状态、任务风险、Agent 资格和凭据。请求提交后不能当作尚未发送而直接重试。",
+      confirmText: "加入委托队列",
+      tone: "warning"
+    });
+    if (!confirmed) return;
+    const ok = await mutate(
       () => request("/tasks/" + encodeURIComponent(taskId) + "/a2a/delegate", {
         method: "POST", body: JSON.stringify({ endpoint_id: endpointId })
       }),
       "A2A 委托已进入待处理队列；尚不代表远端已接单。"
-    ).then((ok) => { if (ok) setEndpointId(""); });
+    );
+    if (ok) setEndpointId("");
   };
 
-  const cancelDelegation = () => {
-    if (!delegation || !window.confirm("确认请求取消远端委托？\n\n对于已到远端的任务，取消请求不等于取消成功。必须等待远端确认，不能据此重复执行。")) return;
-    void mutate(
+  const cancelDelegation = async () => {
+    if (!delegation) return;
+    const confirmed = await dialog.confirm({
+      title: "请求取消远端委托",
+      message: "确认请求取消远端委托？\n\n对于已到远端的任务，取消请求不等于取消成功。必须等待远端确认，不能据此重复执行。",
+      confirmText: "确认请求取消",
+      tone: "warning"
+    });
+    if (!confirmed) return;
+    await mutate(
       () => request("/a2a/delegations/" + encodeURIComponent(delegation.id) + "/cancel", { method: "POST" }),
       "取消请求已记录。请继续检查远端状态。"
     );
   };
 
-  const releaseDelegation = () => {
-    if (!delegation || !window.confirm("只允许对已确认终止且阻塞的委托解除绑定。确定继续？\n\n历史映射会保留以便审计。解除绑定不代表可以不经检查重复外部副作用。")) return;
-    void mutate(
+  const releaseDelegation = async () => {
+    if (!delegation) return;
+    const confirmed = await dialog.confirm({
+      title: "解除终止委托绑定",
+      message: "只允许对已确认终止且阻塞的委托解除绑定。确定继续？\n\n历史映射会保留以便审计。解除绑定不代表可以不经检查重复外部副作用。",
+      confirmText: "确认解除绑定",
+      tone: "danger"
+    });
+    if (!confirmed) return;
+    await mutate(
       () => request("/a2a/delegations/" + encodeURIComponent(delegation.id) + "/release", { method: "POST" }),
       "远端委托绑定已解除，历史记录仍保留。"
     );
   };
 
-  const reconcileDelegation = (event: FormEvent<HTMLFormElement>) => {
+  const reconcileDelegation = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!delegation || !remoteTaskId.trim()) return;
-    if (!window.confirm("确认已在远端系统核实该任务 ID：\n" + remoteTaskId.trim() + "\n\n此操作只建立已核实映射，不重新发送任务。")) return;
-    void mutate(
+    const confirmed = await dialog.confirm({
+      title: "核实远端任务 ID",
+      message: "确认已在远端系统核实该任务 ID：\n" + remoteTaskId.trim() + "\n\n此操作只建立已核实映射，不重新发送任务。",
+      confirmText: "记录映射"
+    });
+    if (!confirmed) return;
+    const ok = await mutate(
       () => request("/a2a/delegations/" + encodeURIComponent(delegation.id) + "/reconcile", {
         method: "POST", body: JSON.stringify({ remote_task_id: remoteTaskId.trim() })
       }),
       "远端任务 ID 已记录，后端将根据可用的轮询 Worker 继续核对。"
-    ).then((ok) => { if (ok) setRemoteTaskId(""); });
+    );
+    if (ok) setRemoteTaskId("");
   };
 
   const unresolvedEffects = effects.filter((effect) => ["pending", "unknown", "reported_executed"].includes(effect.status));
@@ -216,7 +253,7 @@ export default function TaskExecutionSafety({ taskId, projectId, taskStatus, tas
         })}
       </div>
       {!loading && effects.length === 0 && <div className="dag-empty">此任务暂无已登记的外部副作用。没有台账不构成外部操作未发生的证明。</div>}
-      {isOwner && selected && <form className="safety-form" onSubmit={reconcileEffect}>
+      {isOwner && selected && <form className="safety-form" onSubmit={(e) => void reconcileEffect(e)}>
         <strong>核实「{selected.target_system}」的真实结果</strong>
         <p>请先在目标系统检查权威交易记录、作业日志或任务执行证据，然后选择结论。</p>
         <label>人工核实结论<select value={outcome} required onChange={(event) => setOutcome(event.target.value as Outcome | "")}>
@@ -251,10 +288,10 @@ export default function TaskExecutionSafety({ taskId, projectId, taskStatus, tas
         {delegation.last_error && <p className="safety-warning"><AlertTriangle size={13} />{delegation.last_error}</p>}
         {delegation.status === "unknown" && <p className="safety-warning"><ShieldAlert size={15} />远端可能已接受请求但回包丢失。禁止重新发起委托；必须先核实远端任务 ID。</p>}
         <div className="safety-actions">
-          {canCancel && <button className="secondary-button compact" disabled={saving} onClick={cancelDelegation}>请求取消委托</button>}
-          {canRelease && <button className="secondary-button compact" disabled={saving} onClick={releaseDelegation}>解除终止委托绑定</button>}
+          {canCancel && <button className="secondary-button compact" disabled={saving} onClick={() => void cancelDelegation()}>请求取消委托</button>}
+          {canRelease && <button className="secondary-button compact" disabled={saving} onClick={() => void releaseDelegation()}>解除终止委托绑定</button>}
         </div>
-        {canReconcileRemote && <form className="safety-form" onSubmit={reconcileDelegation}>
+        {canReconcileRemote && <form className="safety-form" onSubmit={(e) => void reconcileDelegation(e)}>
           <label>已在远端核实的任务 ID<input value={remoteTaskId} maxLength={128} required
             onChange={(event) => setRemoteTaskId(event.target.value)} placeholder="输入经过核实的远端任务 ID" /></label>
           <button className="primary-button compact" disabled={saving || !remoteTaskId.trim()}>记录映射并交由 Worker 核对</button>
@@ -267,7 +304,7 @@ export default function TaskExecutionSafety({ taskId, projectId, taskStatus, tas
           <option value="">选择已登记远端…</option>
           {endpoints.filter((endpoint) => endpoint.enabled).map((endpoint) => <option key={endpoint.id} value={endpoint.id}>{endpoint.url}</option>)}
         </select></label>
-        <button className="primary-button compact" disabled={!canDelegate || !endpointId || saving} onClick={queueDelegation}>明确授权并加入委托队列</button>
+        <button className="primary-button compact" disabled={!canDelegate || !endpointId || saving} onClick={() => void queueDelegation()}>明确授权并加入委托队列</button>
         {!canDelegate && <p className="form-hint">仅当前状态为「待执行」且风险 R0/R1 的任务可发起新委托；已有委托不会被覆盖。</p>}
         {!endpoints.some((endpoint) => endpoint.enabled) && <Link to="/interfaces" className="secondary-button compact safety-link-button">前往登记远端 Agent<ArrowUpRight size={13} /></Link>}
       </div>}

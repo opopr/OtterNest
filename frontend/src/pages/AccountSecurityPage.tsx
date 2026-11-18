@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { AlertCircle, Copy, KeyRound, LockKeyhole, RefreshCw, ShieldCheck, ShieldOff, UserRound, History, LogOut } from "lucide-react";
 import { request } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
+import { useDialog } from "../components/AppDialog";
 import "./AdminGaps.css";
 
 interface AccountSummary {
@@ -76,6 +77,7 @@ export default function AccountSecurityPage() {
   const [disablePassword, setDisablePassword] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [audit, setAudit] = useState<SecurityAuditResult | null>(null);
+  const dialog = useDialog();
 
   const load = useCallback(async () => {
     if (!isOwner) { setLoading(false); return; }
@@ -102,7 +104,13 @@ export default function AccountSecurityPage() {
     event.preventDefault();
     if (newPassword !== confirmPassword) { setError("两次输入的新密码不一致。"); return; }
     if (!account?.account_configured && !newUsername.trim()) { setError("首次配置需要用户名。"); return; }
-    if (!window.confirm("修改密码会使所有已有登录会话失效。确定继续吗？")) return;
+    const confirmed = await dialog.confirm({
+      title: "更改登录密码",
+      message: "修改密码会使所有已有登录会话失效，并需要重新登录。确定继续吗？",
+      confirmText: "确认更改密码",
+      tone: "warning",
+    });
+    if (!confirmed) return;
     setSaving(true); setError(""); setNotice("");
     try {
       await request("/auth/password", {
@@ -148,7 +156,13 @@ export default function AccountSecurityPage() {
 
   const rotateRecovery = async () => {
     if (!oneTimeCode.trim()) { setError("请输入当前验证器的动态验证码。"); return; }
-    if (!window.confirm("重新生成恢复码会立即使旧恢复码全部失效，是否继续？")) return;
+    const confirmed = await dialog.confirm({
+      title: "轮换恢复码",
+      message: "重新生成恢复码会立即使旧恢复码全部失效，是否继续？",
+      confirmText: "确认轮换",
+      tone: "warning",
+    });
+    if (!confirmed) return;
     setSaving(true); setError(""); setNotice("");
     try {
       const result = await request<RecoveryResult>("/auth/2fa/recovery-codes", {
@@ -165,7 +179,13 @@ export default function AccountSecurityPage() {
     if (!disablePassword.trim() || !oneTimeCode.trim()) {
       setError("关闭双重验证需要密码及验证码或恢复码。"); return;
     }
-    if (!window.confirm("这会降低账号安全等级。确定关闭双重验证吗？")) return;
+    const confirmed = await dialog.confirm({
+      title: "关闭双重验证（2FA）",
+      message: "关闭双重验证会降低账号安全等级。确定继续关闭吗？",
+      confirmText: "确认关闭 2FA",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     setSaving(true); setError(""); setNotice("");
     try {
       await request("/auth/2fa/disable", {
@@ -179,7 +199,13 @@ export default function AccountSecurityPage() {
   };
 
   const revokeSessions = async () => {
-    if (!window.confirm("注销全部会话？其他浏览器的登录也将失效，需要重新登录。")) return;
+    const confirmed = await dialog.confirm({
+      title: "注销全部会话",
+      message: "确定注销全部密码登录会话？其他浏览器的登录也将失效，需要重新登录。",
+      confirmText: "确认注销全部",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     setSaving(true); setError("");
     try {
       await request("/auth/logout-all", { method: "POST" });
@@ -275,8 +301,8 @@ export default function AccountSecurityPage() {
       </div>
       <div className="admin-event-list">
         {audit?.findings.map((finding, idx) => (
-          <div className="admin-event-row" key={idx} style={{ gap: "12px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div className="admin-event-row admin-event-row-gap" key={idx}>
+            <div className="admin-event-title">
               <span className={"status-tag " + (finding.level === "pass" ? "tag-green" : finding.level === "warning" ? "tag-amber" : "tag-neutral")}>{finding.level}</span>
               <strong>{finding.check}</strong>
             </div>

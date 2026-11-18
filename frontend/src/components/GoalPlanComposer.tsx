@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, GitBranch, LoaderCircle, LockKeyhole, Sparkles } from "lucide-react";
 import { request } from "../api/client";
+import { useDialog } from "./AppDialog";
 
 interface PlannedTask {
   title:string;
@@ -42,6 +43,7 @@ export default function GoalPlanComposer({projectId,onConfirmed}:Props){
  const [generating,setGenerating]=useState(false);
  const [confirming,setConfirming]=useState(false);
  const [error,setError]=useState("");
+ const dialog=useDialog();
 
  useEffect(()=>{
   setDraft(null);setConfirmed(null);setError("");setText("");
@@ -61,7 +63,12 @@ export default function GoalPlanComposer({projectId,onConfirmed}:Props){
 
  const confirmPlan=async()=>{
   if(!draft||draft.project_id!==projectId||confirming)return;
-  if(!window.confirm("确认创建这个目标及其 "+draft.proposal.tasks.length+" 个任务？确认后会写入 PostgreSQL，但不会自动授权、分配 Agent 或启动执行。"))return;
+  const ok=await dialog.confirm({
+   title:"确认创建目标与任务",
+   message:`确认创建这个目标及其 ${draft.proposal.tasks.length} 个任务？确认后会写入 PostgreSQL，但不会自动授权、分配 Agent 或启动执行。`,
+   confirmText:"确认并创建"
+  });
+  if(!ok)return;
   setConfirming(true);setError("");
   try{
    const result=await request<{id:string;status:string;result:ConfirmedPlan}>("/goal-plans/"+encodeURIComponent(draft.id)+"/confirm",{method:"POST"});

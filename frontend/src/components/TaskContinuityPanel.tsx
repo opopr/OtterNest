@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { AlertTriangle, ArchiveRestore, CheckCircle2, ClipboardCheck, Download, RefreshCw, ShieldAlert } from "lucide-react";
 import { request } from "../api/client";
+import { useDialog } from "./AppDialog";
 import "./TaskContinuityPanel.css";
 
 interface Checkpoint {
@@ -38,6 +39,7 @@ const labels: Record<string, string> = {
 const message = (reason: unknown) => reason instanceof Error ? reason.message : "操作失败";
 
 export default function TaskContinuityPanel({ taskId, taskStatus, isOwner, onChanged }: Props) {
+  const dialog = useDialog();
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [handoff, setHandoff] = useState<HandoffBundle | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,7 +68,13 @@ export default function TaskContinuityPanel({ taskId, taskStatus, isOwner, onCha
     if (!isOwner || !selectedId || (reviewStatus === "rejected" && reviewNote.trim().length < 5)) return;
     const selected = checkpoints.find((cp) => cp.id === selectedId);
     if (!selected || selected.verification_status !== "self_reported") return;
-    if (!window.confirm("确认" + (reviewStatus === "owner_verified" ? "核验通过" : "驳回") + "这条 Agent 检查点？\n\n核验只确认这一条记录，不证明模型对话状态或外部进程已经安全迁移。")) return;
+    const confirmed = await dialog.confirm({
+      title: reviewStatus === "owner_verified" ? "核验检查点" : "驳回检查点",
+      message: "确认" + (reviewStatus === "owner_verified" ? "核验通过" : "驳回") + "这条 Agent 检查点？\n\n核验只确认这一条记录，不证明模型对话状态或外部进程已经安全迁移。",
+      confirmText: reviewStatus === "owner_verified" ? "确认通过" : "确认驳回",
+      tone: reviewStatus === "rejected" ? "warning" : "default"
+    });
+    if (!confirmed) return;
     setSaving(true); setError(""); setNotice("");
     try {
       await request("/checkpoints/" + encodeURIComponent(selectedId) + "/verify", {
@@ -82,7 +90,13 @@ export default function TaskContinuityPanel({ taskId, taskStatus, isOwner, onCha
   const revokeLease = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!isOwner || taskStatus !== "running" || !understandFencing || revokeReason.trim().length < 5) return;
-    if (!window.confirm("高风险操作：撤销旧租约只会隔离旧 epoch 的控制平面提交，不能停止外部进程或撤销已发生的副作用。\n\n非 R3 任务可能重新进入可调度状态，务必已在执行节点人工核实进程状态。确定继续？")) return;
+    const confirmed = await dialog.confirm({
+      title: "高风险：撤销旧执行租约",
+      message: "撤销旧租约只会隔离旧 epoch 的控制平面提交，不能停止外部进程或撤销已发生的副作用。\n\n非 R3 任务可能重新进入可调度状态，务必已在执行节点人工核实进程状态。确定继续？",
+      confirmText: "撤销旧租约",
+      tone: "danger"
+    });
+    if (!confirmed) return;
     setSaving(true); setError(""); setNotice("");
     try {
       const result = await request<{ remote_execution_stopped_verified: boolean; lease_epoch: number }>(
@@ -105,9 +119,15 @@ export default function TaskContinuityPanel({ taskId, taskStatus, isOwner, onCha
     finally { setHandoffBusy(false); }
   };
 
-  const downloadHandoff = () => {
+  const downloadHandoff = async () => {
     if (!handoff || !isOwner) return;
-    if (!window.confirm("交接包包含任务指令、已批准决策与副作用状态。仅保存到可信设备，不要上传公共仓库或未经授权的外部 AI。确定导出吗？")) return;
+    const confirmed = await dialog.confirm({
+      title: "导出故障交接包",
+      message: "交接包包含任务指令、已批准决策与副作用状态。仅保存到可信设备，不要上传公共仓库或未经授权的外部 AI。确定导出吗？",
+      confirmText: "导出 JSON",
+      tone: "warning"
+    });
+    if (!confirmed) return;
     const json = JSON.stringify(handoff, null, 2);
     const url = URL.createObjectURL(new Blob([json], { type: "application/json;charset=utf-8" }));
     const a = document.createElement("a");
@@ -166,7 +186,7 @@ export default function TaskContinuityPanel({ taskId, taskStatus, isOwner, onCha
           <div><span>外部副作用数</span><strong>{handoff.side_effects.length}</strong></div>
         </div>
         <p className="continuity-boundary"><ShieldAlert size={14} />交接包只代表服务端已记录事实，不保证外部副作用已撤销、旧执行节点已停止或上下文完全可迁移。</p>
-        {isOwner && <button className="secondary-button compact" onClick={downloadHandoff}><Download size={14} />导出授权交接 JSON</button>}
+        {isOwner && <button className="secondary-button compact" onClick={() => void downloadHandoff()}><Download size={14} />导出授权交接 JSON</button>}
       </div>}
     </div>
 

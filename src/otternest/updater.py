@@ -65,7 +65,22 @@ def _run_cmd(cmd: list[str], cwd: Path, timeout: int = 120) -> tuple[int, str, s
 def check_for_updates(repo_root: Path | None = None, *, fetch: bool = True) -> dict[str, Any]:
     root = repo_root or get_repo_root()
     if not (root / ".git").exists():
-        raise UpdateError(f"Repository .git directory not found at {root}")
+        return {
+            "enabled": False,
+            "git_available": False,
+            "repo_root": str(root),
+            "branch": "",
+            "target_ref": "",
+            "current_commit": "",
+            "remote_commit": "",
+            "behind_count": 0,
+            "update_available": False,
+            "working_tree_clean": False,
+            "recent_commits": [],
+            "fetch_error": f"Repository .git directory not found at {root}",
+            "restart_command_configured": bool(os.environ.get("OTTERNEST_RESTART_COMMAND", "").strip()),
+            "checked_at": _now_iso(),
+        }
 
     rc, branch, err = _run_cmd(["git", "rev-parse", "--abbrev-ref", "HEAD"], root, timeout=15)
     if rc != 0:
@@ -103,6 +118,7 @@ def check_for_updates(repo_root: Path | None = None, *, fetch: bool = True) -> d
 
     return {
         "enabled": is_web_update_enabled(),
+        "git_available": True,
         "repo_root": str(root),
         "branch": branch,
         "target_ref": target_ref,
@@ -151,6 +167,8 @@ def start_update_job(repo_root: Path | None = None) -> dict[str, Any]:
     if not is_web_update_enabled():
         raise UpdateError("Web self-update is disabled. Set OTTERNEST_ENABLE_WEB_UPDATE=true on the server.")
     root = repo_root or get_repo_root()
+    if not (root / ".git").exists():
+        raise UpdateError(f"Repository .git directory not found at {root}")
     status_file = get_status_file(root)
     current = get_update_status(root)
     if current.get("state") == "running":

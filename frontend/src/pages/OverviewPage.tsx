@@ -88,45 +88,67 @@ export default function OverviewPage() {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  const firstProjectId = data?.projects.find((project) => project.status === "active")?.id || "";
+  const activeProjectIds = useMemo(
+    () => (data?.projects || []).filter((project) => project.status === "active").slice(0, 5).map((project) => project.id),
+    [data?.projects]
+  );
+  const activeProjectKey = activeProjectIds.join(",");
+
   useEffect(() => {
-    if (!token || !firstProjectId) {
+    if (!token || activeProjectIds.length === 0) {
       setLive("offline");
       return;
     }
     setLive("connecting");
-    let socket: WebSocket | null = null;
-    try {
-      socket = new WebSocket(websocketUrl(
-        "/api/v1/projects/" + encodeURIComponent(firstProjectId) + "/events/ws"
-      ));
-      socket.onopen = () => {
-        socket?.send(JSON.stringify({ type: "auth", token, after: 0 }));
-      };
-      socket.onmessage = (event) => {
-        try {
-          const message = JSON.parse(String(event.data)) as { type?: string; kind?: string };
-          if (message.type === "connected") setLive("connected");
-          if (message.type === "event") {
-            setLastEvent(message.kind || "收到新事件");
-            void refresh();
+    const connectedIds = new Set<string>();
+    const sockets: WebSocket[] = [];
+    for (const pid of activeProjectIds) {
+      try {
+        const socket = new WebSocket(websocketUrl(
+          "/api/v1/projects/" + encodeURIComponent(pid) + "/events/ws"
+        ));
+        socket.onopen = () => {
+          socket.send(JSON.stringify({ type: "auth", token, after: 0 }));
+        };
+        socket.onmessage = (event) => {
+          try {
+            const message = JSON.parse(String(event.data)) as { type?: string; kind?: string };
+            if (message.type === "connected") {
+              connectedIds.add(pid);
+              setLive("connected");
+            }
+            if (message.type === "event") {
+              setLastEvent(message.kind || "收到新事件");
+              void refresh();
+            }
+          } catch {
+            // REST remains the authoritative source if a frame cannot be parsed.
           }
-        } catch {
-          // REST remains the authoritative source if a frame cannot be parsed.
-        }
-      };
-      socket.onerror = () => setLive("offline");
-      socket.onclose = () => setLive("offline");
-    } catch {
-      setLive("offline");
+        };
+        socket.onerror = () => {
+          connectedIds.delete(pid);
+          if (connectedIds.size === 0) setLive("offline");
+        };
+        socket.onclose = () => {
+          connectedIds.delete(pid);
+          if (connectedIds.size === 0) setLive("offline");
+        };
+        sockets.push(socket);
+      } catch {
+        // Ignore individual socket failure if others connect.
+      }
     }
-    return () => socket?.close();
-  }, [token, firstProjectId, refresh]);
+    return () => {
+      for (const socket of sockets) socket.close();
+    };
+  }, [token, activeProjectKey, refresh]);
 
   const projectRows = useMemo(() => {
     if (!data) return [];
-    const metricsByProject = new Map(data.metrics.projects.map((metric) => [metric.project_id, metric]));
-    return data.briefing.projects.map((project) => ({
+    const metricProjects = Array.isArray(data.metrics?.projects) ? data.metrics.projects : [];
+    const briefingProjects = Array.isArray(data.briefing?.projects) ? data.briefing.projects : [];
+    const metricsByProject = new Map(metricProjects.map((metric) => [metric.project_id, metric]));
+    return briefingProjects.map((project) => ({
       ...project,
       metric: metricsByProject.get(project.project_id)
     }));
@@ -210,15 +232,15 @@ export default function OverviewPage() {
         <PendingList title="任务待验收" items={briefing?.pending_review_tasks || []} kind="review" />
         <PendingList title="执行阻塞" items={briefing?.blocked_tasks || []} kind="blocked" />
         {(!briefing || (
-          briefing.pending_r3_tasks.length === 0 &&
-          briefing.pending_review_tasks.length === 0 &&
-          briefing.blocked_tasks.length === 0
+          (briefing.pending_r3_tasks?.length ?? 0) === 0 &&
+          (briefing.pending_review_tasks?.length ?? 0) === 0 &&
+          (briefing.blocked_tasks?.length ?? 0) === 0
         )) && (
           <div className="all-clear"><CheckCircle2 size={22} /><strong>目前没有待处理的任务异常</strong><span>系统仍会持续记录项目事件和执行状态。</span></div>
         )}
       </div>
       <div className="data-footnote">
-        <span>系统模式：{data?.system.mode || "未知"}</span>
+        <span>系统模式：{data?.system?.mode || "未知"}</span>
         <span>简报生成：{briefing?.generated_at ? new Date(briefing.generated_at).toLocaleString("zh-CN") : "—"}</span>
         <span>{lastEvent ? "最近事件：" + lastEvent : "等待项目事件"}</span>
       </div>

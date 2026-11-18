@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { binaryRequest, request } from "../api/client";
 import type { Project, Task } from "../api/types";
+import { useDialog } from "../components/AppDialog";
 import ProjectSelect from "../components/ProjectSelect";
 
 interface Artifact {
@@ -58,6 +59,7 @@ export default function ArtifactsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const dialog = useDialog();
 
   const selectedProject = useMemo(() => projects.find((item) => item.id === selectedProjectId) || null, [projects, selectedProjectId]);
   const selectedTask = useMemo(() => tasks.find((item) => item.id === selectedTaskId) || null, [tasks, selectedTaskId]);
@@ -148,20 +150,23 @@ export default function ArtifactsPage() {
   };
 
   const reviewArtifact = async (artifact: Artifact, accepted: boolean) => {
-    let note = "";
-    if (!accepted) {
-      const input = window.prompt("填写驳回原因（至少 5 个字符）");
-      if (!input || input.trim().length < 5) return;
-      note = input.trim();
-    } else {
-      const input = window.prompt("填写验收说明（可选）");
-      note = input?.trim() || "";
-    }
-    if (!window.confirm(accepted ? "确认验收该成果版本？验收后不能再修改此版本。" : "确认驳回该成果版本？修改必须重新上传新版本。")) return;
+    const input = await dialog.prompt({
+      title: accepted ? "验收通过成果" : "驳回成果版本",
+      message: accepted
+        ? `确认验收成果「${artifact.name} v${artifact.version}」？验收后不能再修改此版本。`
+        : `驳回「${artifact.name} v${artifact.version}」后，如需修改必须重新上传新版本。`,
+      label: accepted ? "验收说明（可选）" : "驳回原因（至少 5 个字符）",
+      placeholder: accepted ? "可选填写验收结论或检查备注" : "请说明具体需要修正的问题…",
+      multiline: true,
+      required: !accepted,
+      minLength: accepted ? 0 : 5,
+      confirmText: accepted ? "确认验收通过" : "确认驳回",
+    });
+    if (input === null) return;
     setSaving(true);
     try {
       await request("/artifacts/" + encodeURIComponent(artifact.id) + "/review", {
-        method: "POST", body: JSON.stringify({ accepted, note })
+        method: "POST", body: JSON.stringify({ accepted, note: input })
       });
       await loadArtifacts(selectedTaskId);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "成果验收失败"); }
@@ -180,7 +185,13 @@ export default function ArtifactsPage() {
 
   const restoreArchive = async () => {
     if (!selectedProjectId || !restoreFile) return;
-    if (!window.confirm("确认将归档包恢复到当前项目？系统会先完整校验清单、路径、大小和 SHA-256。")) return;
+    const confirmed = await dialog.confirm({
+      title: "恢复成果二进制归档",
+      message: "确认将归档包恢复到当前项目？系统会先完整校验清单、路径、大小和 SHA-256。",
+      confirmText: "确认校验并恢复",
+      tone: "warning",
+    });
+    if (!confirmed) return;
     setSaving(true);
     setError("");
     try {
@@ -196,7 +207,15 @@ export default function ArtifactsPage() {
 
   const runGC = async (dryRun: boolean) => {
     if (!selectedProjectId) return;
-    if (!dryRun && !window.confirm("这将物理删除符合条件的成果文件，并保留数据库审计元数据。确认执行 GC？")) return;
+    if (!dryRun) {
+      const confirmed = await dialog.confirm({
+        title: "确认执行成果垃圾回收（GC）",
+        message: "这将物理删除符合条件的未验收/旧版本成果文件，并保留数据库审计元数据。是否继续？",
+        confirmText: "确认执行 GC",
+        tone: "danger",
+      });
+      if (!confirmed) return;
+    }
     setSaving(true);
     setError("");
     try {

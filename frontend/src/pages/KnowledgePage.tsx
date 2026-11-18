@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { request } from "../api/client";
 import type { Project } from "../api/types";
+import { useDialog } from "../components/AppDialog";
 import ProjectSelect from "../components/ProjectSelect";
 
 interface Memory {
@@ -17,6 +18,7 @@ interface Memory {
   status: string;
   version: number;
   score?: number;
+  relevance_score?: number;
 }
 interface Charter {
   project_id: string;
@@ -57,6 +59,7 @@ const sensitivityLabel: Record<string, string> = { public: "公开", internal: "
 const emptyDraft: MemoryDraft = { kind: "fact", title: "", content: "", source: "", sensitivity: "internal" };
 
 export default function KnowledgePage() {
+  const dialog = useDialog();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [memories, setMemories] = useState<Memory[]>([]);
@@ -74,10 +77,15 @@ export default function KnowledgePage() {
   const [shareMemoryId, setShareMemoryId] = useState("");
   const [shareRationale, setShareRationale] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sensitivityFilter, setSensitivityFilter] = useState<string>("all");
   const [tab, setTab] = useState<"memories" | "charter" | "sharing">("memories");
 
   const selectedProject = useMemo(() => projects.find((item) => item.id === selectedId) || null, [projects, selectedId]);
   const publishedMemories = memories.filter((item) => item.status === "published");
+  const visibleMemories = useMemo(
+    () => sensitivityFilter === "all" ? memories : memories.filter((m) => m.sensitivity === sensitivityFilter),
+    [memories, sensitivityFilter]
+  );
 
   const loadProjects = useCallback(async () => {
     setLoading(true);
@@ -94,27 +102,31 @@ export default function KnowledgePage() {
     setLoading(true);
     setError("");
     try {
-      const queryStr = q && q.trim() ? "?q=" + encodeURIComponent(q.trim()) : "";
+      const encoded = encodeURIComponent(projectId);
+      const trimmed = q?.trim() || "";
+      const memoryEndpoint = trimmed
+        ? "/projects/" + encoded + "/memories/search?q=" + encodeURIComponent(trimmed) + "&limit=50"
+        : "/projects/" + encoded + "/memories";
       const [memoryRows, projectCharter, shareRows] = await Promise.all([
-        request<Memory[]>("/projects/" + encodeURIComponent(projectId) + "/memories" + queryStr),
-        request<Charter>("/projects/" + encodeURIComponent(projectId) + "/charter"),
-        request<KnowledgeShare[]>("/projects/" + encodeURIComponent(projectId) + "/knowledge-shares")
+        request<Memory[]>(memoryEndpoint),
+        request<Charter>("/projects/" + encoded + "/charter"),
+        request<KnowledgeShare[]>("/projects/" + encoded + "/knowledge-shares")
       ]);
-      setMemories(memoryRows);
-      setCharter(projectCharter);
-      setShares(shareRows);
+      setMemories(Array.isArray(memoryRows) ? memoryRows : []);
+      setCharter(projectCharter || null);
+      setShares(Array.isArray(shareRows) ? shareRows : []);
       setCharterDraft({
-        scope_boundary: projectCharter.scope_boundary,
-        stop_conditions: projectCharter.stop_conditions,
-        max_concurrent_tasks: String(projectCharter.max_concurrent_tasks),
-        max_total_tasks: String(projectCharter.max_total_tasks)
+        scope_boundary: projectCharter?.scope_boundary ?? "",
+        stop_conditions: projectCharter?.stop_conditions ?? "",
+        max_concurrent_tasks: String(projectCharter?.max_concurrent_tasks ?? 5),
+        max_total_tasks: String(projectCharter?.max_total_tasks ?? 200)
       });
     } catch (reason) { setError(reason instanceof Error ? reason.message : "知识与项目章程读取失败"); }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { void loadProjects(); }, []);
-  useEffect(() => { if (selectedId) void loadProjectData(selectedId); else { setMemories([]); setShares([]); setCharter(null); } }, [selectedId, loadProjectData]);
+  useEffect(() => { if (selectedId) void loadProjectData(selectedId, searchQuery); else { setMemories([]); setShares([]); setCharter(null); } }, [selectedId, loadProjectData]);
 
   const setDraftField = (key: keyof MemoryDraft, value: string) => setMemoryDraft((current) => ({ ...current, [key]: value }));
 
@@ -135,29 +147,42 @@ export default function KnowledgePage() {
         });
       }
       setMemoryDraft(emptyDraft); setRevisionReason(""); setEditingId(""); setShowMemoryForm(false);
-      await loadProjectData(selectedId);
+      await loadProjectData(selectedId, searchQuery);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "保存知识记录失败"); }
     finally { setSaving(false); }
   };
 
   const publishMemory = async (memory: Memory) => {
-    if (!window.confirm("确认发布这条知识？发布后它会成为可被项目 Agent 使用的知识。")) return;
+    const confirmed = await dialog.confirm({
+      title: "发布项目知识",
+      message: `确认发布「${memory.title}」？发布后它会成为可被项目 Agent 使用的知识。`,
+      confirmText: "确认发布"
+    });
+    if (!confirmed) return;
     setSaving(true);
     try {
       await request("/memories/" + encodeURIComponent(memory.id) + "/publish", { method: "POST" });
-      await loadProjectData(selectedId);
+      await loadProjectData(selectedId, searchQuery);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "发布知识失败"); }
     finally { setSaving(false); }
   };
 
   const archiveMemory = async (memory: Memory) => {
-    const reason = window.prompt("填写归档原因（至少 5 个字符）");
-    if (!reason || reason.trim().length < 5) return;
-    if (!window.confirm("确认归档这条知识？归档记录不会被物理删除。")) return;
+    const reason = await dialog.prompt({
+      title: "归档项目知识",
+      message: `归档「${memory.title}」后不再作为活跃上下文提供，但历史审计记录仍会保留。`,
+      label: "归档原因（至少 5 个字符）",
+      placeholder: "说明信息过期、已替代或需要封存的原因…",
+      required: true,
+      minLength: 5,
+      multiline: true,
+      confirmText: "确认归档"
+    });
+    if (reason === null) return;
     setSaving(true);
     try {
-      await request("/memories/" + encodeURIComponent(memory.id) + "/archive", { method: "POST", body: JSON.stringify({ reason: reason.trim() }) });
-      await loadProjectData(selectedId);
+      await request("/memories/" + encodeURIComponent(memory.id) + "/archive", { method: "POST", body: JSON.stringify({ reason }) });
+      await loadProjectData(selectedId, searchQuery);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "归档知识失败"); }
     finally { setSaving(false); }
   };
@@ -199,21 +224,29 @@ export default function KnowledgePage() {
         body: JSON.stringify({ target_project_id: targetProjectId, item_kind: "memory", source_item_id: shareMemoryId, rationale: shareRationale.trim() })
       });
       setShareRationale("");
-      await loadProjectData(selectedId);
+      await loadProjectData(selectedId, searchQuery);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "提交跨项目共享申请失败"); }
     finally { setSaving(false); }
   };
 
   const resolveShare = async (share: KnowledgeShare, approved: boolean) => {
-    const note = window.prompt(approved ? "填写批准说明（至少 5 个字符）" : "填写拒绝原因（至少 5 个字符）");
-    if (!note || note.trim().length < 5) return;
-    if (!window.confirm(approved ? "确认将知识复制到目标项目？" : "确认拒绝该共享申请？")) return;
+    const note = await dialog.prompt({
+      title: approved ? "批准跨项目知识共享" : "拒绝跨项目知识共享",
+      message: approved ? "批准后将把该知识的受控副本复制到目标项目。" : "拒绝后不会向目标项目写入任何副本。",
+      label: approved ? "批准说明（至少 5 个字符）" : "拒绝原因（至少 5 个字符）",
+      placeholder: approved ? "记录批准共享的适用边界或审查意见…" : "说明拒绝跨项目共享的原因…",
+      required: true,
+      minLength: 5,
+      multiline: true,
+      confirmText: approved ? "批准并复制" : "确认拒绝"
+    });
+    if (note === null) return;
     setSaving(true);
     try {
       await request("/knowledge-shares/" + encodeURIComponent(share.id) + "/resolve", {
-        method: "POST", body: JSON.stringify({ approved, note: note.trim() })
+        method: "POST", body: JSON.stringify({ approved, note })
       });
-      await loadProjectData(selectedId);
+      await loadProjectData(selectedId, searchQuery);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "处理共享申请失败"); }
     finally { setSaving(false); }
   };
@@ -224,7 +257,7 @@ export default function KnowledgePage() {
     <div className="page-stack">
       <div className="page-heading">
         <div><div className="eyebrow">KNOWLEDGE & CONTINUITY</div><h1>知识库与项目章程</h1><p>管理项目记忆的提议、发布、修订、归档，以及跨项目共享和执行边界。</p></div>
-        <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadProjectData(selectedId)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
+        <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadProjectData(selectedId, searchQuery)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
       <section className="panel project-toolbar"><div><div className="eyebrow">PROJECT WORKSPACE</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={setSelectedId} /><span className="muted-inline">{memories.length} 条记忆 · {publishedMemories.length} 条已发布</span></section>
@@ -237,14 +270,26 @@ export default function KnowledgePage() {
         <section className="panel">
           <div className="panel-heading">
             <div className="panel-title"><Database size={17} /><h3>知识生命周期</h3></div>
-            <div className="heading-actions" style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-              <form onSubmit={(e) => { e.preventDefault(); if (selectedId) void loadProjectData(selectedId, searchQuery); }} style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+            <div className="heading-actions flex-row-gap">
+              <form onSubmit={(e) => { e.preventDefault(); if (selectedId) void loadProjectData(selectedId, searchQuery); }} className="flex-row-gap-sm">
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="混合向量语义检索…"
-                  style={{ minWidth: "200px", padding: "6px 10px" }}
+                  className="search-input-compact"
                 />
+                <select
+                  aria-label="按敏感级别筛选"
+                  value={sensitivityFilter}
+                  onChange={(e) => setSensitivityFilter(e.target.value)}
+                  className="compact-select"
+                >
+                  <option value="all">全部敏感级</option>
+                  <option value="public">公开 (public)</option>
+                  <option value="internal">内部 (internal)</option>
+                  <option value="confidential">机密 (confidential)</option>
+                  <option value="restricted">受限 (restricted)</option>
+                </select>
                 <button type="submit" className="secondary-button compact" disabled={!selectedId || loading}><Search size={14} />检索</button>
                 {searchQuery && <button type="button" className="text-button" onClick={() => { setSearchQuery(""); if (selectedId) void loadProjectData(selectedId, ""); }}>清除</button>}
               </form>
@@ -265,14 +310,17 @@ export default function KnowledgePage() {
             <div className="form-actions"><button className="primary-button compact" disabled={saving || (Boolean(editingId) && revisionReason.trim().length < 5)}>{saving ? "保存中…" : editingId ? "保存修订" : "提交记忆"}</button></div>
           </form>}
           <div className="memory-grid">
-            {memories.map((memory) => <article className="memory-card" key={memory.id}>
-              <div className="memory-card-head"><span className="capability-tag">{kindLabel[memory.kind] || memory.kind}</span><span className={"status-tag " + (memory.status === "published" ? "tag-green" : memory.status === "proposed" ? "tag-amber" : "tag-neutral")}>{statusLabel[memory.status] || memory.status}</span></div>
-              <h3>{memory.title}</h3><p>{memory.content}</p>
-              <div className="memory-meta"><span><LockKeyhole size={12} />{sensitivityLabel[memory.sensitivity] || memory.sensitivity}</span><span>版本 {memory.version}</span>{typeof memory.score === "number" && <span className="status-tag tag-green">相关度 {memory.score}</span>}</div>
-              <small className="memory-source">来源：{memory.source}</small>
-              <div className="memory-actions">{memory.status !== "archived" && <button className="text-button" onClick={() => editMemory(memory)}><Pencil size={13} />修订</button>}{memory.status === "proposed" && <button className="secondary-button compact" disabled={saving} onClick={() => void publishMemory(memory)}><Check size={13} />发布</button>}{memory.status !== "archived" && <button className="icon-button" title="归档" disabled={saving} onClick={() => void archiveMemory(memory)}><Archive size={15} /></button>}</div>
-            </article>)}
-            {!memories.length && <div className="empty-state"><BookOpen size={25} /><strong>暂无项目记忆</strong><p>先提出事实、决策、经验或流程，再由所有者审核发布。</p></div>}
+            {visibleMemories.map((memory) => {
+              const displayScore = typeof memory.relevance_score === "number" ? memory.relevance_score : memory.score;
+              return <article className="memory-card" key={memory.id}>
+                <div className="memory-card-head"><span className="capability-tag">{kindLabel[memory.kind] || memory.kind}</span><span className={"status-tag " + (memory.status === "published" ? "tag-green" : memory.status === "proposed" ? "tag-amber" : "tag-neutral")}>{statusLabel[memory.status] || memory.status}</span></div>
+                <h3>{memory.title}</h3><p>{memory.content}</p>
+                <div className="memory-meta"><span><LockKeyhole size={12} />{sensitivityLabel[memory.sensitivity] || memory.sensitivity}</span><span>版本 {memory.version}</span>{typeof displayScore === "number" && <span className="status-tag tag-green">相关度 {displayScore.toFixed(2)}</span>}</div>
+                <small className="memory-source">来源：{memory.source}</small>
+                <div className="memory-actions">{memory.status !== "archived" && <button className="text-button" onClick={() => editMemory(memory)}><Pencil size={13} />修订</button>}{memory.status === "proposed" && <button className="secondary-button compact" disabled={saving} onClick={() => void publishMemory(memory)}><Check size={13} />发布</button>}{memory.status !== "archived" && <button className="icon-button" title="归档" disabled={saving} onClick={() => void archiveMemory(memory)}><Archive size={15} /></button>}</div>
+              </article>;
+            })}
+            {!visibleMemories.length && <div className="empty-state"><BookOpen size={25} /><strong>{memories.length ? "当前筛选下暂无记忆" : "暂无项目记忆"}</strong><p>{memories.length ? "请调整敏感级别筛选或检索关键词。" : "先提出事实、决策、经验或流程，再由所有者审核发布。"}</p></div>}
           </div>
         </section>
       ) : tab === "charter" ? (
@@ -308,3 +356,4 @@ export default function KnowledgePage() {
     </div>
   );
 }
+

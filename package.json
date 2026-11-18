@@ -7,6 +7,7 @@
     "dev": "npm --workspace frontend run dev",
     "build": "npm --workspace frontend run build",
     "typecheck": "npm --workspace frontend run typecheck",
+    "lint": "npm --workspace frontend run lint",
     "api:types": "npm --workspace frontend run api:types"
   }
 }

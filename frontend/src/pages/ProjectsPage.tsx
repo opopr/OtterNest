@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { AlertCircle, FolderKanban, Pencil, Plus, RefreshCw, Search, Trash2, Users, X } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { AlertCircle, Eye, FolderKanban, Pencil, Plus, RefreshCw, Search, Target, Trash2, Users, X } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
 import { request } from "../api/client";
 import type { Agent, Project, Task } from "../api/types";
+import { useAuth } from "../auth/AuthProvider";
+import { useDialog } from "../components/AppDialog";
+import TaskDetailPanel, { type TaskDetailSelection } from "../components/TaskDetailPanel";
 
 interface ProjectMember {
   id: string;
@@ -13,13 +16,41 @@ interface ProjectMember {
   max_sensitivity: string;
 }
 
+interface GoalSummary {
+  id: string;
+  title: string;
+  status: string;
+}
+
+interface ProjectBriefing {
+  task_counts: {
+    waiting_dependencies: number;
+    waiting_approval: number;
+    ready: number;
+    running_lease_active: number;
+    running_lease_expired_unverified: number;
+    submitted: number;
+    blocked: number;
+    completed: number;
+    cancelled: number;
+  };
+  pending_owner_actions: {
+    decisions_proposed: number;
+    memories_proposed: number;
+    skills_proposed: number;
+    side_effects_unreconciled: number;
+  };
+}
+
 const statusLabels: Record<string, string> = {
   ready: "待执行", running: "执行中", submitted: "待验收",
-  waiting_approval: "待审批", blocked: "已阻塞",
-  completed: "已完成", cancelled: "已取消"
+  waiting_approval: "待审批", waiting_dependencies: "等待依赖",
+  blocked: "已阻塞", completed: "已完成", cancelled: "已取消"
 };
 
 export default function ProjectsPage() {
+  const { user } = useAuth();
+  const dialog = useDialog();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedProjectId = searchParams.get("project") || "";
   const [projects, setProjects] = useState<Project[]>([]);
@@ -27,6 +58,9 @@ export default function ProjectsPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [goals, setGoals] = useState<GoalSummary[]>([]);
+  const [briefing, setBriefing] = useState<ProjectBriefing | null>(null);
+  const [detailSelection, setDetailSelection] = useState<TaskDetailSelection | null>(null);
   const [newMemberAgentId, setNewMemberAgentId] = useState("");
   const [newMemberRole, setNewMemberRole] = useState<ProjectMember["role"]>("worker");
   const [showMemberForm, setShowMemberForm] = useState(false);
@@ -44,6 +78,10 @@ export default function ProjectsPage() {
   const [taskTitle, setTaskTitle] = useState("");
   const [taskInstruction, setTaskInstruction] = useState("");
   const [taskAcceptance, setTaskAcceptance] = useState("");
+  const [taskGoalId, setTaskGoalId] = useState("");
+  const [taskRisk, setTaskRisk] = useState<"R0" | "R1" | "R2" | "R3">("R1");
+  const [taskPriority, setTaskPriority] = useState("50");
+  const [taskSensitivity, setTaskSensitivity] = useState<"public" | "internal" | "confidential" | "restricted">("internal");
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -75,14 +113,19 @@ export default function ProjectsPage() {
   const loadProjectDetail = useCallback(async (projectId: string) => {
     setDetailLoading(true);
     try {
-      const [taskRows, memberRows, agentRows] = await Promise.all([
-        request<Task[]>("/projects/" + encodeURIComponent(projectId) + "/tasks"),
-        request<ProjectMember[]>("/projects/" + encodeURIComponent(projectId) + "/members"),
-        request<Agent[]>("/agents").catch(() => [] as Agent[])
+      const encoded = encodeURIComponent(projectId);
+      const [taskRows, memberRows, agentRows, goalRows, briefingRow] = await Promise.all([
+        request<Task[]>("/projects/" + encoded + "/tasks"),
+        request<ProjectMember[]>("/projects/" + encoded + "/members"),
+        request<Agent[]>("/agents").catch(() => [] as Agent[]),
+        request<GoalSummary[]>("/projects/" + encoded + "/goals").catch(() => [] as GoalSummary[]),
+        request<ProjectBriefing>("/projects/" + encoded + "/briefing").catch(() => null)
       ]);
       setTasks(taskRows);
       setMembers(memberRows);
       setAgents(agentRows);
+      setGoals(goalRows);
+      setBriefing(briefingRow);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "项目详情读取失败");
     } finally {
@@ -91,7 +134,13 @@ export default function ProjectsPage() {
   }, []);
 
   useEffect(() => {
-    if (!selectedId) { setTasks([]); setMembers([]); return; }
+    if (!selectedId) {
+      setTasks([]);
+      setMembers([]);
+      setGoals([]);
+      setBriefing(null);
+      return;
+    }
     void loadProjectDetail(selectedId);
   }, [selectedId, loadProjectDetail]);
 
@@ -121,19 +170,30 @@ export default function ProjectsPage() {
     setSaving(true);
     setError("");
     try {
+      const parsedPriority = Math.min(100, Math.max(0, Number(taskPriority) || 50));
       await request<Task>("/projects/" + encodeURIComponent(selectedId) + "/tasks", {
         method: "POST",
         body: JSON.stringify({
-          title: taskTitle, instruction: taskInstruction, acceptance: taskAcceptance,
-          goal_id: null, risk: "R1", priority: 50, sensitivity: "internal",
-          dependency_ids: [], required_capabilities: []
+          title: taskTitle,
+          instruction: taskInstruction,
+          acceptance: taskAcceptance,
+          goal_id: taskGoalId || null,
+          risk: taskRisk,
+          priority: parsedPriority,
+          sensitivity: taskSensitivity,
+          dependency_ids: [],
+          required_capabilities: []
         })
       });
       setTaskTitle("");
       setTaskInstruction("");
       setTaskAcceptance("");
+      setTaskGoalId("");
+      setTaskRisk("R1");
+      setTaskPriority("50");
+      setTaskSensitivity("internal");
       setShowTaskForm(false);
-      setTasks(await request<Task[]>("/projects/" + encodeURIComponent(selectedId) + "/tasks"));
+      await loadProjectDetail(selectedId);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "创建任务失败");
     } finally { setSaving(false); }
@@ -179,7 +239,14 @@ export default function ProjectsPage() {
   };
 
   const removeMember = async (member: ProjectMember) => {
-    if (!selectedId || !window.confirm(`确认将「${member.agent_name}」从当前项目移除？`)) return;
+    if (!selectedId) return;
+    const confirmed = await dialog.confirm({
+      title: "移除项目成员",
+      message: `确认将「${member.agent_name}」从当前项目移除？`,
+      confirmText: "确认移除",
+      tone: "warning"
+    });
+    if (!confirmed) return;
     setSaving(true);
     setError("");
     try {
@@ -193,7 +260,14 @@ export default function ProjectsPage() {
   };
 
   const deleteTask = async (task: Task) => {
-    if (!selectedId || !window.confirm(`确认删除任务「${task.title}」？此操作不可撤销。`)) return;
+    if (!selectedId) return;
+    const confirmed = await dialog.confirm({
+      title: "删除任务",
+      message: `确认删除任务「${task.title}」？此操作不可撤销。`,
+      confirmText: "永久删除",
+      tone: "danger"
+    });
+    if (!confirmed) return;
     setSaving(true);
     setError("");
     try {
@@ -234,7 +308,14 @@ export default function ProjectsPage() {
   };
 
   const deleteProject = async () => {
-    if (!selectedProject || !window.confirm(`确认永久删除项目「${selectedProject.name}」及其所有目标、任务与记录？此操作不可撤销。`)) return;
+    if (!selectedProject) return;
+    const confirmed = await dialog.confirm({
+      title: "永久删除项目",
+      message: `确认永久删除项目「${selectedProject.name}」及其所有目标、任务与记录？此操作不可撤销。`,
+      confirmText: "确认删除项目",
+      tone: "danger"
+    });
+    if (!confirmed) return;
     setSaving(true);
     setError("");
     try {
@@ -254,8 +335,13 @@ export default function ProjectsPage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><div className="eyebrow">PROJECT WORKSPACE</div><h1>项目与任务</h1><p>项目和任务的统一入口；目标依赖等高级治理暂由旧版管理台承接。任务状态以服务端记录为准。</p></div>
+        <div>
+          <div className="eyebrow">PROJECT WORKSPACE</div>
+          <h1>项目与任务</h1>
+          <p>项目、任务、成员与简报的统一入口；任务状态与权限仍由服务端治理。</p>
+        </div>
         <div className="heading-actions">
+          <Link to="/goals-workflows" className="secondary-button compact"><Target size={14} />目标与工作流</Link>
           <button className="secondary-button" onClick={() => void loadProjects()} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button>
           <button className="primary-button compact" onClick={() => setShowProjectForm(true)}><Plus size={16} />新建项目</button>
         </div>
@@ -304,12 +390,22 @@ export default function ProjectsPage() {
                   <div className="project-avatar large"><FolderKanban size={21} /></div>
                   <div><div className="eyebrow">PROJECT</div><h2>{selectedProject.name}</h2><p>{selectedProject.description || "暂无项目说明"}</p></div>
                 </div>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <div className="flex-row-gap">
                   <span className={"status-tag " + (selectedProject.status === "active" ? "tag-green" : "tag-neutral")}>{selectedProject.status}</span>
                   <button className="secondary-button compact" onClick={startEditProject} disabled={saving}><Pencil size={13} />编辑</button>
                   <button className="text-button" onClick={() => void deleteProject()} disabled={saving}><Trash2 size={14} />删除项目</button>
                 </div>
               </div>
+
+              {briefing?.task_counts && briefing?.pending_owner_actions && (
+                <div className="project-briefing-grid" aria-label="项目执行简报">
+                  <div className="project-briefing-tile"><span>待执行</span><strong>{briefing.task_counts.ready ?? 0}</strong></div>
+                  <div className="project-briefing-tile"><span>执行中（租约有效）</span><strong>{briefing.task_counts.running_lease_active ?? 0}</strong></div>
+                  <div className="project-briefing-tile"><span>待审批 / 待验收</span><strong>{(briefing.task_counts.waiting_approval ?? 0) + (briefing.task_counts.submitted ?? 0)}</strong></div>
+                  <div className="project-briefing-tile"><span>阻塞 / 过期租约</span><strong>{(briefing.task_counts.blocked ?? 0) + (briefing.task_counts.running_lease_expired_unverified ?? 0)}</strong></div>
+                  <div className="project-briefing-tile"><span>待决策 / 待核实副作用</span><strong>{(briefing.pending_owner_actions.decisions_proposed ?? 0) + (briefing.pending_owner_actions.side_effects_unreconciled ?? 0)}</strong></div>
+                </div>
+              )}
 
               {editingProject && (
                 <form className="panel form-panel" onSubmit={saveEditProject}>
@@ -324,7 +420,7 @@ export default function ProjectsPage() {
               )}
 
               <div className="section-heading compact-heading">
-                <div><h2>任务列表</h2><p>{tasks.length} 项任务 · 按创建时间倒序</p></div>
+                <div><h2>任务列表</h2><p>{tasks.length} 项任务 · 点击任务行或「详情」查看依赖图、检查点与副作用</p></div>
                 <button className="primary-button compact" onClick={() => setShowTaskForm((value) => !value)}><Plus size={15} />新建任务</button>
               </div>
 
@@ -332,39 +428,86 @@ export default function ProjectsPage() {
                 <form className="panel form-panel" onSubmit={createTask}>
                   <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>创建任务</h3></div><button type="button" className="icon-button" onClick={() => setShowTaskForm(false)}><X size={17} /></button></div>
                   <label>任务标题<input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} required maxLength={240} /></label>
+                  <div className="form-grid four">
+                    <label>关联目标
+                      <select value={taskGoalId} onChange={(e) => setTaskGoalId(e.target.value)}>
+                        <option value="">不绑定目标</option>
+                        {goals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
+                      </select>
+                    </label>
+                    <label>风险等级
+                      <select value={taskRisk} onChange={(e) => setTaskRisk(e.target.value as "R0" | "R1" | "R2" | "R3")}>
+                        <option value="R0">R0 · 只读/低风险</option>
+                        <option value="R1">R1 · 一般执行</option>
+                        <option value="R2">R2 · 较高风险</option>
+                        <option value="R3">R3 · 高风险/需审批</option>
+                      </select>
+                    </label>
+                    <label>敏感级别
+                      <select value={taskSensitivity} onChange={(e) => setTaskSensitivity(e.target.value as "public" | "internal" | "confidential" | "restricted")}>
+                        <option value="public">public（公开）</option>
+                        <option value="internal">internal（内部）</option>
+                        <option value="confidential">confidential（机密）</option>
+                        <option value="restricted">restricted（受限）</option>
+                      </select>
+                    </label>
+                    <label>优先级 (0-100)
+                      <input type="number" min={0} max={100} value={taskPriority} onChange={(e) => setTaskPriority(e.target.value)} />
+                    </label>
+                  </div>
                   <label>执行说明<textarea value={taskInstruction} onChange={(event) => setTaskInstruction(event.target.value)} required maxLength={12000} rows={3} /></label>
                   <label>验收标准<textarea value={taskAcceptance} onChange={(event) => setTaskAcceptance(event.target.value)} required maxLength={6000} rows={2} /></label>
-                  <p className="form-hint">默认风险等级 R1、内部敏感级、优先级 50。高风险授权仍由服务端治理规则控制。</p>
+                  <p className="form-hint">R3 高风险任务创建后将自动进入待授权状态，直到所有者审批通过后才可调度执行。</p>
                   <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "保存中…" : "创建任务"}</button></div>
                 </form>
               )}
 
               <div className="panel task-table-panel">
                 {detailLoading ? <div className="panel-loading"><div className="spinner" /></div> : tasks.length === 0 ? (
-                  <div className="empty-state"><span className="empty-icon">✓</span><strong>这个项目还没有任务</strong><p>创建第一个任务，或从旧版管理台继续管理目标与工作流。</p></div>
+                  <div className="empty-state">
+                    <span className="empty-icon">✓</span>
+                    <strong>这个项目还没有任务</strong>
+                    <p>创建第一个任务，或前往<Link to="/goals-workflows" className="safety-inline-link">目标与工作流</Link>使用结构化目标拆分。</p>
+                  </div>
                 ) : (
                   <div className="task-list">
                     {tasks.map((task) => (
-                      <div className="task-row" key={task.id}>
+                      <div
+                        className="task-row task-row-clickable"
+                        key={task.id}
+                        onClick={() => setDetailSelection({ id: task.id, projectId: selectedProject.id, projectName: selectedProject.name })}
+                      >
                         <div className="task-status-mark" />
-                        <div className="task-main"><strong>{task.title}</strong><small>{task.id.slice(0, 12)} · {task.risk} · 优先级 {task.priority}</small></div>
+                        <div className="task-main">
+                          <strong>{task.title}</strong>
+                          <small>{task.id.slice(0, 12)} · {task.risk} · {task.sensitivity} · 优先级 {task.priority}</small>
+                        </div>
                         <span className={"status-tag " + (
                           task.status === "completed" ? "tag-green" :
                             task.status === "blocked" || task.status === "waiting_approval" ? "tag-red" :
                               task.status === "running" || task.status === "submitted" ? "tag-blue" : "tag-neutral"
                         )}>{statusLabels[task.status] || task.status}</span>
-                        {task.status !== "running" && (
-                          <button className="icon-button" title="删除任务" disabled={saving} onClick={() => void deleteTask(task)}>
-                            <Trash2 size={14} />
+                        <div className="flex-row-gap-sm" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            className="secondary-button compact"
+                            onClick={() => setDetailSelection({ id: task.id, projectId: selectedProject.id, projectName: selectedProject.name })}
+                          >
+                            <Eye size={13} />详情
                           </button>
-                        )}
+                          {task.status !== "running" && (
+                            <button type="button" className="icon-button" title="删除任务" disabled={saving} onClick={() => void deleteTask(task)}>
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              <div className="section-heading compact-heading" style={{ marginTop: "18px" }}>
+              <div className="section-heading compact-heading section-spacer-top">
                 <div><h2>项目成员管理</h2><p>{members.length} 位成员 · 支持添加、改角色与移除</p></div>
                 <button className="secondary-button compact" onClick={() => setShowMemberForm((v) => !v)}><Users size={15} />添加成员</button>
               </div>
@@ -394,7 +537,7 @@ export default function ProjectsPage() {
                 ) : (
                   <div className="task-list">
                     {members.map((member) => (
-                      <div className="task-row" key={member.id} style={{ gap: "10px" }}>
+                      <div className="task-row flex-row-gap" key={member.id}>
                         <div className="task-main">
                           <strong>{member.agent_name}</strong>
                           <small>{member.agent_id.slice(0, 12)} · 敏感级上限 {member.max_sensitivity} · {member.enabled ? "已启用" : "已停用"}</small>
@@ -404,7 +547,7 @@ export default function ProjectsPage() {
                           value={member.role}
                           disabled={saving}
                           onChange={(e) => void updateMemberRole(member, e.target.value as ProjectMember["role"])}
-                          style={{ padding: "4px 8px", borderRadius: "6px" }}
+                          className="compact-select"
                         >
                           <option value="worker">worker</option>
                           <option value="manager">manager</option>
@@ -423,6 +566,16 @@ export default function ProjectsPage() {
           )}
         </section>
       </div>
+
+      {detailSelection && (
+        <TaskDetailPanel
+          selection={detailSelection}
+          isOwner={user?.kind === "owner"}
+          onClose={() => setDetailSelection(null)}
+          onChanged={() => { if (selectedId) void loadProjectDetail(selectedId); }}
+        />
+      )}
     </div>
   );
 }
+

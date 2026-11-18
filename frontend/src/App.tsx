@@ -1,59 +1,77 @@
+import { lazy } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
+import { SystemModeProvider } from "./auth/SystemModeProvider";
+import { DialogProvider } from "./components/AppDialog";
 import AppShell from "./components/AppShell";
 import LoginPage from "./pages/LoginPage";
-import OverviewPage from "./pages/OverviewPage";
-import ProjectsPage from "./pages/ProjectsPage";
-import AgentsPage from "./pages/AgentsPage";
-import RuntimeMonitorPage from "./pages/RuntimeMonitorPage";
-import TaskCenterPage from "./pages/TaskCenterPage";
-import CommandCenterPage from "./pages/CommandCenterPage";
-import GovernancePage from "./pages/GovernancePage";
-import GoalsWorkflowPage from "./pages/GoalsWorkflowPage";
-import KnowledgePage from "./pages/KnowledgePage";
-import PortfolioPage from "./pages/PortfolioPage";
-import SystemPage from "./pages/SystemPage";
-import SkillsPage from "./pages/SkillsPage";
-import AccessPage from "./pages/AccessPage";
-import ArtifactsPage from "./pages/ArtifactsPage";
-import ExternalInterfacesPage from "./pages/ExternalInterfacesPage";
-import AccountSecurityPage from "./pages/AccountSecurityPage";
-import ProjectPortabilityPage from "./pages/ProjectPortabilityPage";
+
+const OverviewPage = lazy(() => import("./pages/OverviewPage"));
+const ProjectsPage = lazy(() => import("./pages/ProjectsPage"));
+const AgentsPage = lazy(() => import("./pages/AgentsPage"));
+const RuntimeMonitorPage = lazy(() => import("./pages/RuntimeMonitorPage"));
+const TaskCenterPage = lazy(() => import("./pages/TaskCenterPage"));
+const CommandCenterPage = lazy(() => import("./pages/CommandCenterPage"));
+const GovernancePage = lazy(() => import("./pages/GovernancePage"));
+const GoalsWorkflowPage = lazy(() => import("./pages/GoalsWorkflowPage"));
+const KnowledgePage = lazy(() => import("./pages/KnowledgePage"));
+const PortfolioPage = lazy(() => import("./pages/PortfolioPage"));
+const SystemPage = lazy(() => import("./pages/SystemPage"));
+const SkillsPage = lazy(() => import("./pages/SkillsPage"));
+const AccessPage = lazy(() => import("./pages/AccessPage"));
+const ArtifactsPage = lazy(() => import("./pages/ArtifactsPage"));
+const ExternalInterfacesPage = lazy(() => import("./pages/ExternalInterfacesPage"));
+const AccountSecurityPage = lazy(() => import("./pages/AccountSecurityPage"));
+const ProjectPortabilityPage = lazy(() => import("./pages/ProjectPortabilityPage"));
 
 function AuthGate() {
   const { checking, isAuthenticated } = useAuth();
   if (checking) {
-    return <div className="boot-screen"><div className="boot-mascot">🦦</div><div className="spinner" /><p>正在连接 OtterNest 控制平面…</p></div>;
+    return (
+      <div className="boot-screen">
+        <div className="boot-mascot">🦦</div>
+        <div className="spinner" />
+        <p>正在连接 OtterNest 控制平面…</p>
+      </div>
+    );
   }
   if (!isAuthenticated) return <LoginPage />;
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route element={<AppShell />}>
-          <Route index element={<OverviewPage />} />
-          <Route path="/projects" element={<ProjectsPage />} />
-          <Route path="/tasks" element={<TaskCenterPage />} />
-          <Route path="/command" element={<CommandCenterPage />} />
-          <Route path="/agents" element={<AgentsPage />} />
-          <Route path="/interfaces" element={<ExternalInterfacesPage />} />
-          <Route path="/account-security" element={<AccountSecurityPage />} />
-          <Route path="/project-portability" element={<ProjectPortabilityPage />} />
-          <Route path="/runtimes" element={<RuntimeMonitorPage />} />
-          <Route path="/governance" element={<GovernancePage />} />
-          <Route path="/goals-workflows" element={<GoalsWorkflowPage />} />
-          <Route path="/knowledge" element={<KnowledgePage />} />
-          <Route path="/portfolio" element={<PortfolioPage />} />
-          <Route path="/system" element={<SystemPage />} />
-          <Route path="/skills" element={<SkillsPage />} />
-          <Route path="/access" element={<AccessPage />} />
-          <Route path="/artifacts" element={<ArtifactsPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <SystemModeProvider>
+      <DialogProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route index element={<OverviewPage />} />
+              <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/tasks" element={<TaskCenterPage />} />
+              <Route path="/command" element={<CommandCenterPage />} />
+              <Route path="/agents" element={<AgentsPage />} />
+              <Route path="/interfaces" element={<ExternalInterfacesPage />} />
+              <Route path="/account-security" element={<AccountSecurityPage />} />
+              <Route path="/project-portability" element={<ProjectPortabilityPage />} />
+              <Route path="/runtimes" element={<RuntimeMonitorPage />} />
+              <Route path="/governance" element={<GovernancePage />} />
+              <Route path="/goals-workflows" element={<GoalsWorkflowPage />} />
+              <Route path="/knowledge" element={<KnowledgePage />} />
+              <Route path="/portfolio" element={<PortfolioPage />} />
+              <Route path="/system" element={<SystemPage />} />
+              <Route path="/skills" element={<SkillsPage />} />
+              <Route path="/access" element={<AccessPage />} />
+              <Route path="/artifacts" element={<ArtifactsPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </DialogProvider>
+    </SystemModeProvider>
   );
 }
 
 export default function App() {
-  return <AuthProvider><AuthGate /></AuthProvider>;
+  return (
+    <AuthProvider>
+      <AuthGate />
+    </AuthProvider>
+  );
 }
