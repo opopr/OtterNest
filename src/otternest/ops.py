@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from .db import get_session
 from .models import Artifact, Membership, SystemState, TaskGrant, now
 from .security import Actor, as_utc, authenticate, owner_only
-from .services import Conflict, emit, get_system_mode, require_project, require_task
+from .services import Conflict, emit, get_system_mode, require_project, require_task, require_writable_system
 
 router = APIRouter(prefix="/api/v1", tags=["Operations & Security Governance"])
 
@@ -131,6 +131,7 @@ def update_system_mode(body: SystemModeIn, actor: Actor = Depends(authenticate),
 @router.post("/tasks/{task_id}/grants", status_code=201)
 def create_task_grant(task_id: str, body: TaskGrantIn, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     owner_only(actor)
+    require_writable_system(db)
     task = require_task(db, task_id, actor)
     membership = db.scalar(
         select(Membership).where(Membership.project_id == task.project_id, Membership.agent_id == body.agent_id)
@@ -271,6 +272,7 @@ async def restore_artifact_archive(project_id: str, request: Request, actor: Act
     """Restore artifact binaries from an otternest.artifacts.v1 tar.gz archive matching checksums."""
     owner_only(actor)
     require_project(db, project_id, actor)
+    require_writable_system(db)
     archive_stream = tempfile.SpooledTemporaryFile(max_size=1024 * 1024)
     size = 0
     try:
@@ -417,6 +419,11 @@ async def restore_artifact_archive(project_id: str, request: Request, actor: Act
                 raise HTTPException(422, "Archive matches more than 1000 destination artifacts")
             restore_by_id[art.id] = (art, data)
 
+    restore_bytes = sum(len(data) for _, data in restore_by_id.values())
+    if restore_bytes > MAX_ARCHIVE_PAYLOAD_BYTES:
+        raise HTTPException(413, "Restore destinations exceed the 44 MiB write limit")
+    require_writable_system(db)
+
     staged: list[tuple[str, Path, Artifact, bytes]] = []
     backup_paths: list[Path] = []
     backups: list[tuple[Path, Path]] = []
@@ -493,6 +500,8 @@ def gc_project_artifacts(project_id: str, body: ArtifactGCIn, actor: Actor = Dep
     """Garbage-collect superseded unaccepted or rejected artifact binaries while preserving audit metadata."""
     owner_only(actor)
     require_project(db, project_id, actor)
+    if not body.dry_run:
+        require_writable_system(db)
     rows = db.scalars(
         select(Artifact)
         .where(Artifact.project_id == project_id, Artifact.deleted_at.is_(None))
@@ -517,33 +526,54 @@ def gc_project_artifacts(project_id: str, body: ArtifactGCIn, actor: Actor = Dep
     base = Path(os.environ.get("OTTERNEST_ARTIFACT_DIR", "./var/artifacts")).resolve()
     project_root = (base / project_id).resolve()
     reclaimed_bytes = 0
-    affected_ids: list[str] = []
+    reclaimable_bytes = 0
+    deleted_ids: list[str] = []
+    missing_ids: list[str] = []
+    failed_ids: list[str] = []
     for art in candidates:
-        file_size = art.size_bytes or 0
-        if art.uri and not art.uri.startswith("unavailable://"):
-            try:
-                p = Path(art.uri).resolve()
-                if project_root.is_relative_to(base) and p.is_relative_to(project_root) and p.is_file():
-                    file_size = max(file_size, p.stat().st_size)
-                    if not body.dry_run:
-                        p.unlink()
-            except OSError:
-                pass
-        reclaimed_bytes += file_size
-        affected_ids.append(art.id)
+        try:
+            if not art.uri or art.uri.startswith("unavailable://"):
+                missing_ids.append(art.id)
+            else:
+                path = Path(art.uri).resolve()
+                if project_root == base or not project_root.is_relative_to(base) or not path.is_relative_to(project_root):
+                    raise OSError("Unsafe artifact path")
+                try:
+                    file_size = path.stat().st_size
+                except FileNotFoundError:
+                    missing_ids.append(art.id)
+                else:
+                    if not path.is_file():
+                        raise OSError("Artifact is not a regular file")
+                    if body.dry_run:
+                        reclaimable_bytes += file_size
+                        continue
+                    path.unlink()
+                    reclaimed_bytes += file_size
+                    deleted_ids.append(art.id)
+        except OSError:
+            failed_ids.append(art.id)
+            continue
         if not body.dry_run:
             art.deleted_at = now()
 
-    if not body.dry_run and affected_ids:
+    if not body.dry_run and candidates:
         emit(db, actor, "artifact.gc_completed", project_id, project_id, {
-            "deleted_count": len(affected_ids),
+            "deleted_count": len(deleted_ids),
+            "deleted_ids": deleted_ids,
+            "missing_ids": missing_ids,
+            "failed_ids": failed_ids,
             "reclaimed_bytes": reclaimed_bytes,
         })
         db.commit()
     return {
         "project_id": project_id,
         "dry_run": body.dry_run,
-        "candidate_count": len(affected_ids),
-        "candidate_ids": affected_ids,
+        "candidate_count": len(candidates),
+        "candidate_ids": [art.id for art in candidates],
+        "deleted_ids": deleted_ids,
+        "missing_ids": missing_ids,
+        "failed_ids": failed_ids,
+        "reclaimable_bytes": reclaimable_bytes,
         "reclaimed_bytes": reclaimed_bytes,
     }
