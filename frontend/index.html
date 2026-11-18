@@ -2,6 +2,42 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function () {
+        function ensureWritableFetch(target) {
+          if (!target) return;
+          try {
+            var desc = Object.getOwnPropertyDescriptor(target, "fetch");
+            if (desc && desc.get && !desc.set && desc.configurable) {
+              var current = desc.get.call(window);
+              Object.defineProperty(target, "fetch", {
+                configurable: true,
+                enumerable: desc.enumerable !== false,
+                get: function () { return current; },
+                set: function (fn) { if (typeof fn === "function") current = fn; }
+              });
+            }
+          } catch (_) {}
+        }
+        ensureWritableFetch(window);
+        if (typeof Window !== "undefined") ensureWritableFetch(Window.prototype);
+        window.addEventListener(
+          "error",
+          function (event) {
+            var msg = String((event && event.message) || "");
+            var file = String((event && event.filename) || "");
+            if (
+              msg.indexOf("Cannot set property fetch") !== -1 ||
+              file.indexOf("chrome-extension://") === 0
+            ) {
+              event.stopImmediatePropagation();
+              event.preventDefault();
+            }
+          },
+          true
+        );
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f4f6fb" />
     <meta name="description" content="OtterNest 水獭窝 · 个人 AI 团队控制中心" />

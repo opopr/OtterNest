@@ -56,9 +56,10 @@ export default function AgentsPage() {
     setLoading(true);
     try {
       const rows = await request<Agent[]>("/agents?include_deleted=true");
-      setAgents(rows);
+      const safeRows = Array.isArray(rows) ? rows : [];
+      setAgents(safeRows);
       setError("");
-      setSelectedAgentId((current) => rows.some((agent) => agent.id === current && !agent.deleted_at) ? current : "");
+      setSelectedAgentId((current) => safeRows.some((agent) => agent.id === current && !agent.deleted_at) ? current : "");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Agent 列表读取失败");
     } finally { setLoading(false); }
@@ -67,7 +68,8 @@ export default function AgentsPage() {
   const loadRuntimes = useCallback(async (agentId: string) => {
     if (!agentId) { setRuntimes([]); return; }
     try {
-      setRuntimes(await request<Runtime[]>("/agents/" + encodeURIComponent(agentId) + "/runtimes"));
+      const rows = await request<Runtime[]>("/agents/" + encodeURIComponent(agentId) + "/runtimes");
+      setRuntimes(Array.isArray(rows) ? rows : []);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Runtime 列表读取失败");
     }
@@ -76,7 +78,7 @@ export default function AgentsPage() {
   useEffect(() => { void loadAgents(); }, [loadAgents]);
   useEffect(() => {
     if (selectedAgent) {
-      setVerifiedCapabilities(selectedAgent.verified_capabilities.join(", "));
+      setVerifiedCapabilities((selectedAgent.verified_capabilities || []).join(", "));
       void loadRuntimes(selectedAgent.id);
     } else setRuntimes([]);
   }, [selectedAgent, loadRuntimes]);
@@ -108,7 +110,7 @@ export default function AgentsPage() {
     setEditName(agent.name);
     setEditPlatform(agent.platform);
     setEditExecutionMode(agent.execution_mode);
-    setEditCapabilities(agent.declared_capabilities.join(", "));
+    setEditCapabilities((agent.declared_capabilities || []).join(", "));
   };
 
   const updateAgent = async (event: FormEvent<HTMLFormElement>) => {
@@ -135,7 +137,12 @@ export default function AgentsPage() {
   };
 
   const rotateAgentToken = async (agent: Agent) => {
-    if (!window.confirm(`确认重新生成并轮换 Agent「${agent.name}」的主令牌？旧令牌将立即失效！`)) return;
+    if (!(await dialog.confirm({
+      title: "重新生成 Agent 主令牌",
+      message: `确认重新生成并轮换 Agent「${agent.name}」的主令牌？旧令牌将立即失效！`,
+      confirmText: "确认轮换",
+      tone: "warning"
+    }))) return;
     setSaving(true);
     setError("");
     try {
@@ -311,7 +318,7 @@ export default function AgentsPage() {
             <label>执行方式<select value={editExecutionMode} onChange={(event) => setEditExecutionMode(event.target.value as Agent["execution_mode"])}><option value="manual">手动</option><option value="polling">轮询 Runner</option><option value="remote">远程接入</option></select></label>
           </div>
           <label>能力声明（逗号分隔）<input value={editCapabilities} onChange={(event) => setEditCapabilities(event.target.value)} placeholder="python, browser, filesystem" /></label>
-          <div className="form-actions" style={{ display: "flex", gap: "8px" }}>
+          <div className="form-actions flex-row-gap">
             <button className="primary-button compact" disabled={saving}>{saving ? "保存中…" : "保存修改"}</button>
             <button type="button" className="secondary-button compact" onClick={() => setEditingAgent(null)}>取消</button>
           </div>
@@ -343,10 +350,10 @@ export default function AgentsPage() {
               </span>
             </div>
             <h3>{agent.name}</h3><p>{agent.platform} · {agent.execution_mode}</p>
-            <div className="agent-capabilities"><span>声明能力 {agent.declared_capabilities.length}</span><span>已核验 {agent.verified_capabilities.length}</span></div>
+            <div className="agent-capabilities"><span>声明能力 {(agent.declared_capabilities || []).length}</span><span>已核验 {(agent.verified_capabilities || []).length}</span></div>
             <div className="capability-list">
-              {agent.verified_capabilities.length > 0
-                ? agent.verified_capabilities.map((capability) => <span className="capability-tag verified" key={capability}><ShieldCheck size={12} />{capability}</span>)
+              {(agent.verified_capabilities || []).length > 0
+                ? (agent.verified_capabilities || []).map((capability) => <span className="capability-tag verified" key={capability}><ShieldCheck size={12} />{capability}</span>)
                 : <span className="muted-inline">暂无已核验能力</span>}
             </div>
             <small className="agent-id">ID · {agent.id}</small>
