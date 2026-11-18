@@ -133,3 +133,108 @@ def test_s3_sigv4_requests_and_mcp_memory_query(monkeypatch):
     assert res[0]["id"] == "m1"
     assert "q=vector+search" in captured["url"] or "q=vector%20search" in captured["url"]
     mcp.close()
+
+
+def test_s3_artifact_gc_and_delete_error_handling(env, owner_headers, monkeypatch):
+    monkeypatch.setenv("OTTERNEST_STORAGE_TYPE", "s3")
+    monkeypatch.setenv("OTTERNEST_S3_BUCKET", "test-bucket")
+    monkeypatch.setenv("OTTERNEST_S3_ENDPOINT", "https://s3.example.com")
+    monkeypatch.setenv("OTTERNEST_S3_ACCESS_KEY", "AKIAIOSFODNN7EXAMPLE")
+    monkeypatch.setenv("OTTERNEST_S3_SECRET_KEY", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
+    monkeypatch.setattr("otternest.storage._DEFAULT_BACKEND", None)
+
+    put_urls = []
+    delete_urls = []
+    stored_objects = {}
+
+    def fake_put(url, content=b"", headers=None, timeout=60):
+        put_urls.append(url)
+        stored_objects[url] = content
+        return httpx.Response(200, headers={"etag": '"mock-etag"'})
+
+    def fake_get(url, headers=None, timeout=60):
+        if url not in stored_objects:
+            return httpx.Response(404)
+        return httpx.Response(200, content=stored_objects[url])
+
+    monkeypatch.setattr(httpx, "put", fake_put)
+    monkeypatch.setattr(httpx, "get", fake_get)
+
+    pid = env.post("/api/v1/projects", headers=owner_headers, json={"name": "S3GCProj"}).json()["id"]
+    tid = env.post(
+        f"/api/v1/projects/{pid}/tasks",
+        headers=owner_headers,
+        json={"title": "Upload S3 Artifacts", "instruction": "do", "acceptance": "ok"},
+    ).json()["id"]
+
+    v1 = env.post(
+        f"/api/v1/tasks/{tid}/artifacts",
+        headers={**owner_headers, "X-Artifact-Name": "report.md"},
+        content=b"rejected-s3-payload",
+    ).json()
+    v2 = env.post(
+        f"/api/v1/tasks/{tid}/artifacts",
+        headers={**owner_headers, "X-Artifact-Name": "report.md"},
+        content=b"accepted-s3-payload",
+    ).json()
+    assert len(put_urls) == 2
+    assert f"/{pid}/{v1['id']}" in put_urls[0]
+    assert f"/{pid}/{v2['id']}" in put_urls[1]
+
+    assert env.post(
+        f"/api/v1/artifacts/{v1['id']}/review",
+        headers=owner_headers,
+        json={"accepted": False, "note": "rejected s3 draft"},
+    ).status_code == 200
+    assert env.post(
+        f"/api/v1/artifacts/{v2['id']}/review",
+        headers=owner_headers,
+        json={"accepted": True, "note": "accepted s3 final"},
+    ).status_code == 200
+
+    # Dry-run GC identifies v1 and reports reclaimable bytes
+    gc_dry = env.post(
+        f"/api/v1/projects/{pid}/artifacts/gc",
+        headers=owner_headers,
+        json={"dry_run": True, "keep_versions": 1, "include_rejected": True},
+    )
+    assert gc_dry.status_code == 200
+    dry_data = gc_dry.json()
+    assert v1["id"] in dry_data["candidate_ids"]
+    assert v2["id"] not in dry_data["candidate_ids"]
+    assert dry_data["reclaimable_bytes"] > 0
+
+    # Failed S3 DELETE (500) records artifact in failed_ids and keeps metadata for retry
+    def fake_delete_fail(url, headers=None, timeout=30):
+        delete_urls.append(("FAIL", url))
+        return httpx.Response(500)
+
+    monkeypatch.setattr(httpx, "delete", fake_delete_fail)
+    gc_fail = env.post(
+        f"/api/v1/projects/{pid}/artifacts/gc",
+        headers=owner_headers,
+        json={"dry_run": False, "keep_versions": 1, "include_rejected": True},
+    )
+    assert gc_fail.status_code == 200
+    fail_data = gc_fail.json()
+    assert v1["id"] in fail_data["failed_ids"]
+    assert v1["id"] not in fail_data["deleted_ids"]
+    assert fail_data["reclaimed_bytes"] == 0
+
+    # Successful S3 DELETE (204) deletes candidate and reports reclaimed bytes
+    def fake_delete_ok(url, headers=None, timeout=30):
+        delete_urls.append(("OK", url))
+        return httpx.Response(204)
+
+    monkeypatch.setattr(httpx, "delete", fake_delete_ok)
+    gc_ok = env.post(
+        f"/api/v1/projects/{pid}/artifacts/gc",
+        headers=owner_headers,
+        json={"dry_run": False, "keep_versions": 1, "include_rejected": True},
+    )
+    assert gc_ok.status_code == 200
+    ok_data = gc_ok.json()
+    assert v1["id"] in ok_data["deleted_ids"]
+    assert ok_data["failed_ids"] == []
+    assert ok_data["reclaimed_bytes"] > 0
+    assert any(status == "OK" and f"/{pid}/{v1['id']}" in url for status, url in delete_urls)

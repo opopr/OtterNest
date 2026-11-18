@@ -228,12 +228,19 @@ class S3StorageBackend:
 
     def delete(self, uri: str) -> None:
         prefix = f"s3://{self.bucket}/"
-        if not uri.startswith(prefix) or not self._has_credentials():
-            return
+        if not uri.startswith(prefix):
+            raise StorageError("Invalid S3 URI for configured bucket")
+        if not self._has_credentials():
+            raise StorageError("S3 credentials are not configured")
         import httpx
         key = uri[len(prefix):]
         headers = self._signed_headers("DELETE", key)
-        httpx.delete(self._object_url(key), headers=headers, timeout=30)
+        try:
+            response = httpx.delete(self._object_url(key), headers=headers, timeout=30)
+        except httpx.HTTPError as exc:
+            raise StorageError("S3 DELETE request failed") from exc
+        if response.status_code not in (200, 202, 204):
+            raise StorageError(f"S3 DELETE failed ({response.status_code})")
 
     def initiate_multipart(self, project_id: str, artifact_id: str, filename: str) -> str:
         key = f"{project_id}/{artifact_id}"

@@ -687,11 +687,18 @@ def update_member(
 ):
     owner_only(actor)
     require_project(db, project_id, actor)
+    db.scalar(select(Project.id).where(Project.id == project_id).with_for_update())
     member = db.scalar(
         select(Membership).where(Membership.project_id == project_id, Membership.agent_id == agent_id).with_for_update()
     )
     if not member:
         raise HTTPException(404, "Project member not found")
+    if member.role == "manager" and body.role is not None and body.role != "manager":
+        other_manager = db.scalar(select(Membership.id).where(
+            Membership.project_id == project_id, Membership.role == "manager", Membership.id != member.id
+        ).limit(1))
+        if other_manager is None:
+            raise Conflict("Cannot change the last project manager")
     if body.role is not None:
         member.role = body.role
     if body.max_sensitivity is not None:
@@ -710,11 +717,18 @@ def remove_member(
 ):
     owner_only(actor)
     require_project(db, project_id, actor)
+    db.scalar(select(Project.id).where(Project.id == project_id).with_for_update())
     member = db.scalar(
         select(Membership).where(Membership.project_id == project_id, Membership.agent_id == agent_id).with_for_update()
     )
     if not member:
         raise HTTPException(404, "Project member not found")
+    if member.role == "manager":
+        other_manager = db.scalar(select(Membership.id).where(
+            Membership.project_id == project_id, Membership.role == "manager", Membership.id != member.id
+        ).limit(1))
+        if other_manager is None:
+            raise Conflict("Cannot remove the last project manager")
     running_task = db.scalar(
         select(Task.id).where(Task.project_id == project_id, Task.assigned_agent_id == agent_id, Task.status == "running")
     )

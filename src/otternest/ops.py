@@ -25,6 +25,7 @@ from .db import get_session
 from .models import Artifact, Membership, SystemState, TaskGrant, now
 from .security import Actor, as_utc, authenticate, owner_only
 from .services import Conflict, emit, get_system_mode, require_project, require_task, require_writable_system
+from .storage import S3StorageBackend, StorageError, get_storage_backend
 
 router = APIRouter(prefix="/api/v1", tags=["Operations & Security Governance"])
 
@@ -534,6 +535,17 @@ def gc_project_artifacts(project_id: str, body: ArtifactGCIn, actor: Actor = Dep
         try:
             if not art.uri or art.uri.startswith("unavailable://"):
                 missing_ids.append(art.id)
+            elif art.uri.startswith("s3://"):
+                backend = get_storage_backend()
+                expected_uri = f"s3://{backend.bucket}/{project_id}/{art.id}" if isinstance(backend, S3StorageBackend) else ""
+                if art.uri != expected_uri:
+                    raise StorageError("Artifact S3 URI does not match the configured project and bucket")
+                if body.dry_run:
+                    reclaimable_bytes += art.size_bytes or 0
+                    continue
+                backend.delete(art.uri)
+                reclaimed_bytes += art.size_bytes or 0
+                deleted_ids.append(art.id)
             else:
                 path = Path(art.uri).resolve()
                 if project_root == base or not project_root.is_relative_to(base) or not path.is_relative_to(project_root):
@@ -551,7 +563,7 @@ def gc_project_artifacts(project_id: str, body: ArtifactGCIn, actor: Actor = Dep
                     path.unlink()
                     reclaimed_bytes += file_size
                     deleted_ids.append(art.id)
-        except OSError:
+        except (OSError, StorageError):
             failed_ids.append(art.id)
             continue
         if not body.dry_run:

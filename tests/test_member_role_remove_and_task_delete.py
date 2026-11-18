@@ -31,13 +31,25 @@ def test_update_member_role_and_remove_member(env, owner_headers):
     assert len(members) == 1
     assert members[0]["role"] == "manager"
 
-    # Remove member
+    # A project must retain a manager when changing roles or removing members.
+    assert env.patch(f"/api/v1/projects/{pid}/members/{agent_id}", headers=owner_headers, json={"role": "worker"}).status_code == 409
+    assert env.delete(f"/api/v1/projects/{pid}/members/{agent_id}", headers=owner_headers).status_code == 409
+
+    backup_id = env.post(
+        "/api/v1/agents", headers=owner_headers,
+        json={"name": "backup-manager", "platform": "local", "execution_mode": "manual", "capabilities": []},
+    ).json()["id"]
+    assert env.post(f"/api/v1/projects/{pid}/members", headers=owner_headers,
+                    json={"agent_id": backup_id, "role": "manager"}).status_code == 201
+
+    # Remove member after another manager takes the role.
     removed = env.delete(f"/api/v1/projects/{pid}/members/{agent_id}", headers=owner_headers)
     assert removed.status_code == 200
     assert removed.json()["removed"] is True
 
     members_after = env.get(f"/api/v1/projects/{pid}/members", headers=owner_headers).json()
-    assert members_after == []
+    assert len(members_after) == 1
+    assert members_after[0]["agent_id"] == backup_id
 
 
 def test_delete_task_and_guard_running_task(env, owner_headers):
