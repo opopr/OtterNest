@@ -7,6 +7,7 @@ import {
 
 const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
 let accessToken: string | null = null;
+let unauthorizedHandler: (() => void) | null = null;
 
 export class ApiError extends Error {
   status: number;
@@ -19,6 +20,10 @@ export class ApiError extends Error {
 
 export function setAccessToken(token: string | null): void {
   accessToken = token;
+}
+
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  unauthorizedHandler = handler;
 }
 
 export function getApiOrigin(): string {
@@ -50,6 +55,9 @@ export async function request<T>(
     : await response.text();
 
   if (!response.ok) {
+    if (response.status === 401 && token && unauthorizedHandler) {
+      unauthorizedHandler();
+    }
     const detail =
       typeof payload === "object" && payload !== null && "detail" in payload
         ? (payload as { detail?: unknown }).detail
@@ -78,6 +86,9 @@ export async function binaryRequest(
     credentials: "omit"
   });
   if (!response.ok) {
+    if (response.status === 401 && token && unauthorizedHandler) {
+      unauthorizedHandler();
+    }
     const contentType = response.headers.get("content-type") || "";
     const payload: unknown = contentType.includes("application/json")
       ? await response.json()

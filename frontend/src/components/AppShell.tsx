@@ -1,12 +1,12 @@
-import { Component, Suspense, useState, type ReactNode } from "react";
+import { Component, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
 import {
-  Activity, ArchiveRestore, ArrowUpRight, BookMarked, BookOpen, Bot, ChevronDown,
+  Activity, ArchiveRestore, ArrowUpRight, Bell, BookMarked, BookOpen, Bot, CheckCheck, ChevronDown,
   CircleHelp, ClipboardCheck, FileArchive, FolderKanban, Gauge, GitBranch, KeyRound,
   LayoutDashboard, LockKeyhole, LogOut, MessageSquare, Monitor, PlugZap, Settings2,
   ShieldCheck, Wifi, type LucideIcon
 } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { getApiOrigin } from "../api/client";
+import { getApiOrigin, request } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { useSystemMode } from "../auth/SystemModeProvider";
 import { getSystemModeLabel } from "../utils/labels";
@@ -69,12 +69,56 @@ class RouteErrorBoundary extends Component<{ resetKey: string; children: ReactNo
   }
 }
 
+interface TopbarNotification {
+  id: string;
+  project_id: string | null;
+  level: "urgent" | "important" | "digest" | string;
+  title: string;
+  body: string;
+  read: boolean;
+  created_at: string;
+}
+
 export default function AppShell() {
   const { user, logout } = useAuth();
   const { systemMode } = useSystemMode();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<TopbarNotification[]>([]);
   const location = useLocation();
 
+  const loadNotifications = useCallback(async () => {
+    try {
+      const rows = await request<TopbarNotification[]>("/notifications?limit=20");
+      setNotifications(Array.isArray(rows) ? rows : []);
+    } catch {
+      // Keep topbar resilient if notifications endpoint is temporarily unreachable.
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadNotifications();
+  }, [loadNotifications, location.pathname]);
+
+  const markRead = async (id: string) => {
+    try {
+      await request("/notifications/" + encodeURIComponent(id) + "/read", { method: "POST" });
+      setNotifications((items) => items.map((item) => item.id === id ? { ...item, read: true } : item));
+    } catch {
+      // Ignore transient error in quick popover.
+    }
+  };
+
+  const markAllRead = async () => {
+    try {
+      await request("/notifications/read-all", { method: "POST" });
+      setNotifications((items) => items.map((item) => ({ ...item, read: true })));
+    } catch {
+      // Ignore transient error in quick popover.
+    }
+  };
+
+  const unreadCount = notifications.filter((item) => !item.read).length;
   const modeLabel = getSystemModeLabel(systemMode?.mode);
 
   return (
@@ -136,8 +180,65 @@ export default function AppShell() {
             <div className={"connection-pill" + (systemMode ? "" : " is-offline")}>
               <Wifi size={15} />{systemMode ? "API 已连接" : "API 状态未知"}
             </div>
+            <div className="notif-menu-wrap">
+              <button
+                type="button"
+                className="notif-button"
+                aria-label="通知收件箱"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setNotifOpen((open) => {
+                    if (!open) void loadNotifications();
+                    return !open;
+                  });
+                }}
+              >
+                <Bell size={16} />
+                {unreadCount > 0 && <span className="notif-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
+              </button>
+              {notifOpen && (
+                <div className="notif-popover" role="dialog" aria-label="系统通知">
+                  <div className="notif-popover-head">
+                    <strong>通知收件箱 ({unreadCount} 未读)</strong>
+                    {unreadCount > 0 && (
+                      <button type="button" className="text-button" onClick={() => void markAllRead()}>
+                        <CheckCheck size={13} />全部已读
+                      </button>
+                    )}
+                  </div>
+                  <div className="notif-popover-list">
+                    {notifications.length === 0 ? (
+                      <div className="notif-empty">暂无系统通知</div>
+                    ) : (
+                      notifications.slice(0, 8).map((item) => (
+                        <div className={"notif-item " + (item.read ? "is-read" : "is-unread")} key={item.id}>
+                          <div className="notif-item-main">
+                            <div className="notif-item-title">
+                              <span className={"status-tag " + (item.level === "urgent" ? "tag-red" : item.level === "important" ? "tag-amber" : "tag-neutral")}>
+                                {item.level === "urgent" ? "紧急" : item.level === "important" ? "重要" : "摘要"}
+                              </span>
+                              <strong>{item.title}</strong>
+                            </div>
+                            <p>{item.body}</p>
+                            <small>{new Date(item.created_at).toLocaleString("zh-CN", { hour12: false })}</small>
+                          </div>
+                          {!item.read && (
+                            <button type="button" className="text-button" onClick={() => void markRead(item.id)}>
+                              已读
+                            </button>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="notif-popover-foot">
+                    <Link to="/portfolio" onClick={() => setNotifOpen(false)}>前往 Portfolio 查看完整收件箱 →</Link>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="user-menu-wrap">
-              <button className="user-button" onClick={() => setMenuOpen((open) => !open)}>
+              <button className="user-button" onClick={() => { setNotifOpen(false); setMenuOpen((open) => !open); }}>
                 <span className="user-avatar">O</span>
                 <span className="user-name">{user?.id === "owner" ? "所有者" : user?.id || "账户"}</span>
                 <ChevronDown size={15} />

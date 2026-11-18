@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "test": "npx --yes tsx --test src/api/url.test.ts src/utils/labels.test.ts src/utils/navigation.test.ts src/components/dialogValidation.test.ts",
+    "test": "npx --yes tsx --test src/api/url.test.ts src/utils/labels.test.ts src/utils/navigation.test.ts src/utils/reconnect.test.ts src/components/dialogValidation.test.ts",
     "lint": "tsc --noEmit && npm run test",
     "api:types": "openapi-typescript http://127.0.0.1:8000/openapi.json -o src/api/schema.d.ts"
   },

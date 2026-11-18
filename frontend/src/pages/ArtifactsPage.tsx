@@ -58,6 +58,7 @@ export default function ArtifactsPage() {
   const [restoreResult, setRestoreResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [error, setError] = useState("");
   const dialog = useDialog();
 
@@ -67,7 +68,8 @@ export default function ArtifactsPage() {
   const loadProjects = useCallback(async () => {
     setLoading(true);
     try {
-      const rows = await request<Project[]>("/projects");
+      const raw = await request<Project[]>("/projects");
+      const rows = Array.isArray(raw) ? raw : [];
       setProjects(rows);
       setSelectedProjectId((current) => rows.some((item) => item.id === current) ? current : rows[0]?.id || "");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "项目列表读取失败"); }
@@ -77,7 +79,8 @@ export default function ArtifactsPage() {
   const loadProjectTasks = useCallback(async (projectId: string) => {
     setLoading(true);
     try {
-      const rows = await request<Task[]>("/projects/" + encodeURIComponent(projectId) + "/tasks");
+      const raw = await request<Task[]>("/projects/" + encodeURIComponent(projectId) + "/tasks");
+      const rows = Array.isArray(raw) ? raw : [];
       setTasks(rows);
       setSelectedTaskId((current) => rows.some((item) => item.id === current) ? current : rows[0]?.id || "");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "项目任务读取失败"); }
@@ -88,7 +91,8 @@ export default function ArtifactsPage() {
     if (!taskId) { setArtifacts([]); return; }
     setLoading(true);
     try {
-      setArtifacts(await request<Artifact[]>("/tasks/" + encodeURIComponent(taskId) + "/artifacts"));
+      const raw = await request<Artifact[]>("/tasks/" + encodeURIComponent(taskId) + "/artifacts");
+      setArtifacts(Array.isArray(raw) ? raw : []);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "成果列表读取失败"); }
     finally { setLoading(false); }
   }, []);
@@ -100,6 +104,7 @@ export default function ArtifactsPage() {
   const uploadArtifact = async () => {
     if (!selectedTaskId || !uploadFile) return;
     setSaving(true);
+    setUploadProgress(0);
     setError("");
     try {
       const MULTIPART_THRESHOLD = 4 * 1024 * 1024;
@@ -110,6 +115,7 @@ export default function ArtifactsPage() {
           body: JSON.stringify({ filename: uploadFile.name, sensitivity })
         });
         const parts: Array<{ part_number: number; sha256: string; size: number }> = [];
+        const totalParts = Math.max(1, Math.ceil(uploadFile.size / CHUNK_SIZE));
         let partNumber = 1;
         for (let offset = 0; offset < uploadFile.size; offset += CHUNK_SIZE) {
           const chunk = uploadFile.slice(offset, offset + CHUNK_SIZE);
@@ -118,6 +124,7 @@ export default function ArtifactsPage() {
             body: chunk
           });
           parts.push(await partRes.json() as { part_number: number; sha256: string; size: number });
+          setUploadProgress(Math.min(99, Math.round((partNumber / totalParts) * 100)));
           partNumber += 1;
         }
         await request("/tasks/" + encodeURIComponent(selectedTaskId) + "/artifacts/multipart/" + encodeURIComponent(init.upload_id) + "/complete?filename=" + encodeURIComponent(uploadFile.name) + "&sensitivity=" + encodeURIComponent(sensitivity), {
@@ -134,10 +141,14 @@ export default function ArtifactsPage() {
           body: uploadFile
         });
       }
+      setUploadProgress(100);
       setUploadFile(null);
       await loadArtifacts(selectedTaskId);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "成果上传失败"); }
-    finally { setSaving(false); }
+    finally {
+      setSaving(false);
+      setUploadProgress(null);
+    }
   };
 
   const downloadArtifact = async (artifact: Artifact) => {
@@ -245,9 +256,11 @@ export default function ArtifactsPage() {
         <div className="artifact-upload">
           <label>上传文件<input type="file" onChange={(event) => setUploadFile(event.target.files?.[0] || null)} /></label>
           <label>敏感级<select value={sensitivity} onChange={(event) => setSensitivity(event.target.value)}><option value="public">公开</option><option value="internal">内部</option><option value="confidential">机密</option><option value="restricted">受限</option></select></label>
-          <button className="primary-button compact" disabled={saving || !selectedTaskId || !uploadFile} onClick={() => void uploadArtifact()}><FileUp size={14} />上传为新版本</button>
+          <button className="primary-button compact" disabled={saving || !selectedTaskId || !uploadFile} onClick={() => void uploadArtifact()}>
+            <FileUp size={14} />{uploadProgress !== null ? `上传中 ${uploadProgress}%` : "上传为新版本"}
+          </button>
         </div>
-        <p className="form-hint">单文件最大 5 MiB。相同任务和文件名会创建新版本，不覆盖旧文件。</p>
+        <p className="form-hint">常规单次上传上限 5 MiB；超过 4 MiB 自动启用分块上传。相同任务和文件名会创建新版本，不覆盖旧文件。</p>
         <div className="artifact-list">{artifacts.map((artifact) => <article className="artifact-card" key={artifact.id}>
           <div className="artifact-card-main"><div className="artifact-file-icon"><Archive size={18} /></div><div><strong>{artifact.name}</strong><small>v{artifact.version} · {sizeText(artifact.size_bytes)} · {artifact.checksum.slice(0, 16)}…</small><small>敏感级 {artifact.sensitivity} · {new Date(artifact.created_at).toLocaleString("zh-CN", { hour12: false })}</small></div></div>
           <div className="artifact-card-actions"><span className={"status-tag " + (artifact.review_status === "accepted" ? "tag-green" : artifact.review_status === "rejected" ? "tag-red" : "tag-amber")}>{reviewLabel[artifact.review_status] || artifact.review_status}</span><button className="icon-button" title="下载并校验" disabled={saving || Boolean(artifact.deleted_at)} onClick={() => void downloadArtifact(artifact)}><Download size={15} /></button>{artifact.review_status === "pending" && <><button className="icon-button" title="验收通过" disabled={saving} onClick={() => void reviewArtifact(artifact, true)}><Check size={15} /></button><button className="icon-button" title="驳回" disabled={saving} onClick={() => void reviewArtifact(artifact, false)}><X size={15} /></button></>}</div>

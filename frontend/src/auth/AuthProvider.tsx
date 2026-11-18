@@ -1,7 +1,7 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode
 } from "react";
-import { getApiOrigin, request, setAccessToken } from "../api/client";
+import { getApiOrigin, request, setAccessToken, setUnauthorizedHandler } from "../api/client";
 import { formatAuthConnectionError } from "../api/url";
 import type { AuthStatus, OwnerActor } from "../api/types";
 
@@ -52,10 +52,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refreshAuthStatus();
   }, [refreshAuthStatus]);
 
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setAccessToken(null);
+      setToken(null);
+      setUser(null);
+      setAuthError("登录会话已过期或失效，请重新登录。");
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
   const establishSession = useCallback(async (newToken: string) => {
     setAccessToken(newToken);
     try {
       const actor = await request<OwnerActor>("/me");
+      setAuthError("");
       setToken(newToken);
       setUser(actor);
     } catch (error) {

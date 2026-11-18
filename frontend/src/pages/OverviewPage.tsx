@@ -10,6 +10,7 @@ import type {
 } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import StatCard from "../components/StatCard";
+import { computeReconnectDelayMs } from "../utils/reconnect";
 
 interface OverviewData {
   projects: Project[];
@@ -99,18 +100,25 @@ export default function OverviewPage() {
       setLive("offline");
       return;
     }
+    let disposed = false;
     setLive("connecting");
     const connectedIds = new Set<string>();
-    const sockets: WebSocket[] = [];
-    for (const pid of activeProjectIds) {
+    const activeSockets = new Map<string, WebSocket>();
+    const retryTimers = new Map<string, number>();
+
+    const connectProject = (pid: string, attempt: number) => {
+      if (disposed) return;
       try {
         const socket = new WebSocket(websocketUrl(
           "/api/v1/projects/" + encodeURIComponent(pid) + "/events/ws"
         ));
+        activeSockets.set(pid, socket);
         socket.onopen = () => {
+          if (disposed) return;
           socket.send(JSON.stringify({ type: "auth", token, after: 0 }));
         };
         socket.onmessage = (event) => {
+          if (disposed) return;
           try {
             const message = JSON.parse(String(event.data)) as { type?: string; kind?: string };
             if (message.type === "connected") {
@@ -125,21 +133,39 @@ export default function OverviewPage() {
             // REST remains the authoritative source if a frame cannot be parsed.
           }
         };
+        const scheduleRetry = () => {
+          if (disposed) return;
+          connectedIds.delete(pid);
+          if (connectedIds.size === 0) setLive("offline");
+          const existingTimer = retryTimers.get(pid);
+          if (existingTimer !== undefined) window.clearTimeout(existingTimer);
+          const delay = computeReconnectDelayMs(attempt, 2000, 15000);
+          const timer = window.setTimeout(() => {
+            retryTimers.delete(pid);
+            connectProject(pid, attempt + 1);
+          }, delay);
+          retryTimers.set(pid, timer);
+        };
         socket.onerror = () => {
           connectedIds.delete(pid);
           if (connectedIds.size === 0) setLive("offline");
         };
-        socket.onclose = () => {
-          connectedIds.delete(pid);
-          if (connectedIds.size === 0) setLive("offline");
-        };
-        sockets.push(socket);
+        socket.onclose = scheduleRetry;
       } catch {
         // Ignore individual socket failure if others connect.
       }
+    };
+
+    for (const pid of activeProjectIds) {
+      connectProject(pid, 0);
     }
+
     return () => {
-      for (const socket of sockets) socket.close();
+      disposed = true;
+      for (const timer of retryTimers.values()) window.clearTimeout(timer);
+      retryTimers.clear();
+      for (const socket of activeSockets.values()) socket.close();
+      activeSockets.clear();
     };
   }, [token, activeProjectKey, refresh]);
 

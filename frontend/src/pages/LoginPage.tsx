@@ -105,6 +105,7 @@ export default function LoginPage() {
           </div>
         ) : (
           <>
+            {authError && !error && <div className="form-error mb-10">{authError}</div>}
             <div className="login-tabs">
               <button className={mode === "account" ? "selected" : ""} onClick={() => { setMode("account"); setError(""); }}>账号登录</button>
               <button className={mode === "token" ? "selected" : ""} onClick={() => { setMode("token"); setError(""); }}>管理员令牌</button>

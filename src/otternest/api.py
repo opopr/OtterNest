@@ -809,9 +809,21 @@ def _read_artifact_content(artifact: Artifact) -> bytes:
 
 
 @router.get("/projects/{project_id}/tasks")
-def tasks(project_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+def tasks(
+    project_id: str,
+    status: str | None = None,
+    limit: int | None = None,
+    actor: Actor = Depends(authenticate),
+    db: Session = Depends(get_session),
+):
     require_project(db, project_id, actor)
-    return [task_public(t) for t in db.scalars(select(Task).where(Task.project_id == project_id).order_by(Task.created_at.desc()))]
+    query = select(Task).where(Task.project_id == project_id)
+    if status:
+        query = query.where(Task.status == status)
+    query = query.order_by(Task.created_at.desc())
+    if limit is not None:
+        query = query.limit(max(1, min(limit, 1000)))
+    return [task_public(t) for t in db.scalars(query)]
 
 
 @router.get("/projects/{project_id}/task-graph")
@@ -1160,11 +1172,21 @@ def propose_decision(project_id: str, body: DecisionIn, actor: Actor = Depends(a
 
 
 @router.get("/projects/{project_id}/decisions")
-def decisions(project_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+def decisions(
+    project_id: str,
+    status: str | None = None,
+    limit: int | None = None,
+    actor: Actor = Depends(authenticate),
+    db: Session = Depends(get_session),
+):
     require_project(db, project_id, actor)
     query = select(Decision).where(Decision.project_id == project_id)
     if not actor.is_owner:
         query = query.where(Decision.status == "approved")
+    elif status:
+        query = query.where(Decision.status == status)
+    if limit is not None:
+        query = query.limit(max(1, min(limit, 1000)))
     return [as_dict(d, "id", "question", "resolution", "rationale", "status") for d in db.scalars(query)]
 
 
@@ -1261,12 +1283,15 @@ async def upload_artifact(
     )
     db.add(record)
     db.flush()
-    base = Path(os.environ.get("OTTERNEST_ARTIFACT_DIR", "./var/artifacts")).resolve()
-    dest = base / row.project_id / record.id
-    dest.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    with open(dest, "xb") as f:
-        f.write(content)
-    record.uri = str(dest)
+    if os.environ.get("OTTERNEST_STORAGE_TYPE", "local").lower() == "s3":
+        record.uri = _active_storage().save(row.project_id, record.id, content)
+    else:
+        base = Path(os.environ.get("OTTERNEST_ARTIFACT_DIR", "./var/artifacts")).resolve()
+        dest = base / row.project_id / record.id
+        dest.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        with open(dest, "xb") as f:
+            f.write(content)
+        record.uri = str(dest)
     emit(db, actor, "artifact.submitted", record.id, row.project_id, {"task_id": task_id, "sha256": checksum})
     db.commit()
     return as_dict(record, "id", "family_id", "version", "project_id", "task_id", "name", "checksum", "size_bytes", "sensitivity", "review_status", "review_note", "reviewed_at", "deleted_at", "created_at")
