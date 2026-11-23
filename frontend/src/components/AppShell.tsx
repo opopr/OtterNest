@@ -10,7 +10,7 @@ import { getApiOrigin, request } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { useSystemMode } from "../auth/SystemModeProvider";
 import { getSystemModeLabel } from "../utils/labels";
-import { NAVIGATION_GROUPS, findNavLabel, type NavIconKey } from "../utils/navigation";
+import { NAVIGATION_GROUPS, findNavLabel, findNavGroupId, type NavIconKey } from "../utils/navigation";
 
 const NAV_ICONS: Record<NavIconKey, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -86,6 +86,13 @@ export default function AppShell() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<TopbarNotification[]>([]);
   const location = useLocation();
+  const [expandedNavId, setExpandedNavId] = useState<string | null>(
+    () => findNavGroupId(location.pathname)
+  );
+
+  useEffect(() => {
+    setExpandedNavId(findNavGroupId(location.pathname));
+  }, [location.pathname]);
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -130,27 +137,57 @@ export default function AppShell() {
         </Link>
 
         <nav className="side-nav-grouped" aria-label="主导航">
-          {NAVIGATION_GROUPS.map((group) => (
-            <div className="nav-group" key={group.id}>
-              <div className="nav-section-label">{group.label}</div>
-              <div className="side-nav">
-                {group.items.map((item) => {
-                  const Icon = NAV_ICONS[item.icon];
-                  return (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      end={item.end}
-                      className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}
+          {NAVIGATION_GROUPS.map((group) => {
+            const Icon = NAV_ICONS[group.icon];
+            const onlyItem = group.items.length === 1 ? group.items[0] : null;
+            const isActiveGroup = group.items.some((item) => item.to === location.pathname);
+            const isExpanded = expandedNavId === group.id;
+            return (
+              <div className="nav-group" key={group.id}>
+                {onlyItem ? (
+                  <NavLink
+                    to={onlyItem.to}
+                    end={onlyItem.end}
+                    className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}
+                  >
+                    <Icon size={17} strokeWidth={1.8} />
+                    <span>{group.label}</span>
+                  </NavLink>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className={"nav-link nav-parent" + (isActiveGroup ? " active" : "")}
+                      aria-expanded={isExpanded}
+                      aria-controls={"nav-submenu-" + group.id}
+                      onClick={() => setExpandedNavId(isExpanded ? null : group.id)}
                     >
                       <Icon size={17} strokeWidth={1.8} />
-                      <span>{item.label}</span>
-                    </NavLink>
-                  );
-                })}
+                      <span>{group.label}</span>
+                      <ChevronDown
+                        size={15}
+                        className={"nav-chevron" + (isExpanded ? " expanded" : "")}
+                      />
+                    </button>
+                    {isExpanded && (
+                      <div className="nav-submenu" id={"nav-submenu-" + group.id}>
+                        {group.items.map((item) => (
+                          <NavLink
+                            key={item.to}
+                            to={item.to}
+                            end={item.end}
+                            className={({ isActive }) => "nav-sublink" + (isActive ? " active" : "")}
+                          >
+                            {item.label}
+                          </NavLink>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
 
         <div className="sidebar-spacer" />
