@@ -85,7 +85,7 @@ class RuntimeIn(BaseModel):
 
 
 class RuntimeHeartbeat(BaseModel):
-    status: Literal["idle", "busy", "stopped"] = "idle"
+    status: Literal["idle", "busy", "stopped", "monitoring"] = "idle"
     health: dict = Field(default_factory=dict)
 
 
@@ -204,7 +204,7 @@ def runtime_public(runtime: AgentRuntime, agent: Agent | None = None, *, cutoff=
         last_seen = last_seen.replace(tzinfo=timezone.utc)
     record = as_dict(runtime, "id", "agent_id", "label", "environment", "enabled", "status", "last_health", "last_seen")
     record["has_token"] = bool(runtime.token_hash)
-    record["online"] = bool(runtime.enabled and last_seen and last_seen >= cutoff and runtime.status in {"idle", "busy"})
+    record["online"] = bool(runtime.enabled and last_seen and last_seen >= cutoff and runtime.status in {"idle", "busy", "monitoring"})
     if agent is not None:
         record.update({
             "agent_name": agent.name,
