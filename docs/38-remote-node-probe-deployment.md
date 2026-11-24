@@ -4,7 +4,7 @@
 
 ## 准备（独立 Linux 服务器）
 
-1. 在 OtterNest 的 Agent 管理中为该节点创建 Agent 和 Runtime，通过 monitor-token API 签发该 Runtime 的专用 on_monitor_ 监控令牌（不要使用普通 Runtime 执行令牌）。每台机器一个 Runtime ID 与监控令牌。管理者令牌不应复制到节点。
+1. 在 OtterNest 的 Agent 管理中为该节点创建 Agent 和 Runtime，在「Runtime 监控」点击「签发仅监控凭据」（对应服务端 `POST /api/v1/agents/{agent_id}/runtimes/{runtime_id}/monitor-token`），领取该 Runtime 专用 `on_monitor_` 监控令牌。**不要使用普通 Runtime 执行令牌**。签发新监控凭据会使原有 Runtime 凭据失效。每台机器一个 Runtime ID 与监控令牌。所有者令牌不应复制到节点。
 2. 节点安装 Python >= 3.11，确保能通过 HTTPS **主动访问**控制平面。不要为了采集开放反向 SSH/Docker/Postgres 端口。
 3. 以管理员身份建立专用的无登录用户和目录（以下命令需要在目标服务器上手动执行；不要在控制平面上运行）：
 
