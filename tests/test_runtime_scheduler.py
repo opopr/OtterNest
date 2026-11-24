@@ -233,3 +233,86 @@ def test_scheduler_spreads_work_across_two_live_agents(env, owner_headers):
     assert [r["task_id"] for r in scheduled["routes"]] == [high["id"], low["id"]]
     assert {r["agent_id"] for r in scheduled["routes"]} == set(agents)
     assert env.get(f"/api/v1/tasks/{third['id']}", headers=owner_headers).json()["target_agent_id"] is None
+
+
+def test_dedicated_runtime_runner_submits_work_but_requires_owner_review(env, owner_headers, monkeypatch):
+    """Exercise the real API via an HTTP transport, without launching an unsafe process."""
+    import httpx
+    import otternest.runner as runner_module
+
+    project_id = project(env, owner_headers, "Harness integration")
+    bot, _ = agent(env, owner_headers, project_id)
+    runtime = env.post(
+        f"/api/v1/agents/{bot['id']}/runtimes", headers=owner_headers,
+        json={"label": "harness-worker", "environment": "isolated-linux"},
+    ).json()
+    token_response = env.post(
+        f"/api/v1/agents/{bot['id']}/runtimes/{runtime['id']}/token",
+        headers=owner_headers,
+    )
+    assert token_response.status_code == 200
+    runtime_token = token_response.json()["token"]
+    assert runtime_token.startswith("on_runtime_")
+
+    capability = env.put(
+        f"/api/v1/agents/{bot['id']}/verified-capabilities",
+        headers=owner_headers, json={"capabilities": ["python"]},
+    )
+    assert capability.status_code == 200
+    work = task(env, owner_headers, project_id, title="remote-harness-test")
+    assert env.get("/api/v1/agent/queue", headers={"Authorization": "Bearer " + runtime_token}).json()
+
+    observed = []
+    def execute_stub(command, packet, timeout, heartbeat, pass_env, **kwargs):
+        observed.append(packet)
+        heartbeat()  # Exercises the task lease and runtime heartbeat with the actual API.
+        return runner_module.WorkerResult(summary="Remote worker completed test")
+
+    monkeypatch.setattr(runner_module, "execute_command", execute_stub)
+    monkeypatch.setattr(runner_module, "collect_host_health", lambda: {"cpu_percent": "10.0"})
+    worker = runner_module.Runner(
+        "http://127.0.0.1:8000", runtime_token, ["verified-worker"],
+        runtime_id=runtime["id"],
+    )
+    worker.client.close()
+
+    def handler(request):
+        result = env.request(
+            request.method, request.url.path, headers=dict(request.headers),
+            content=request.content,
+        )
+        return httpx.Response(
+            result.status_code, content=result.content,
+            headers={"content-type": "application/json"},
+        )
+
+    worker.client = httpx.Client(
+        base_url="http://127.0.0.1:8000", transport=httpx.MockTransport(handler),
+        headers={"Authorization": "Bearer " + runtime_token},
+    )
+    try:
+        assert worker.run_one() is True
+        assert len(observed) == 1
+        assert worker.run_one() is False
+    finally:
+        worker.close()
+
+    current = env.get(f"/api/v1/tasks/{work['id']}", headers=owner_headers)
+    assert current.status_code == 200
+    assert current.json()["status"] == "submitted"
+    assert current.json()["result_summary"] == "Remote worker completed test"
+    assert env.post(
+        f"/api/v1/tasks/{work['id']}/review",
+        headers={"Authorization": "Bearer " + runtime_token},
+        json={"accepted": True},
+    ).status_code == 403
+    reviewed = env.post(
+        f"/api/v1/tasks/{work['id']}/review",
+        headers=owner_headers, json={"accepted": True},
+    )
+    assert reviewed.status_code == 200
+    assert env.get(f"/api/v1/tasks/{work['id']}", headers=owner_headers).json()["status"] == "accepted"
+    live = env.get("/api/v1/runtimes", headers=owner_headers).json()
+    report = next(row for row in live if row["id"] == runtime["id"])
+    assert report["online"] is True
+    assert report["last_health"]["cpu_percent"] == "10.0"
