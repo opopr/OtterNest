@@ -29,6 +29,6 @@
 
 - systemd `Restart=on-failure` 只负责**进程重启**，不等于租约恢复、任务幂等或跨机任务续跑。
 - Bubblewrap 提供私有网络/文件系统视图，但不能替代宿主机隔离、cgroup 限额、安全审计；尤其不要把未经信任的第三方代码默认当安全。
-- Probe 的 `monitoring` 状态防止它被**自动调度**；它不等于服务端持久化的“只监控权限”凭据。对探针凭据也要严格保密，后续应增加服务端独立 scope 才能对人工调用做到完整权限隔离。
+- Probe 必须使用通过 `/agents/{agent_id}/runtimes/{runtime_id}/monitor-token` 签发的 `on_monitor_` 凭据；服务端只允许其向绑定 Runtime 提交 `monitoring` 心跳，拒绝任务 API。`monitoring` 状态额外阻止自动调度。
 - Worker 专用 Runtime Token 可以承担 Agent 获授权任务：请确保测试阶段只注册在有限权限的独立 Agent 上。
 - 本文档与模板不能宣称实机已联调：真实服务器的安装、网络限制和密钥放置需要运维侧完成。
