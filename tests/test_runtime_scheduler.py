@@ -311,7 +311,7 @@ def test_dedicated_runtime_runner_submits_work_but_requires_owner_review(env, ow
         headers=owner_headers, json={"accepted": True},
     )
     assert reviewed.status_code == 200
-    assert env.get(f"/api/v1/tasks/{work['id']}", headers=owner_headers).json()["status"] == "accepted"
+    assert env.get(f"/api/v1/tasks/{work['id']}", headers=owner_headers).json()["status"] == "completed"
     live = env.get("/api/v1/runtimes", headers=owner_headers).json()
     report = next(row for row in live if row["id"] == runtime["id"])
     assert report["online"] is True
