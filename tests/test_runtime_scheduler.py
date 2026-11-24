@@ -316,3 +316,41 @@ def test_dedicated_runtime_runner_submits_work_but_requires_owner_review(env, ow
     report = next(row for row in live if row["id"] == runtime["id"])
     assert report["online"] is True
     assert report["last_health"]["cpu_percent"] == "10.0"
+
+
+def test_telemetry_only_runtime_is_online_but_never_schedulable(env, owner_headers):
+    project_id = project(env, owner_headers, "Telemetry only")
+    bot, auth = agent(env, owner_headers, project_id)
+    rt = env.post(
+        f"/api/v1/agents/{bot['id']}/runtimes", headers=owner_headers,
+        json={"label": "monitor-only", "environment": "linux"},
+    ).json()
+    issued = env.post(
+        f"/api/v1/agents/{bot['id']}/runtimes/{rt['id']}/token",
+        headers=owner_headers,
+    ).json()
+    runtime_auth = {"Authorization": "Bearer " + issued["token"]}
+    heartbeat_response = env.post(
+        f"/api/v1/agent/runtimes/{rt['id']}/heartbeat",
+        headers=runtime_auth,
+        json={"status": "monitoring", "health": {"cpu_percent": "12.0"}},
+    )
+    assert heartbeat_response.status_code == 200, heartbeat_response.text
+    snapshot = env.get("/api/v1/runtimes", headers=owner_headers).json()
+    row = next(item for item in snapshot if item["id"] == rt["id"])
+    assert row["online"] is True
+    assert row["status"] == "monitoring"
+    verified = env.put(
+        f"/api/v1/agents/{bot['id']}/verified-capabilities",
+        headers=owner_headers, json={"capabilities": ["python"]},
+    )
+    assert verified.status_code == 200
+    work = task(env, owner_headers, project_id, title="should-not-route")
+    decision = env.post(
+        f"/api/v1/projects/{project_id}/schedule",
+        headers=owner_headers, json={},
+    )
+    assert decision.status_code == 200
+    assert decision.json()["count"] == 0
+    result = env.get(f"/api/v1/tasks/{work['id']}", headers=owner_headers).json()
+    assert result["target_agent_id"] is None
