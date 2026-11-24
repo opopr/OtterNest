@@ -34,7 +34,7 @@ def send_probe(client: httpx.Client, runtime_id: str) -> None:
     """Self-report Runtime liveness. Cannot prove physical host attestation."""
     response = client.post(
         "/api/v1/agent/runtimes/" + runtime_id + "/heartbeat",
-        json={"status": "idle", "health": collect_host_health()},
+        json={"status": "monitoring", "health": collect_host_health()},
     )
     response.raise_for_status()
 
