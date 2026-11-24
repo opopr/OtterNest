@@ -19,6 +19,7 @@ dependencies = [
 
 [project.scripts]
 otternest-runner = "otternest.runner:main"
+otternest-node-probe = "otternest.node_probe:main"
 otternest-cgroup-recover = "otternest.cgroup_recovery:main"
 otternest-model-worker = "otternest.model_worker:main"
 otternest-codex-worker = "otternest.codex_worker:main"
