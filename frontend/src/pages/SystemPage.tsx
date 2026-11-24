@@ -8,6 +8,7 @@ import type { Project, SystemMode } from "../api/types";
 import { useSystemMode } from "../auth/SystemModeProvider";
 import { useDialog } from "../components/AppDialog";
 import ProjectSelect from "../components/ProjectSelect";
+import ServerHealthCards from "../components/ServerHealthCards";
 
 interface ProjectEvent {
   id: number;
@@ -291,6 +292,8 @@ export default function SystemPage() {
         <div className="heading-actions"><button className="secondary-button" onClick={() => void loadSystem()} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新状态</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
+
+      <ServerHealthCards />
 
       <section className="panel connection-diagnostics-panel">
         <div className="panel-heading">
