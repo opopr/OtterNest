@@ -17,7 +17,7 @@ interface RuntimeRow {
 interface RuntimeToken { id:string; agent_id:string; token:string; }
 type Filter = "all"|"online"|"offline"|"disabled"|"missing_token";
 
-const stateLabels:Record<string,string>={idle:"空闲",busy:"忙碌",stopped:"已停止"};
+const stateLabels:Record<string,string>={idle:"空闲",busy:"忙碌",stopped:"已停止",monitoring:"仅监控"};
 const formatTime=(value:string|null)=>value?new Date(value).toLocaleString("zh-CN",{hour12:false}):"从未上报";
 
 export default function RuntimeMonitorPage(){
