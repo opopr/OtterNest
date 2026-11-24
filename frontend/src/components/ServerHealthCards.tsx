@@ -15,16 +15,11 @@ interface RuntimeHealth {
   status: string;
 }
 
-const safeValue = (value: unknown): string => {
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  if (typeof value === "string" && value.trim()) return value;
-  return "未上报";
-};
-const metric = (health: Record<string, unknown> | null, keys: string[]): string => {
-  for (const key of keys) {
-    if (health && Object.prototype.hasOwnProperty.call(health, key)) return safeValue(health[key]);
-  }
-  return "未上报";
+const percent = (health: Record<string, unknown> | null, key: string): string => {
+  const value = health?.[key];
+  if (value === undefined || value === null || value === "") return "未上报";
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric >= 0 && numeric <= 100 ? numeric.toFixed(1) + "%" : "数据无效";
 };
 const lastSeen = (value: string | null): string => {
   if (!value) return "从未上报";
@@ -77,8 +72,8 @@ export default function ServerHealthCards() {
                 <strong>{row.label}</strong>
                 <small>{!row.enabled ? "已禁用" : row.online ? "Runtime 在线" : "Runtime 离线 / 未确认"}</small>
                 <small>最后心跳：{lastSeen(row.last_seen)}</small>
-                <small>CPU：{metric(row.last_health, ["cpu_percent", "cpu_usage_percent"])} · 内存：{metric(row.last_health, ["memory_percent", "memory_used_bytes"])}</small>
-                <small>磁盘：{metric(row.last_health, ["disk_percent", "disk_used_bytes"])} · GPU：{metric(row.last_health, ["gpu_percent", "gpu_utilization"])}</small>
+                <small>CPU：{percent(row.last_health, "cpu_percent")} · 内存：{percent(row.last_health, "memory_percent")}</small>
+                <small>磁盘：{percent(row.last_health, "disk_percent")} · GPU：{percent(row.last_health, "gpu_percent")}</small>
               </div>
             </article>
           ))}
