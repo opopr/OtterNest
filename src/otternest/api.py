@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from .db import get_session
 from .models import A2ADelegation, Agent, AgentRuntime, Artifact, Decision, DecisionReview, DecisionDeliberation, DecisionRebuttal, Event, Goal, Membership, Memory, Notification, Project, Task, TaskDependency, new_id, now
-from .security import Actor, SENSITIVITY_ORDER, authenticate, hash_token, new_agent_token, new_runtime_token, owner_only, sensitivity_allowed
+from .security import Actor, SENSITIVITY_ORDER, authenticate, hash_token, new_agent_token, new_runtime_token, new_monitor_token, owner_only, sensitivity_allowed
 from .services import Conflict, claim, dependency_ids, dependencies_completed, effective_sensitivity, emit, enforce_project_task_total_budget, ensure_lease, has_unreconciled_side_effects, release_dependents, require_project, require_task, require_writable_system, task_ready_status, update_dependencies, validate_goal, choose_dispatch_targets
 
 router = APIRouter(prefix="/api/v1")
@@ -514,10 +514,29 @@ def issue_runtime_token(agent_id: str, runtime_id: str, actor: Actor = Depends(a
     return {"id": runtime.id, "agent_id": agent_id, "token": token}
 
 
+@router.post("/agents/{agent_id}/runtimes/{runtime_id}/monitor-token")
+def issue_monitor_token(agent_id: str, runtime_id: str, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
+    """Replace any existing token with a monitor-only credential on this runtime."""
+    owner_only(actor)
+    runtime = db.scalar(select(AgentRuntime).where(
+        AgentRuntime.id == runtime_id, AgentRuntime.agent_id == agent_id,
+    ).with_for_update())
+    if runtime is None or not runtime.enabled:
+        raise HTTPException(404, "Runtime not found")
+    token = new_monitor_token()
+    runtime.token_hash = hash_token(token)
+    runtime.status = "monitoring"
+    emit(db, actor, "agent.runtime_monitor_token_issued", runtime.id, payload={"agent_id": agent_id})
+    db.commit()
+    return {"id": runtime.id, "agent_id": agent_id, "token": token}
+
+
 @router.post("/agent/runtimes/{runtime_id}/heartbeat")
 def runtime_heartbeat(runtime_id: str, body: RuntimeHeartbeat, actor: Actor = Depends(authenticate), db: Session = Depends(get_session)):
     if actor.is_owner:
         raise HTTPException(403, "Agent or runtime credential required")
+    if actor.kind == "monitor" and body.status != "monitoring":
+        raise HTTPException(403, "Monitor credentials cannot report executable status")
     if actor.runtime_id is not None and actor.runtime_id != runtime_id:
         raise HTTPException(403, "Runtime credential does not match target runtime")
     runtime = db.scalar(select(AgentRuntime).where(AgentRuntime.id == runtime_id, AgentRuntime.agent_id == actor.id).with_for_update())
