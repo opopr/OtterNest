@@ -24,7 +24,7 @@ def validate_endpoint(url: str, runtime_id: str, token: str, interval: int) -> N
         raise ValueError("Server hostname required")
     if not runtime_id.strip():
         raise ValueError("OTTERNEST_RUNTIME_ID required")
-    if not token.startswith("on_runtime_"):
+    if not token.startswith("on_monitor_"):
         raise ValueError("Dedicated OTTERNEST_RUNTIME_TOKEN required")
     if not 10 <= interval <= 120:
         raise ValueError("Interval must be 10..120 seconds")
