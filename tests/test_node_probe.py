@@ -35,7 +35,7 @@ def test_probe_posts_only_runtime_heartbeat_with_measured_fields(monkeypatch):
         node_probe.send_probe(client, "runtime-1")
     assert seen == [(
         "POST", "/api/v1/agent/runtimes/runtime-1/heartbeat",
-        {"status": "idle", "health": {"cpu_percent": "12.5", "telemetry_scope": "collector_os_view"}}
+        {"status": "monitoring", "health": {"cpu_percent": "12.5", "telemetry_scope": "collector_os_view"}}
     )]
 
 
