@@ -8,7 +8,7 @@ from otternest import node_probe
 
 
 def test_probe_enforces_dedicated_runtime_credential_and_tls():
-    valid = ("https://control.example.com", "runtime-1", "on_runtime_secret", 30)
+    valid = ("https://control.example.com", "runtime-1", "on_monitor_secret", 30)
     node_probe.validate_endpoint(*valid)
     for values in [
         ("http://control.example.com", *valid[1:]),
@@ -16,7 +16,7 @@ def test_probe_enforces_dedicated_runtime_credential_and_tls():
         ("https://control.example.com/?token=x", *valid[1:]),
         ("https://control.example.com", "", *valid[2:]),
         ("https://control.example.com", "runtime-1", "on_agent_token", 30),
-        ("https://control.example.com", "runtime-1", "on_runtime_secret", 0),
+        ("https://control.example.com", "runtime-1", "on_monitor_secret", 0),
     ]:
         with pytest.raises(ValueError):
             node_probe.validate_endpoint(*values)
