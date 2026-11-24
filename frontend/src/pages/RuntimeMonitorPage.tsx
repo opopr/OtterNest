@@ -60,11 +60,11 @@ export default function RuntimeMonitorPage(){
   }).sort((a,b)=>Number(b.online)-Number(a.online)||a.agent_name.localeCompare(b.agent_name)||a.label.localeCompare(b.label));
  },[rows,filter,query]);
 
- const rotateToken=async(row:RuntimeRow)=>{
-  if(!(await dialog.confirm({title:"轮换 Runtime 凭据",message:"为「"+row.label+"」轮换独立 Runtime 凭据？旧凭据将立即失效，必须同步更新对应 Runner 的配置。",confirmText:"确认轮换",tone:"warning"})))return;
+ const rotateToken=async(row:RuntimeRow, monitorOnly=false)=>{
+  if(!(await dialog.confirm({title:monitorOnly?"签发只读监控凭据":"轮换 Runtime 凭据",message:monitorOnly?"为「"+row.label+"」签发仅允许心跳的监控凭据？原有 Runtime 凭据将立即失效，此节点无法再通过原凭据执行任务。":"为「"+row.label+"」轮换独立 Runtime 凭据？旧凭据将立即失效，必须同步更新对应 Runner 的配置。",confirmText:monitorOnly?"签发监控凭据":"确认轮换",tone:"warning"})))return;
   setSaving(true);setError("");
   try{
-   const token=await request<RuntimeToken>("/agents/"+encodeURIComponent(row.agent_id)+"/runtimes/"+encodeURIComponent(row.id)+"/token",{method:"POST"});
+   const token=await request<RuntimeToken>("/agents/"+encodeURIComponent(row.agent_id)+"/runtimes/"+encodeURIComponent(row.id)+(monitorOnly?"/monitor-token":"/token"),{method:"POST"});
    setIssuedToken(token);
    await load();
   }catch(reason){setError(reason instanceof Error?reason.message:"Runtime 凭据轮换失败");}
@@ -124,7 +124,7 @@ export default function RuntimeMonitorPage(){
     </div>
     <div className="runtime-health-row"><span className="runtime-health-label">健康信息</span>{Object.entries(row.last_health||{}).length?Object.entries(row.last_health).map(([key,value])=><span className="runtime-health-chip" key={key}>{key}：{value}</span>):<span className="muted-inline">暂无健康信息上报</span>}</div>
     <div className="runtime-monitor-actions">
-     {row.enabled&&<button className="secondary-button compact" disabled={saving} onClick={()=>void rotateToken(row)}><KeyRound size={13}/>{row.has_token?"轮换凭据":"签发凭据"}</button>}
+     {row.enabled&&<button className="secondary-button compact" disabled={saving} onClick={()=>void rotateToken(row)}><KeyRound size={13}/>{row.has_token?"轮换凭据":"签发凭据"}</button>}{row.enabled&&<button className="secondary-button compact" disabled={saving} onClick={()=>void rotateToken(row,true)}><KeyRound size={13}/>签发仅监控凭据</button>}
      {row.enabled&&<button className="text-button" disabled={saving} onClick={()=>void disableRuntime(row)}><XCircle size={13}/>禁用 Runtime</button>}
     </div>
    </article>)}</div>:<div className="empty-state"><Monitor size={27}/><strong>{rows.length?"没有符合条件的 Runtime":"尚未登记 Runtime"}</strong><p>{rows.length?"调整搜索条件或状态筛选。":"先在 Agent 管理中登记 Agent，再为它创建 Runtime 并签发独立凭据。"}</p>{!rows.length&&<Link className="secondary-button" to="/agents">前往 Agent 管理</Link>}</div>}
