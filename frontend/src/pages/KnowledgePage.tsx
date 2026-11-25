@@ -1,3 +1,4 @@
+import ListPagination, { useListPage } from "../components/ListPagination";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertCircle, Archive, BookOpen, Check, Database, FilePlus2, Globe2,
@@ -87,6 +88,7 @@ export default function KnowledgePage() {
     () => memories.filter(m => (sensitivityFilter === "all" || m.sensitivity === sensitivityFilter) && (memoryStatus === "all" || m.status === memoryStatus)),
     [memories, sensitivityFilter, memoryStatus]
   );
+  const memoryPage = useListPage(visibleMemories, JSON.stringify([selectedId, searchQuery, sensitivityFilter, memoryStatus]));
 
   const loadProjects = useCallback(async () => {
     setLoading(true);
@@ -312,7 +314,7 @@ export default function KnowledgePage() {
             <div className="form-actions"><button className="primary-button compact" disabled={saving || (Boolean(editingId) && revisionReason.trim().length < 5)}>{saving ? "保存中…" : editingId ? "保存修订" : "提交记忆"}</button></div>
           </form>}
           <div className="memory-grid">
-            {visibleMemories.map((memory) => {
+            {memoryPage.rows.map((memory) => {
               const displayScore = typeof memory.relevance_score === "number" ? memory.relevance_score : memory.score;
               return <article className="memory-card" key={memory.id}>
                 <div className="memory-card-head"><span className="capability-tag">{kindLabel[memory.kind] || memory.kind}</span><span className={"status-tag " + (memory.status === "published" ? "tag-green" : memory.status === "proposed" ? "tag-amber" : "tag-neutral")}>{statusLabel[memory.status] || memory.status}</span></div>
@@ -324,6 +326,7 @@ export default function KnowledgePage() {
             })}
             {!visibleMemories.length && <div className="empty-state"><BookOpen size={25} /><strong>{memories.length ? "当前筛选下暂无记忆" : "暂无项目记忆"}</strong><p>{memories.length ? "请调整敏感级别筛选或检索关键词。" : "先提出事实、决策、经验或流程，再由所有者审核发布。"}</p></div>}
           </div>
+          {!loading && <ListPagination {...memoryPage} label="知识分页" />}
         </section>
       ) : tab === "charter" ? (
         <section className="panel">

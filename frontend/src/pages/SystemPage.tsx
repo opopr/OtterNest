@@ -1,3 +1,4 @@
+import ListPagination, { useListPage } from "../components/ListPagination";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle, Activity, CheckCircle2, Clock3, DownloadCloud, RefreshCw,
@@ -73,6 +74,12 @@ export default function SystemPage() {
   const [selectedId, setSelectedId] = useState("");
   const [systemMode, setSystemMode] = useState<SystemMode | null>(null);
   const [events, setEvents] = useState<ProjectEvent[]>([]);
+  const [eventQuery, setEventQuery] = useState("");
+  const [eventKind, setEventKind] = useState("all");
+  const eventKinds = Array.from(new Set(events.map(e => e.kind))).sort();
+  const filteredEvents = events.filter(e => (eventKind === "all" || e.kind === eventKind) && [eventLabel[e.kind] || e.kind, e.kind, e.subject_id, String(e.id)].join(" ").toLocaleLowerCase().includes(eventQuery.trim().toLocaleLowerCase()));
+  const eventPage = useListPage(filteredEvents, JSON.stringify([selectedId,eventQuery,eventKind]));
+  useEffect(() => { setEventKind("all"); setEventQuery(""); }, [selectedId]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -325,13 +332,14 @@ export default function SystemPage() {
 
         <section className="panel">
           <div className="panel-heading"><div className="panel-title"><Clock3 size={17} /><h3>项目事件流</h3></div><div className="heading-actions"><span className="muted-inline">最近 100 条 · 倒序展示</span><button className="icon-button" title="刷新事件" onClick={() => selectedId && void loadEvents(selectedId)}><RefreshCw size={15} /></button></div></div>
-          <div className="event-timeline">
-            {events.map((event) => <article className="event-timeline-row" key={event.id}>
+          <div className="library-filter-bar"><label>关键词<input aria-label="搜索项目事件" value={eventQuery} onChange={e => setEventQuery(e.target.value)} placeholder="事件名称或对象编号" /></label><label>事件类型<select aria-label="事件类型" value={eventKind} onChange={e => setEventKind(e.target.value)}><option value="all">全部类型</option>{eventKinds.map(k => <option key={k} value={k}>{eventLabel[k] || k}</option>)}</select></label><button type="button" className="text-button" onClick={() => {setEventQuery("");setEventKind("all");}}>清除筛选</button></div><div className="event-timeline">
+            {eventPage.rows.map((event) => <article className="event-timeline-row" key={event.id}>
               <span className="event-timeline-marker" />
               <div className="event-timeline-content"><div><strong>{eventLabel[event.kind] || event.kind}</strong><code>{event.kind}</code></div><p>对象：{event.subject_id}</p>{Object.keys(event.payload || {}).length > 0 && <details className="library-disclosure event-payload"><summary>事件详情</summary><pre>{JSON.stringify(event.payload, null, 2)}</pre></details>}<small>{new Date(event.created_at).toLocaleString("zh-CN", { hour12: false })} · 事件 #{event.id}</small></div>
             </article>)}
-            {!events.length && <div className="empty-state"><Activity size={24} /><strong>暂无项目事件</strong><p>项目中的任务、目标、记忆和治理变更会在这里形成可追踪记录。</p></div>}
+            {!filteredEvents.length && <div className="empty-state"><Activity size={24} /><strong>{events.length ? "没有符合条件的事件" : "暂无项目事件"}</strong></div>}
           </div>
+          <ListPagination {...eventPage} label="事件分页" />
         </section>
       </>}
       <details className="panel maintenance-disclosure"><summary>服务诊断与版本维护</summary><div className="system-maintenance-stack">

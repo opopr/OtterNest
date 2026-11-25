@@ -1,3 +1,4 @@
+import ListPagination, { useListPage } from "../components/ListPagination";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
@@ -53,7 +54,10 @@ export default function PortfolioPage() {
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationFilter, setNotificationFilter] = useState("all");
-  const visibleNotifications = notifications.filter(item => notificationFilter === "all" || (notificationFilter === "unread" ? !item.read : item.level === "urgent"));
+  const [notificationQuery, setNotificationQuery] = useState("");
+  const [notificationProject, setNotificationProject] = useState("all");
+  const visibleNotifications = notifications.filter(item => (notificationFilter === "all" || (notificationFilter === "unread" ? !item.read : item.level === "urgent")) && (notificationProject === "all" || (notificationProject === "system" ? !item.project_id : item.project_id === notificationProject)) && [item.title,item.body,item.source_kind].join(" ").toLocaleLowerCase().includes(notificationQuery.trim().toLocaleLowerCase()));
+  const notificationPage = useListPage(visibleNotifications, JSON.stringify([notificationFilter,notificationQuery,notificationProject]));
   const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -248,14 +252,15 @@ export default function PortfolioPage() {
           <section className="panel">
             <div className="panel-heading"><div className="panel-title"><Bell size={17} /><h3>通知收件箱</h3><span className="count-chip">{unread}</span></div><button className="text-button" onClick={() => void markAllRead()} disabled={saving || unread === 0}>全部标为已读</button></div>
             <div className="approval-switch" role="group" aria-label="通知筛选">{[{key:"all",label:"全部"},{key:"unread",label:"未读"},{key:"urgent",label:"紧急"}].map(item => <button type="button" key={item.key} aria-pressed={notificationFilter === item.key} className={notificationFilter === item.key ? "selected" : ""} onClick={() => setNotificationFilter(item.key)}>{item.label}<span>{item.key === "all" ? notifications.length : item.key === "unread" ? unread : notifications.filter(n => n.level === "urgent").length}</span></button>)}</div>
-            <div className="notification-list">
-              {visibleNotifications.map((item) => <div className={"notification-row " + (item.read ? "is-read" : "")} key={item.id}>
+            <div className="library-filter-bar"><label>关键词<input aria-label="搜索通知" value={notificationQuery} onChange={e => setNotificationQuery(e.target.value)} placeholder="搜索通知内容" /></label><label>项目<select aria-label="通知所属项目" value={notificationProject} onChange={e => setNotificationProject(e.target.value)}><option value="all">全部项目</option><option value="system">系统通知</option>{projects.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label><button type="button" className="text-button" onClick={() => {setNotificationQuery("");setNotificationProject("all");setNotificationFilter("all");}}>清除筛选</button></div><div className="notification-list">
+              {notificationPage.rows.map((item) => <div className={"notification-row " + (item.read ? "is-read" : "")} key={item.id}>
                 <span className={"notification-dot level-" + item.level} />
-                <div className="notification-copy"><div><strong>{item.title}</strong><span className={"status-tag " + (item.level === "urgent" ? "tag-red" : item.level === "important" ? "tag-blue" : "tag-neutral")}>{levelLabel[item.level] || getUiLabel(item.level)}</span></div><p>{item.body}</p><small>{dateText(item.created_at)} · {item.source_kind}</small></div>
+                <div className="notification-copy"><div><strong>{item.title}</strong><span className={"status-tag " + (item.level === "urgent" ? "tag-red" : item.level === "important" ? "tag-blue" : "tag-neutral")}>{levelLabel[item.level] || getUiLabel(item.level)}</span></div><p>{item.body}</p><small>{dateText(item.created_at)} · {projects.find(p => p.id === item.project_id)?.name || (item.project_id ? "项目通知" : "系统通知")}</small></div>
                 {!item.read && <button className="icon-button" title="标记已读" onClick={() => void markRead(item.id)}><Check size={16} /></button>}
               </div>)}
               {!visibleNotifications.length && <div className="empty-state"><Bell size={24} /><strong>暂无此类通知</strong></div>}
             </div>
+            <ListPagination {...notificationPage} label="通知分页" />
           </section>
 
           <section className="panel">

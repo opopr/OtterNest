@@ -1,3 +1,4 @@
+import ListPagination, { useListPage } from "../components/ListPagination";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertCircle, Archive, BookMarked, Check, ClipboardList, Plus,
@@ -42,6 +43,7 @@ export default function SkillsPage() {
     const q = skillQuery.trim().toLocaleLowerCase();
     return skills.filter(skill => (skillFilter === "all" || skill.status === skillFilter) && (!q || [skill.name, skill.version, skill.content, skill.source].some(v => (v || "").toLocaleLowerCase().includes(q))));
   }, [skills, skillQuery, skillFilter]);
+  const skillPage = useListPage(visibleSkills, JSON.stringify([selectedId, skillQuery, skillFilter]));
   const [evaluations, setEvaluations] = useState<Record<string, SkillEvaluation[]>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -193,7 +195,7 @@ export default function SkillsPage() {
           <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "提交中…" : "提交提案"}</button></div>
         </form>}
         <div className="skill-grid">
-          {loading ? <div className="panel-loading"><div className="spinner" /></div> : visibleSkills.map((skill) => <article className="skill-card" key={skill.id}>
+          {loading ? <div className="panel-loading"><div className="spinner" /></div> : skillPage.rows.map((skill) => <article className="skill-card" key={skill.id}>
             <div className="skill-card-head"><div><strong>{skill.name}</strong><small>版本 {skill.version} · {skill.id.slice(0, 8)}</small></div><span className={"status-tag " + (skill.status === "published" ? "tag-green" : skill.status === "proposed" ? "tag-amber" : "tag-neutral")}>{statusLabel[skill.status] || skill.status}</span></div>
             <details className="library-disclosure"><summary>技能内容</summary><pre className="skill-content">{skill.content}</pre><small className="memory-source">来源：{skill.source}</small></details>
             <details className="library-disclosure skill-evaluations"><summary><span><ClipboardList size={13}/> 评价记录</span><span>{(evaluations[skill.id] || []).length} 条</span></summary>{(evaluations[skill.id] || []).map((item) => <div className="skill-evaluation" key={item.id}><span className={"status-tag " + (item.verdict === "pass" ? "tag-green" : item.verdict === "fail" ? "tag-red" : "tag-amber")}>{verdictLabel[item.verdict]}</span><p>{item.notes}</p></div>)}</details>
@@ -201,6 +203,7 @@ export default function SkillsPage() {
           </article>)}
           {!loading && !visibleSkills.length && <div className="empty-state"><BookMarked size={25} /><strong>{skills.length ? "没有符合条件的技能" : "暂无技能"}</strong></div>}
         </div>
+        {!loading && <ListPagination {...skillPage} label="技能分页" />}
       </section>
     </div>
   );
