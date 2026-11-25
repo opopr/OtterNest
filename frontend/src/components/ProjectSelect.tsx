@@ -12,7 +12,7 @@ export default function ProjectSelect({ projects, value, onChange, disabled = fa
   return (
     <label className="project-select">
       <FolderKanban size={15} />
-      <select value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled || projects.length === 0}>
+      <select aria-label="选择项目" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled || projects.length === 0}>
         {projects.length === 0 ? <option value="">暂无项目</option> : projects.map((project) => (
           <option key={project.id} value={project.id}>{project.name}</option>
         ))}

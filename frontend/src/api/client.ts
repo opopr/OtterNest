@@ -1,3 +1,4 @@
+import { formatApiError } from "../utils/labels";
 import {
   buildApiUrl,
   buildWebSocketUrl,
@@ -62,10 +63,7 @@ export async function request<T>(
       typeof payload === "object" && payload !== null && "detail" in payload
         ? (payload as { detail?: unknown }).detail
         : payload;
-    const message = typeof detail === "string"
-      ? detail
-      : detail ? JSON.stringify(detail) : response.statusText;
-    throw new ApiError(message || "请求失败", response.status);
+    throw new ApiError(formatApiError(detail || response.statusText, response.status), response.status);
   }
   return payload as T;
 }
@@ -97,10 +95,7 @@ export async function binaryRequest(
       typeof payload === "object" && payload !== null && "detail" in payload
         ? (payload as { detail?: unknown }).detail
         : payload;
-    const message = typeof detail === "string"
-      ? detail
-      : detail ? JSON.stringify(detail) : response.statusText;
-    throw new ApiError(message || "文件请求失败", response.status);
+    throw new ApiError(formatApiError(detail || response.statusText, response.status), response.status);
   }
   return response;
 }

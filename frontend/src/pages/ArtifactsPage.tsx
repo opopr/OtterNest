@@ -1,3 +1,4 @@
+import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle, Archive, Check, Download, FileArchive, FileCheck2, FileUp,
@@ -262,7 +263,7 @@ export default function ArtifactsPage() {
         </div>
         <p className="form-hint">常规单次上传上限 5 MiB；超过 4 MiB 自动启用分块上传。相同任务和文件名会创建新版本，不覆盖旧文件。</p>
         <div className="artifact-list">{artifacts.map((artifact) => <article className="artifact-card" key={artifact.id}>
-          <div className="artifact-card-main"><div className="artifact-file-icon"><Archive size={18} /></div><div><strong>{artifact.name}</strong><small>v{artifact.version} · {sizeText(artifact.size_bytes)} · {artifact.checksum.slice(0, 16)}…</small><small>敏感级 {artifact.sensitivity} · {new Date(artifact.created_at).toLocaleString("zh-CN", { hour12: false })}</small></div></div>
+          <div className="artifact-card-main"><div className="artifact-file-icon"><Archive size={18} /></div><div><strong>{artifact.name}</strong><small>v{artifact.version} · {sizeText(artifact.size_bytes)} · {artifact.checksum.slice(0, 16)}…</small><small>敏感级 {getUiLabel(artifact.sensitivity)} · {new Date(artifact.created_at).toLocaleString("zh-CN", { hour12: false })}</small></div></div>
           <div className="artifact-card-actions"><span className={"status-tag " + (artifact.review_status === "accepted" ? "tag-green" : artifact.review_status === "rejected" ? "tag-red" : "tag-amber")}>{reviewLabel[artifact.review_status] || artifact.review_status}</span><button className="icon-button" title="下载并校验" disabled={saving || Boolean(artifact.deleted_at)} onClick={() => void downloadArtifact(artifact)}><Download size={15} /></button>{artifact.review_status === "pending" && <><button className="icon-button" title="验收通过" disabled={saving} onClick={() => void reviewArtifact(artifact, true)}><Check size={15} /></button><button className="icon-button" title="驳回" disabled={saving} onClick={() => void reviewArtifact(artifact, false)}><X size={15} /></button></>}</div>
           {artifact.review_note && <p className="artifact-review-note">验收说明：{artifact.review_note}</p>}
           {artifact.deleted_at && <small className="muted-inline">文件已由 GC 回收，元数据仍保留。</small>}

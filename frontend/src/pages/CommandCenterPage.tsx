@@ -1,3 +1,4 @@
+import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Activity, AlertCircle, CheckCircle2, Clock3, FileCode2, MessageSquare, RefreshCw, Search, ShieldCheck, X } from "lucide-react";
 import { request } from "../api/client";
@@ -194,7 +195,7 @@ export default function CommandCenterPage() {
       <div className="page-heading">
         <div>
           
-          <h1>AI 指挥中心</h1>
+          <h1>智能指挥中心</h1>
           <p>通过规则模板或服务器端模型提出任务操作建议；任何授权、指派、验收和取消都必须经过你的确认。</p>
         </div>
         <button className="secondary-button" onClick={() => void loadProjects()} disabled={loading}>
@@ -209,7 +210,7 @@ export default function CommandCenterPage() {
         <label>当前项目
           <select value={selectedId} onChange={(event) => setSelectedId(event.target.value)} disabled={loading || projects.length === 0}>
             {projects.length === 0 && <option value="">暂无项目</option>}
-            {projects.map((project) => <option key={project.id} value={project.id}>{project.name} · {project.status}</option>)}
+            {projects.map((project) => <option key={project.id} value={project.id}>{project.name} · {getUiLabel(project.status)}</option>)}
           </select>
         </label>
         <div>
@@ -264,7 +265,7 @@ export default function CommandCenterPage() {
           {planLookupResult && (
             <div className="command-summary">
               <strong>{planLookupResult.id}</strong>
-              <span>操作：{actionLabels[planLookupResult.action] || planLookupResult.action} · 状态：{planLookupResult.status} · 期望版本：v{planLookupResult.expected_version}</span>
+              <span>操作：{actionLabels[planLookupResult.action] || planLookupResult.action} · 状态：{getUiLabel(planLookupResult.status)} · 期望版本：v{planLookupResult.expected_version}</span>
               <span>过期时间：{formatTime(planLookupResult.expires_at)}</span>
               <pre className="json-preview">{JSON.stringify({ parameters: planLookupResult.parameters, result: planLookupResult.result }, null, 2)}</pre>
             </div>
@@ -291,7 +292,7 @@ export default function CommandCenterPage() {
               {agUiData.events.slice(-8).reverse().map((ev) => (
                 <div className="ag-ui-event-row" key={ev.event_id}>
                   <div className="ag-ui-event-head">
-                    <strong>{ev.type}</strong>
+                    <strong>{getUiLabel(ev.type)}</strong>
                     <span className="status-tag tag-neutral">{ev.otternest_kind}</span>
                   </div>
                   <small>#{ev.event_id} · {ev.subject_id.slice(0, 12)} · {ev.timestamp ? formatTime(ev.timestamp) : "—"}</small>
@@ -341,7 +342,7 @@ export default function CommandCenterPage() {
               <span>预览版本：v{plan.expected_version}</span>
               {targetAgent && <span>目标 Agent：{targetAgent}</span>}
               <span><Clock3 size={13} />有效期至：{formatTime(plan.expires_at)}</span>
-              <span>计划状态：{plan.status}</span>
+              <span>计划状态：{getUiLabel(plan.status)}</span>
             </div>
             <div className="form-actions">
               <button className="secondary-button" onClick={() => setPlan(null)} disabled={saving}>暂不执行</button>

@@ -6,63 +6,63 @@
 <title>OtterNest · 控制中心</title>
 <style>
 :root{
-  --bg:#F4F6FB;
-  --bg-subtle:#ECEEF8;
-  --sidebar:#EFEFF9;
-  --sidebar-border:#E3E5F3;
-  --card:#FFFFFF;
-  --card-soft:#F7F8FD;
-  --surface-hover:#F4F3FC;
-  --surface-input:#FFFFFF;
-  --surface-code:#F1F2FA;
-  --border:#E6E8F4;
-  --border-strong:#D4D8EC;
-  --text:#1B1F33;
-  --text-soft:#474E6B;
-  --muted:#6B7290;
-  --accent:#5955E9;
-  --accent-deep:#4338CA;
-  --accent-soft:#E4E2FB;
-  --ok:#13B96A;
-  --ok-soft:#E7F8EE;
-  --ok-text:#15803D;
+  --bg:#F8F1E7;
+  --bg-subtle:#F0E4D8;
+  --sidebar:#FFF7EF;
+  --sidebar-border:#E7DCCE;
+  --card:#FFFDF9;
+  --card-soft:#FAF4EB;
+  --surface-hover:#F5E9DC;
+  --surface-input:#FFFDF9;
+  --surface-code:#F0E9DE;
+  --border:#E7DCCE;
+  --border-strong:#C8B7A5;
+  --text:#0F3F3E;
+  --text-soft:#355955;
+  --muted:#57706E;
+  --accent:#B64D28;
+  --accent-deep:#943B1E;
+  --accent-soft:#FBE2D4;
+  --ok:#176B4F;
+  --ok-soft:#E4F4EB;
+  --ok-text:#176B4F;
   --warn:#E79B15;
   --warn-soft:#FEF3DF;
-  --warn-text:#B45309;
+  --warn-text:#895A15;
   --danger:#ED525D;
   --danger-soft:#FDECEC;
   --danger-text:#B91C1C;
-  --info-soft:#EBF1FE;
-  --info-text:#1D4ED8;
-  --blue:#287EF4;
-  --purple:#8B5CF6;
-  --shadow:0 8px 26px rgba(62,72,126,.06);
-  --shadow-sm:0 2px 10px rgba(62,72,126,.05);
-  --shadow-lg:0 20px 50px rgba(24,29,58,.16);
-  --hero-grad:linear-gradient(135deg,#ECEAFB 0%,#F7F8FE 62%,#E8E4FC 100%);
-  --radius:18px;
-  --radius-sm:12px;
+  --info-soft:#E0F2ED;
+  --info-text:#0F6B6A;
+  --blue:#0F6B6A;
+  --purple:#B64D28;
+  --shadow:0 2px 8px rgba(72,49,29,.045);
+  --shadow-sm:0 1px 4px rgba(72,49,29,.04);
+  --shadow-lg:0 10px 32px rgba(72,49,29,.14);
+  --hero-grad:var(--card);
+  --radius:12px;
+  --radius-sm:8px;
   --font:"PingFang SC","Microsoft YaHei UI","Segoe UI",Inter,-apple-system,BlinkMacSystemFont,sans-serif;
   --mono:"Cascadia Code","JetBrains Mono","Fira Code",Consolas,monospace;
 }
 [data-theme="dark"]{
-  --bg:#0F1220;
-  --bg-subtle:#191E33;
-  --sidebar:#141829;
-  --sidebar-border:#252B45;
-  --card:#181D31;
-  --card-soft:#1E243C;
-  --surface-hover:#242B47;
-  --surface-input:#141829;
-  --surface-code:#222842;
-  --border:#282F4B;
-  --border-strong:#363F63;
-  --text:#EEF1FA;
-  --text-soft:#C1C8E0;
-  --muted:#8D96B8;
-  --accent:#7C78FF;
-  --accent-deep:#9D9AFF;
-  --accent-soft:rgba(124,120,255,.18);
+  --bg:#172321;
+  --bg-subtle:#20302D;
+  --sidebar:#1B2926;
+  --sidebar-border:#344841;
+  --card:#233430;
+  --card-soft:#293C36;
+  --surface-hover:#30453D;
+  --surface-input:#1B2926;
+  --surface-code:#30423B;
+  --border:#40564C;
+  --border-strong:#587166;
+  --text:#F6F1E7;
+  --text-soft:#D3E4D9;
+  --muted:#A6BFB0;
+  --accent:#EEA685;
+  --accent-deep:#FFC3A7;
+  --accent-soft:#51372D;
   --ok:#22C55E;
   --ok-soft:rgba(34,197,94,.16);
   --ok-text:#4ADE80;
@@ -72,12 +72,12 @@
   --danger:#F87171;
   --danger-soft:rgba(248,113,113,.16);
   --danger-text:#FCA5A5;
-  --info-soft:rgba(59,130,246,.16);
-  --info-text:#93C5FD;
+  --info-soft:#233F39;
+  --info-text:#9EDFD0;
   --shadow:0 10px 28px rgba(0,0,0,.32);
   --shadow-sm:0 4px 12px rgba(0,0,0,.24);
   --shadow-lg:0 24px 60px rgba(0,0,0,.55);
-  --hero-grad:linear-gradient(135deg,#1E2340 0%,#191E34 62%,#26214A 100%);
+  --hero-grad:var(--card);
 }
 *{box-sizing:border-box}
 [hidden]{display:none !important}
@@ -1388,6 +1388,28 @@ button.sm,.btn.sm{padding:6px 11px;font-size:13.5px;border-radius:10px}
   .kanban-grid{grid-template-columns:1fr}
   .notif-popover{right:16px;top:68px}
 }
+
+/* Shared warm, compact administrative style. Functional controls and audit details remain visible. */
+body{font-family:Inter,"PingFang SC","Microsoft YaHei UI","Noto Sans CJK SC",system-ui,sans-serif;font-size:14px}
+.panel,.card,.modal-card,.notif-popover{border-radius:12px;box-shadow:var(--shadow)}
+.login-shell{background:var(--bg)}
+.login-grid{max-width:460px;grid-template-columns:minmax(0,1fr)}
+.login-brand{margin-bottom:20px}
+.login-grid>aside{display:none}
+.sidebar-art,.login-mascot,.topbar-sub,.page-hero-mascot,.page-hero-wave,.cmd-hero-mascot,.cmd-hero-wave{display:none}
+.page-hero,.cmd-hero{background:var(--card);border:1px solid var(--border);border-radius:12px;min-height:0;padding:16px}
+.page-hero-left,.cmd-hero-left{max-width:none;width:100%}
+.nav-btn{border-radius:8px;min-height:40px}
+.nav-btn.active::before{display:none}
+.brand-avatar{background:var(--info-soft);box-shadow:none}
+.brand-avatar img{width:42px;height:42px}
+.nav-icon-img,.page-title-icon{filter:none}
+button,.btn,input,select,textarea{border-radius:8px}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--info-text);outline-offset:2px}
+.modal-backdrop{backdrop-filter:none}
+.modal-card{max-height:calc(100dvh - 32px);overflow-y:auto}
+pre{max-width:100%;overflow:auto}
+@media(max-width:860px){.main-area{padding:16px 12px 24px}.topbar-right{flex-wrap:wrap;min-width:0;max-width:100%}.topbar-title-row{flex-wrap:wrap}.login-shell{padding:16px 12px}.panel,.card{padding:16px}.nav-btn{font-size:13px}.modal-backdrop{padding:12px}}
 </style>
 </head>
 <body>
@@ -1398,14 +1420,14 @@ button.sm,.btn.sm{padding:6px 11px;font-size:13.5px;border-radius:10px}
       <div class="login-brand">
         <div class="login-brand-left">
           <div class="brand-avatar" aria-hidden="true">
-            <img src="/assets/icons/SVG/装饰/水獭头像.svg" width="38" height="38" alt="OtterNest 图标">
+            <img src="/assets/icons/SVG/装饰/水獭品牌.svg" width="38" height="38" alt="OtterNest 图标">
           </div>
           <div>
             <div class="login-brand-title">OtterNest · 控制台登录</div>
-            <div class="muted">AI Team OS · 账号会话与双重身份验证（2FA）</div>
+            <div class="muted">账号登录与双重身份验证</div>
           </div>
         </div>
-        <img class="login-mascot" src="/assets/mascots/otter-wave.png" alt="欢迎水獭">
+        
       </div>
 
       <div class="segmented" style="margin-bottom:16px" role="tablist" aria-label="登录方式">
@@ -1442,14 +1464,14 @@ button.sm,.btn.sm{padding:6px 11px;font-size:13.5px;border-radius:10px}
           </div>
           <div class="actions">
             <button type="submit">登录控制台</button>
-            <a class="btn secondary" href="/api/docs" target="_blank" rel="noopener">OpenAPI 文档</a>
+            <a class="btn secondary" href="/api/docs" target="_blank" rel="noopener">接口文档</a>
           </div>
         </form>
 
         <form id="accountStep2" hidden onsubmit="event.preventDefault();verify2FALogin(event);">
           <div class="callout" style="margin-bottom:12px">
             <strong>第二步：双重身份验证（2FA）</strong>
-            <div class="muted" id="mfaUserHint" style="margin-top:4px">请输入验证器 App 生成的 6 位动态验证码，或输入 8 位一次性备用恢复码。</div>
+            <div class="muted" id="mfaUserHint" style="margin-top:4px">请输入验证器应用 生成的 6 位动态验证码，或输入 8 位一次性备用恢复码。</div>
           </div>
           <label for="mfaCode">动态验证码 / 备用恢复码</label>
           <input id="mfaCode" name="code" type="text" autocomplete="one-time-code" placeholder="例如：123456 或 AB12-CD34" required>
@@ -1470,7 +1492,7 @@ button.sm,.btn.sm{padding:6px 11px;font-size:13.5px;border-radius:10px}
           </div>
           <div class="actions">
             <button type="submit">连接控制台</button>
-            <a class="btn secondary" href="/api/docs" target="_blank" rel="noopener">OpenAPI 文档</a>
+            <a class="btn secondary" href="/api/docs" target="_blank" rel="noopener">接口文档</a>
           </div>
         </form>
       </div>
@@ -1481,19 +1503,7 @@ button.sm,.btn.sm{padding:6px 11px;font-size:13.5px;border-radius:10px}
       </div>
     </section>
 
-    <aside class="panel panel-tight">
-      <div class="card-head" style="margin-bottom:8px">
-        <div class="card-title-group">
-          <img class="card-title-icon" src="/assets/icons/SVG/功能/lock-安全权限.svg" alt="安全边界">
-          <h2>认证与安全保护机制</h2>
-        </div>
-      </div>
-      <ul class="info-list">
-        <li><strong>账号登录与会话隔离</strong>：密码使用加盐 <code>scrypt</code> 哈希存储；登录后颁发 12 小时有限会话令牌，退出时服务端立即吊销。</li>
-        <li><strong>RFC 6238 双重身份验证（2FA）</strong>：支持 Google Authenticator、Apple 密码、1Password 等 TOTP 验证器与单次备用恢复码，并强制防重放与 5 次失败临时锁定。</li>
-        <li><strong>部署与自动化兼容</strong>：<code>OTTERNEST_OWNER_TOKEN</code> 仍可用于脚本/CLI 无头调用；生产部署请置于 HTTPS 网关之后。</li>
-      </ul>
-    </aside>
+    
   </div>
 </div>
 
@@ -1502,23 +1512,17 @@ button.sm,.btn.sm{padding:6px 11px;font-size:13.5px;border-radius:10px}
     <div class="sidebar-top">
       <div class="brand-row">
         <div class="brand-avatar" aria-hidden="true">
-          <img src="/assets/icons/SVG/装饰/水獭头像.svg" width="38" height="38" alt="OtterNest 徽标">
+          <img src="/assets/icons/SVG/装饰/水獭品牌.svg" width="38" height="38" alt="OtterNest 徽标">
         </div>
         <div>
           <div class="brand-name">OtterNest</div>
-          <div class="brand-sub">AI 团队协作控制平面</div>
+          <div class="brand-sub">水獭窝</div>
         </div>
       </div>
       <nav id="nav" aria-label="主导航"></nav>
     </div>
 
-    <div class="sidebar-art" aria-hidden="true">
-      <img class="sidebar-otter" src="/assets/mascots/otter-laptop.png" alt="">
-      <svg class="sidebar-wave" viewBox="0 0 252 92" fill="none" preserveAspectRatio="none">
-        <path d="M0 32 Q65 10 132 28 T252 24 L252 92 L0 92 Z" fill="#E3E0FA" opacity=".78"/>
-        <path d="M0 52 Q78 34 155 54 T252 48 L252 92 L0 92 Z" fill="#D5D0F7" opacity=".88"/>
-      </svg>
-    </div>
+    
   </aside>
 
   <main class="main-area">
@@ -1526,7 +1530,7 @@ button.sm,.btn.sm{padding:6px 11px;font-size:13.5px;border-radius:10px}
       <div class="topbar-left">
         <div class="topbar-title-row">
           <img id="pageIcon" class="page-title-icon" src="/assets/icons/SVG/导航/home-概览.svg" alt="">
-          <h1 id="pageTitle">首页仪表盘</h1>
+          <h1 id="pageTitle">总览</h1>
           <div class="project-pill-wrap">
             <span class="dot dot-on" aria-hidden="true"></span>
             <select id="projectSelect" aria-label="选择当前工作项目" onchange="onProjectSwitch()"></select>
@@ -1538,7 +1542,7 @@ button.sm,.btn.sm{padding:6px 11px;font-size:13.5px;border-radius:10px}
       <div class="topbar-right">
         <div class="search-box">
           <img src="/assets/icons/SVG/功能/search-全局搜索.svg" width="20" height="20" alt="搜索">
-          <input id="globalSearch" type="search" placeholder="搜索项目、任务或 Agent..." aria-label="全局搜索" oninput="onSearchInput(this.value)">
+          <input id="globalSearch" type="search" placeholder="搜索项目、任务或智能体" aria-label="全局搜索" oninput="onSearchInput(this.value)">
           <button id="searchClearBtn" class="search-clear" type="button" title="清除搜索" hidden onclick="clearGlobalSearch()">×</button>
           <span id="searchKbdChip" class="kbd-chip">⌘K</span>
         </div>
@@ -1556,7 +1560,7 @@ button.sm,.btn.sm{padding:6px 11px;font-size:13.5px;border-radius:10px}
         <div class="user-menu-wrap">
           <button id="userMenuBtn" class="avatar-btn" type="button" aria-haspopup="true" aria-expanded="false" onclick="toggleUserMenu()">
             <span class="avatar-circle" aria-hidden="true">
-              <img src="/assets/icons/SVG/装饰/水獭头像.svg" width="26" height="26" alt="管理员">
+              <img src="/assets/icons/SVG/装饰/水獭品牌.svg" width="26" height="26" alt="管理员">
             </span>
             <span id="userDisplayName">管理员</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1729,10 +1733,10 @@ function uiForm({title='填写信息',subtitle='',fields=[],submitText='确定',
 }
 
 const NAV_DEFS=[
-  ['overview','首页仪表盘','/assets/icons/SVG/导航/home-概览.svg','总览项目任务分布、Agent 在线心跳与最近动态'],
+  ['overview','总览','/assets/icons/SVG/导航/home-概览.svg','总览项目任务分布、Agent 在线心跳与最近动态'],
   ['projects','项目与任务','/assets/icons/SVG/导航/folder-项目管理.svg','管理项目、任务图谱、租约核验与执行进度'],
-  ['commands','AI 指挥中心','/assets/icons/SVG/导航/sparkle-智能指挥中心.svg','受限中文意图解析与 10 分钟二次确认执行预览'],
-  ['agents','Agent 管理','/assets/icons/SVG/导航/bot-Agent管理.svg','管理可执行节点、运行实例心跳及已独立核验能力'],
+  ['commands','智能指挥中心','/assets/icons/SVG/导航/sparkle-智能指挥中心.svg','受限中文意图解析与 10 分钟二次确认执行预览'],
+  ['agents','智能体管理','/assets/icons/SVG/导航/bot-Agent管理.svg','管理可执行节点、运行实例心跳及已独立核验能力'],
   ['approvals','操作审批','/assets/icons/SVG/导航/shield-check-审批管理.svg','集中审批高风险任务、外部副作用核对与跨项目共享提案'],
   ['collaboration','协作与决策','/assets/icons/SVG/导航/network-协作调度.svg','发起团队决策、独立意见审查与二轮协同协商'],
   ['memories','记忆与知识','/assets/icons/SVG/导航/database-记忆与知识.svg','管理项目记忆修订、Skill 评估记录与跨项目知识发布'],
@@ -1752,6 +1756,12 @@ function agentMascot(agent){
   return '/assets/mascots/otter-laptop.png';
 }
 
+function displayRequestError(detail,status){
+  const raw=typeof detail==='string'?detail:detail?JSON.stringify(detail):'';
+  if(/[\u3400-\u9fff]/.test(raw))return raw;
+  const labels={400:'请求参数有误',401:'身份验证失败，请重新登录',403:'没有操作权限',404:'资源不存在',409:'状态冲突，请刷新后重试',422:'输入校验失败',429:'请求过于频繁',500:'服务内部错误',502:'上游服务不可用',503:'服务暂不可用',504:'请求超时'};
+  return (labels[status]||'请求失败')+(raw?'（原始信息：'+raw+'）':'');
+}
 const api=async(path,method="GET",data)=>{
   setLoading(1);
   try{
@@ -1761,7 +1771,7 @@ const api=async(path,method="GET",data)=>{
       body:data===undefined?undefined:JSON.stringify(data)
     });
     const out=await response.json();
-    if(!response.ok)throw Error(out.detail||response.statusText);
+    if(!response.ok)throw Error(displayRequestError(out.detail||response.statusText,response.status));
     return out;
   }finally{setLoading(-1);}
 };
@@ -1812,7 +1822,7 @@ function renderLoginAccountView(){
   if(mfaChallengeToken){
     boot.hidden=true;s1.hidden=true;s2.hidden=false;
     const hint=document.getElementById('mfaUserHint');
-    if(hint)hint.textContent=`正在验证账号 @${mfaUsername||'owner'}：请输入验证器 App 生成的 6 位动态验证码，或 8 位一次性备用恢复码。`;
+    if(hint)hint.textContent=`正在验证账号 @${mfaUsername||'owner'}：请输入验证器应用 生成的 6 位动态验证码，或 8 位一次性备用恢复码。`;
     return;
   }
   s2.hidden=true;
@@ -1858,7 +1868,7 @@ async function authPost(path,body){
     body:JSON.stringify(body)
   });
   const out=await res.json();
-  if(!res.ok)throw Error(out.detail||res.statusText);
+  if(!res.ok)throw Error(displayRequestError(out.detail||res.statusText,res.status));
   return out;
 }
 
@@ -2217,12 +2227,12 @@ function verdictBadge(v){
   const labels={pass:'评估通过',concern:'存在隐患',fail:'未通过'};
   return `<span class="${tagCls(v)}">${esc(labels[v]||v)}</span>`;
 }
-function itemKindLabel(k){return k==='skill'?'Skill':(k==='memory'?'项目记忆':String(k||''))}
+function itemKindLabel(k){return k==='skill'?'技能':(k==='memory'?'项目记忆':String(k||''))}
 function pageHero(iconSrc,title,subtitle,mascotSrc,pillsHtml=''){
   return `<section class="page-hero">
     <div class="page-hero-left">
       <div class="page-hero-title"><img src="${iconSrc}" width="32" height="32" alt=""><span>${esc(title)}</span></div>
-      <p class="page-hero-sub">${esc(subtitle)}</p>
+      ${subtitle?`<p class="page-hero-sub">${esc(subtitle)}</p>`:''}
       ${pillsHtml?`<div class="page-hero-pills">${pillsHtml}</div>`:''}
     </div>
     <img class="page-hero-mascot" src="${mascotSrc}" alt="">
@@ -2663,8 +2673,8 @@ async function render(){
     root.innerHTML=`
     ${pageHero(
       '/assets/icons/SVG/导航/bot-Agent管理.svg',
-      'Agent 目录与执行环境',
-      '声明能力不等于已验证能力；运行实例状态由节点主动心跳上报。',
+      '智能体与执行环境',
+      '声明能力不等于已核验能力；在线状态以心跳为准。',
       '/assets/mascots/otter-laptop.png',
       `<span class="tag tag-info">已筛选 ${esc(filteredAgents.length)} 个节点</span><span class="tag ${onlineAgents>0?'tag-ok':'tag-warn'}">在线心跳 ${esc(onlineAgents)} 个</span>`
     )}
@@ -3004,7 +3014,7 @@ async function render(){
     const approvalsHero=pageHero(
       '/assets/icons/SVG/导航/shield-check-审批管理.svg',
       '操作与知识审批中心',
-      '覆盖高风险任务授权、成果验收、unknown 外部副作用核对及跨项目知识共享审批。',
+      '高风险授权、成果验收、副作用核对与知识共享审批。',
       totalPending===0?'/assets/mascots/otter-celebrate.png':'/assets/mascots/otter-checklist.png',
       totalPending===0
         ?'<span class="tag tag-ok">当前无待审批项</span>'
@@ -3101,8 +3111,8 @@ async function render(){
     root.innerHTML=`
     ${pageHero(
       '/assets/icons/SVG/导航/network-协作调度.svg',
-      '多 Agent 决策协同与二轮协商',
-      '支持先收集独立意见、配置锁定二轮名单并开启反驳与补充，最终裁决权始终归属管理员。',
+      '决策与协商',
+      '最终裁决权归属管理员。',
       '/assets/mascots/otter-thinking.png',
       `<span class="chip">团队决策 ${esc(ds.length)} 项</span><span class="chip">共享提案 ${esc(shs.length)} 条</span>`
     )}
@@ -3214,10 +3224,10 @@ async function render(){
     root.innerHTML=`
     ${pageHero(
       '/assets/icons/SVG/导航/database-记忆与知识.svg',
-      '团队记忆与可复用 Skills 台账',
-      '支持 Context Broker 相关性检索、记忆版本修订与归档、Skill 实战评估打分及跨项目克隆。',
+      '记忆与技能',
+      '',
       '/assets/mascots/otter-reading.png',
-      `<span class="chip">项目记忆 ${esc(filteredM.length)} 条</span><span class="chip">Skills ${esc(filteredS.length)} 个</span>`
+      `<span class="chip">项目记忆 ${esc(filteredM.length)} 条</span><span class="chip">技能 ${esc(filteredS.length)} 个</span>`
     )}
     <div class="grid-2">
       <div class="card">
@@ -3292,7 +3302,7 @@ async function render(){
     ${pageHero(
       '/assets/icons/SVG/导航/chart-监控分析.svg',
       '不可变审计事件流',
-      '记录每步任务状态迁移、租约 epoch、外部副作用台账、账号登录 2FA 及决策协商轨迹。',
+      '',
       '/assets/mascots/otter-explorer.png',
       `<span class="chip">审计事件总计 ${esc(ev.length)} 条</span><span class="tag tag-info">筛选命中 ${esc(filteredEv.length)} 条</span>`
     )}
@@ -3409,7 +3419,7 @@ async function render(){
             <li><strong>正式上线前提</strong>：多管理员精细 RBAC 与企业 SSO 建议结合前置 HTTPS 反向代理及企业认证网关部署。</li>
           </ul>
           <div class="actions">
-            <a class="btn secondary sm" href="/api/docs" target="_blank" rel="noopener">打开 OpenAPI 文档</a>
+            <a class="btn secondary sm" href="/api/docs" target="_blank" rel="noopener">打开 接口文档</a>
           </div>
         </div>
 
@@ -3522,7 +3532,7 @@ async function approve(id){await safe(async()=>{await api('/decisions/'+id+'/app
 async function saveCharter(e){e.preventDefault();await safe(async()=>{const body=form(e);body.max_concurrent_tasks=Number(body.max_concurrent_tasks);body.max_total_tasks=Number(body.max_total_tasks);await api('/projects/'+project+'/charter','PUT',body);notice('项目宪章与预算已保存');await refresh()})}
 async function changeProjectStatus(e){e.preventDefault();await safe(async()=>{const body=form(e);const res=await api('/projects/'+project+'/status','POST',body);notice('项目状态已更新为 '+res.status+'（当前运行中任务：'+res.in_flight_running_tasks+'）');await refresh()})}
 async function showTaskContinuity(id){await safe(async()=>{const [cps,handoff,ses,arts]=await Promise.all([api('/tasks/'+id+'/checkpoints'),api('/tasks/'+id+'/handoff'),api('/tasks/'+id+'/side-effects'),api('/tasks/'+id+'/artifacts')]);const root=document.getElementById('continuity-'+id);if(!root)return;const cpMap={self_reported:'节点自报',owner_verified:'已核验',rejected:'已驳回'};const cpHtml=cps.map(cp=>item(`<div class="item-head"><span class="${tagCls(cp.verification_status)}">epoch ${esc(cp.lease_epoch)} · #${esc(cp.step_number)} · ${esc(cpMap[cp.verification_status]||cp.verification_status)}</span><span class="muted">Agent: <code>${esc(cp.agent_id)}</code></span></div><p>${esc(cp.summary)}</p>${cp.next_steps?`<p class="muted"><strong>下一步：</strong>${esc(cp.next_steps)}</p>`:''}<p class="muted"><strong>关联成果：</strong>${esc((cp.artifact_ids||[]).join(', ')||'无')}</p>${cp.owner_note?`<p class="muted"><strong>核验备注：</strong>${esc(cp.owner_note)}</p>`:''}<div class="actions"><button class="sm" onclick="verifyCheckpoint('${esc(cp.id)}','owner_verified','${esc(id)}')">核验通过</button> <button class="secondary sm" onclick="verifyCheckpoint('${esc(cp.id)}','rejected','${esc(id)}')">驳回检查点</button></div>`)).join('')||'<p class="muted">暂无检查点</p>';const seHtml=ses.map(se=>item(`<div class="item-head"><div><strong>${esc(se.target_system)}</strong> · <code>${esc(se.idempotency_key)}</code></div><div class="stack">${sideEffectStatusBadge(se.status)}<span class="chip">epoch ${esc(se.lease_epoch)} · ${se.owner_verified?'已核对':'待核对'}</span></div></div><p>${esc(se.description)}</p>${se.evidence_summary?`<p class="muted"><strong>执行自证：</strong>${esc(se.evidence_summary)}</p>`:''}${se.owner_note?`<p class="muted"><strong>对账备注：</strong>${esc(se.owner_note)}</p>`:''}<div class="actions"><button class="sm" onclick="reconcileSideEffect('${esc(se.id)}','verified_executed','${esc(id)}')">核验已执行</button> <button class="secondary sm" onclick="reconcileSideEffect('${esc(se.id)}','verified_not_executed','${esc(id)}')">核验未执行（允许重开）</button></div>`)).join('')||'<p class="muted">暂无登记的外部副作用</p>';const artStatus={pending:'待所有者验收',accepted:'已验收',rejected:'已驳回'};const artHtml=arts.map(a=>item(`<div class="item-head"><div><strong>${esc(a.name)}</strong> · <code>v${esc(a.version)}</code></div><span class="${tagCls(a.review_status)}">${esc(artStatus[a.review_status]||a.review_status)}</span></div><p class="muted">SHA-256：<code>${esc(a.checksum)}</code></p>${a.review_note?`<p class="muted">${esc(a.review_note)}</p>`:''}<div class="actions"><button class="secondary sm" onclick="downloadArtifact('${esc(a.id)}')">下载并校验</button>${a.review_status==='pending'?`<button class="sm" onclick="reviewArtifact('${esc(a.id)}',true,'${esc(id)}')">验收版本</button><button class="secondary sm" onclick="reviewArtifact('${esc(a.id)}',false,'${esc(id)}')">驳回版本</button>`:''}</div>`)).join('')||'<p class="muted">暂无上传成果</p>';root.innerHTML=`<div class="continuity-box"><div class="grid-2"><div><h3>任务检查点（Epoch 隔离）</h3>${cpHtml}</div><div><h3>外部副作用台账（不可自动回滚）</h3>${seHtml}</div></div><h3>不可变成果版本</h3>${artHtml}<h3>标准交接包边界</h3><div class="callout">${esc(handoff.handoff_boundary)}</div><details class="payload-details"><summary>查看交接包原始 JSON 快照</summary><pre>${esc(JSON.stringify({latest_verified_checkpoint:handoff.latest_verified_checkpoint,latest_self_reported_checkpoint:handoff.latest_self_reported_checkpoint,side_effects:handoff.side_effects,artifacts:handoff.artifacts},null,2))}</pre></details></div>`})}
-async function downloadArtifact(id){await safe(async()=>{const response=await fetch('/api/v1/artifacts/'+encodeURIComponent(id)+'/content',{headers:{'Authorization':'Bearer '+token}});if(!response.ok){const error=await response.json().catch(()=>({}));throw Error(error.detail||response.statusText)}const disposition=response.headers.get('Content-Disposition')||'';const encodedName=disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];const filename=encodedName?decodeURIComponent(encodedName):'artifact.bin';const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);notice('成果文件已验证 SHA-256 并下载')})}
+async function downloadArtifact(id){await safe(async()=>{const response=await fetch('/api/v1/artifacts/'+encodeURIComponent(id)+'/content',{headers:{'Authorization':'Bearer '+token}});if(!response.ok){const error=await response.json().catch(()=>({}));throw Error(displayRequestError(error.detail||response.statusText,response.status))}const disposition=response.headers.get('Content-Disposition')||'';const encodedName=disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];const filename=encodedName?decodeURIComponent(encodedName):'artifact.bin';const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);notice('成果文件已验证 SHA-256 并下载')})}
 async function reviewArtifact(id,accepted,taskId){await safe(async()=>{const vals=await uiForm({title:accepted?'验收成果版本':'驳回成果版本',fields:[{name:'note',label:accepted?'验收说明（可选）':'驳回原因（至少 5 字）',type:'textarea',required:!accepted,minlength:accepted?undefined:5}],submitText:accepted?'确认验收':'确认驳回',danger:!accepted});if(!vals)return;await api('/artifacts/'+id+'/review','POST',{accepted,note:(vals.note||'').trim()});notice(accepted?'成果版本已验收':'成果版本已驳回');await showTaskContinuity(taskId)})}
 async function verifyCheckpoint(cpId,status,taskId){await safe(async()=>{const isReject=status==='rejected';const vals=await uiForm({title:isReject?'驳回检查点':'核验检查点通过',fields:[{name:'note',label:isReject?'驳回原因（至少 5 字）':'核验备注（可选）',type:'textarea',required:isReject,minlength:isReject?5:undefined}],submitText:isReject?'确认驳回':'核验通过',danger:isReject});if(!vals)return;await api('/checkpoints/'+cpId+'/verify','POST',{status,note:(vals.note||'').trim()});notice('检查点状态已更新：'+status);await showTaskContinuity(taskId)})}
 async function revokeTaskLease(id){await safe(async()=>{const memberOpts=[{value:'',label:'不指定交接目标'},...(cachedMembers||[]).filter(m=>m.enabled).map(m=>({value:m.agent_id,label:`${m.agent_name} (${m.role})`}))];const vals=await uiForm({title:'撤回租约并隔离旧 Epoch',subtitle:'撤回后将递增 lease epoch，旧执行节点的后续上报会被控制面拒绝。',fields:[{name:'reason',label:'撤回与隔离原因（至少 5 字）',type:'textarea',required:true,minlength:5},{name:'target_agent_id',label:'交接目标 Agent（可选）',type:memberOpts.length>1?'select':'text',options:memberOpts,value:''}],submitText:'撤回并隔离',danger:true});if(!vals)return;await api('/tasks/'+id+'/revoke-lease','POST',{reason:vals.reason.trim(),target_agent_id:(vals.target_agent_id||'').trim()||null});notice('租约已撤回并提升 epoch；旧进程未获远端终止核实');await refresh()})}
@@ -3651,7 +3661,7 @@ function renderA2uiNodes(a2ui){
   const metricsHtml=metrics.length?`<div class="a2ui-metrics">${metrics.map(c=>`<span class="chip">${esc(c.label||'')}: <strong>${esc(c.value||'')}</strong></span>`).join('')}</div>`:'';
   const othersHtml=others.map(c=>{
     if(c.type==='list')return `<div class="a2ui-card"><strong>${esc(c.title||'')}</strong><ul class="info-list">${(c.items||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>`;
-    if(c.type==='action_preview')return `<div class="callout" style="margin-top:8px">待确认预览：<strong>${esc(c.title||'')}</strong>（${esc(c.action||'')} ${esc(c.value||'')}）</div>`;
+    if(c.type==='action_preview')return `<div class="callout" style="margin-top:8px">待确认预览：<strong>${esc(c.title||'')}</strong>（${esc(({authorize_task:'批准任务',review_task:'验收任务',route_task:'指派任务',cancel_task:'取消任务'})[c.action]||c.action||'')} ${esc(c.value||'')}）</div>`;
     const kids=Array.isArray(c.children)?renderA2uiNodes({components:c.children}):'';
     const itemsHtml=Array.isArray(c.items)?`<ul class="info-list">${c.items.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`:'';
     return `<div class="a2ui-card"><strong>${esc(c.title||c.text||'')}</strong>${c.subtitle?`<div class="muted">${esc(c.subtitle)}</div>`:''}${itemsHtml}${kids}</div>`;
@@ -3697,7 +3707,7 @@ async function rollbackExperiment(id){await safe(async()=>{const vals=await uiFo
 
 async function changeSystemMode(e){e.preventDefault();await safe(async()=>{const b=form(e);await api('/system/mode','PUT',{mode:b.mode,reason:b.reason||''});notice('系统运行保护模式已切换为 '+b.mode);await refresh()})}
 async function exportArtifactArchive(){await safe(async()=>{if(!project)return;const response=await fetch('/api/v1/projects/'+encodeURIComponent(project)+'/artifacts/archive',{headers:{'Authorization':'Bearer '+token}});if(!response.ok){const err=await response.json().catch(()=>({}));throw Error(err.detail||response.statusText)}const blob=await response.blob();const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`otternest-artifacts-${project.slice(0,8)}.tar.gz`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);notice('已导出带 SHA-256 清单的成果二进制归档')})}
-async function restoreArtifactArchive(){await safe(async()=>{if(!project)return;const inp=document.getElementById('artifactArchiveFile');const file=inp?.files?.[0];if(!file)throw Error('请先选择 .tar.gz 成果归档文件');const res=await fetch('/api/v1/projects/'+encodeURIComponent(project)+'/artifacts/restore',{method:'POST',headers:{'Authorization':'Bearer '+token},body:await file.arrayBuffer()});const out=await res.json();if(!res.ok)throw Error(out.detail||res.statusText);const el=document.getElementById('artifact-ops-result');if(el)el.innerHTML=`<pre>${esc(JSON.stringify(out,null,2))}</pre>`;notice(`已校验恢复 ${out.restored_count} 份成果文件`);await refresh()})}
+async function restoreArtifactArchive(){await safe(async()=>{if(!project)return;const inp=document.getElementById('artifactArchiveFile');const file=inp?.files?.[0];if(!file)throw Error('请先选择 .tar.gz 成果归档文件');const res=await fetch('/api/v1/projects/'+encodeURIComponent(project)+'/artifacts/restore',{method:'POST',headers:{'Authorization':'Bearer '+token},body:await file.arrayBuffer()});const out=await res.json();if(!res.ok)throw Error(displayRequestError(out.detail||res.statusText,res.status));const el=document.getElementById('artifact-ops-result');if(el)el.innerHTML=`<pre>${esc(JSON.stringify(out,null,2))}</pre>`;notice(`已校验恢复 ${out.restored_count} 份成果文件`);await refresh()})}
 async function runArtifactGc(dryRun){await safe(async()=>{if(!project)return;if(!dryRun&&!await uiConfirm({title:'执行成果二进制 GC 清理',message:'确认清理已驳回或旧版本未验收成果的本地二进制文件？（保留审计元数据与已验收版本）',confirmText:'确认清理',danger:true}))return;const out=await api('/projects/'+project+'/artifacts/gc','POST',{dry_run:dryRun,keep_versions:2,include_rejected:true});const el=document.getElementById('artifact-ops-result');if(el)el.innerHTML=`<pre>${esc(JSON.stringify(out,null,2))}</pre>`;notice(dryRun?`GC 预览命中 ${out.candidate_count} 个可回收文件`:`GC 已清理 ${out.deleted_ids.length} 个文件，释放 ${out.reclaimed_bytes} 字节；失败 ${out.failed_ids.length} 个`)})}
 
 function renderSecurityCard(){

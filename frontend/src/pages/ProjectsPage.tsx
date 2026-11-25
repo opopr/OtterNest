@@ -1,3 +1,4 @@
+import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AlertCircle, Eye, FolderKanban, Pencil, Plus, RefreshCw, Search, Target, Trash2, Users, X } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -372,7 +373,7 @@ export default function ProjectsPage() {
                 <button key={project.id} className={"project-list-item " + (project.id === selectedId ? "selected" : "")}
                   onClick={() => { setSelectedId(project.id); setSearchParams({ project: project.id }); }}>
                   <span className="project-list-icon"><FolderKanban size={17} /></span>
-                  <span className="project-list-copy"><strong>{project.name}</strong><small>{project.status} · 优先级 {project.priority}</small></span>
+                  <span className="project-list-copy"><strong>{project.name}</strong><small>{getUiLabel(project.status)} · 优先级 {project.priority}</small></span>
                   <span className="project-list-arrow">›</span>
                 </button>
               ))}
@@ -391,7 +392,7 @@ export default function ProjectsPage() {
                   <div><div className="eyebrow">当前项目</div><h2>{selectedProject.name}</h2><p>{selectedProject.description || "暂无项目说明"}</p></div>
                 </div>
                 <div className="flex-row-gap">
-                  <span className={"status-tag " + (selectedProject.status === "active" ? "tag-green" : "tag-neutral")}>{selectedProject.status}</span>
+                  <span className={"status-tag " + (selectedProject.status === "active" ? "tag-green" : "tag-neutral")}>{getUiLabel(selectedProject.status)}</span>
                   <button className="secondary-button compact" onClick={startEditProject} disabled={saving}><Pencil size={13} />编辑</button>
                   <button className="text-button" onClick={() => void deleteProject()} disabled={saving}><Trash2 size={14} />删除项目</button>
                 </div>
@@ -480,7 +481,7 @@ export default function ProjectsPage() {
                         <div className="task-status-mark" />
                         <div className="task-main">
                           <strong>{task.title}</strong>
-                          <small>{task.id.slice(0, 12)} · {task.risk} · {task.sensitivity} · 优先级 {task.priority}</small>
+                          <small>{task.id.slice(0, 12)} · {task.risk} · {getUiLabel(task.sensitivity)} · 优先级 {task.priority}</small>
                         </div>
                         <span className={"status-tag " + (
                           task.status === "completed" ? "tag-green" :

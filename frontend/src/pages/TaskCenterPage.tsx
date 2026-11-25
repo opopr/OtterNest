@@ -1,3 +1,4 @@
+import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, ClipboardCheck, Eye, Filter, GitBranch, RefreshCw, RotateCcw, ShieldCheck, X } from "lucide-react";
 import { request } from "../api/client";
@@ -271,7 +272,7 @@ export default function TaskCenterPage() {
                     <span className={"status-tag " + (tones[t.status] || "tag-neutral")}>{labels[t.status] || t.status}</span>
                     <span className="status-tag tag-neutral">{t.risk}</span>
                   </div>
-                  <p>{t.project_name} · 优先级 {t.priority} · {t.sensitivity}</p>
+                  <p>{t.project_name} · 优先级 {t.priority} · {getUiLabel(t.sensitivity)}</p>
                   <small>{t.result_summary || t.failure_reason || t.instruction}</small>
                   <small>任务 ID：{t.id}</small>
                 </div>
@@ -303,7 +304,7 @@ export default function TaskCenterPage() {
             <div className="command-summary">
               <strong>{plan.task_title || tasks.find((t) => t.id === plan.task_id)?.title || "任务"}</strong>
               <span>操作：{planActionLabel}</span>
-              <span>预览状态：{plan.status}</span>
+              <span>预览状态：{getUiLabel(plan.status)}</span>
               <span>任务版本：{plan.expected_version}</span>
               <span>有效期：{time(plan.expires_at)}</span>
             </div>

@@ -1086,3 +1086,54 @@ input, textarea, select { accent-color: var(--accent); }
   .page-heading h1 { font-size: 22px; }
   .stat-copy strong { font-size: 20px; }
 }
+
+/* Compact, consistent interaction surfaces and mobile overflow protection. */
+.workspace,.page-content,.page-stack,.heading-actions,.project-toolbar,.task-center-row{min-width:0}
+.heading-actions,.form-actions,.task-center-actions,.task-detail-header-actions{flex-wrap:wrap;gap:8px}
+.nav-link svg,.nav-sublink svg,.primary-button svg,.secondary-button svg,.icon-button svg,.panel-title svg{flex-shrink:0;stroke-width:1.8}
+.nav-link,.nav-sublink{gap:10px}
+.nav-sublink{padding-left:12px}
+.project-select,.search-field,.search-input-compact,.compact-select{min-height:36px;border-radius:8px;background:var(--surface)}
+.project-select select{font-size:14px}
+.form-panel input,.form-panel textarea,.form-panel select,.login-form input,.app-dialog-field input,.app-dialog-field textarea,.app-dialog-field select{min-height:36px;border-radius:8px;font-size:14px}
+.task-row,.pending-row,.task-center-row{min-height:44px;border-color:var(--border)}
+.task-detail-dialog,.confirm-dialog,.app-dialog-card{background:var(--surface);border-radius:12px;max-height:calc(100dvh - 40px);overflow-y:auto}
+.modal-backdrop{backdrop-filter:none}
+.a2ui-renderer{gap:10px;min-width:0}
+.a2ui-card,.a2ui-action-preview,.a2ui-metric{border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:12px;min-width:0;overflow-wrap:anywhere}
+.a2ui-card>strong,.a2ui-list>strong,.a2ui-action-preview strong{font-size:14px;color:var(--text)}
+.a2ui-text,.a2ui-card>p,.a2ui-list ul,.a2ui-action-preview span,.a2ui-table{font-size:13px;line-height:1.6;color:var(--text-soft);overflow-wrap:anywhere}
+.a2ui-badge{font-size:12px;background:#f0e4d8;color:var(--text-soft)}
+.a2ui-badge.tone-success{background:var(--green-soft);color:var(--green)}
+.a2ui-badge.tone-warning{background:var(--amber-soft);color:var(--amber)}
+.a2ui-badge.tone-error{background:var(--red-soft);color:var(--red)}
+.a2ui-badge.tone-info{background:var(--blue-soft);color:var(--blue)}
+.a2ui-metric strong{color:var(--brand-deep-teal);font-size:20px;font-variant-numeric:tabular-nums}
+.a2ui-metric small{color:var(--muted)}
+.a2ui-table-wrap{max-width:100%;overflow-x:auto}
+.a2ui-table td{padding:8px 10px;border-color:var(--border)}
+.project-select:focus-within,.search-field:focus-within{outline:2px solid var(--brand-deep-teal);outline-offset:1px}
+.page-content pre{max-width:100%;overflow-x:auto}
+@media(max-width:820px){
+  .topbar{gap:8px;min-height:52px;padding:10px 12px;flex-wrap:wrap}
+  .topbar-actions{margin-left:auto;flex-wrap:wrap;max-width:100%}
+  .page-content{padding:16px 12px 28px}
+  .project-toolbar{flex-wrap:wrap}
+  .project-select{max-width:100%;min-width:0;flex:1 1 160px}
+  .search-input-compact{max-width:100%;min-width:0}
+  .side-nav-grouped{gap:4px}
+  .nav-parent{white-space:normal}
+  .nav-submenu{max-width:100%;min-width:0}
+  .nav-sublink{min-height:36px}
+  .notif-popover{position:fixed;top:70px;right:12px;width:min(360px,calc(100vw - 24px))}
+}
+@media(max-width:580px){
+  .panel,.stat-card,.project-card{padding:14px}
+  .stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stat-card{flex-wrap:wrap;gap:6px}
+  .stat-copy strong{font-size:20px}
+  .heading-actions,.form-actions{align-items:center;justify-content:flex-start}
+  .modal-backdrop{padding:12px}
+  .task-detail-dialog,.confirm-dialog,.app-dialog-card{padding:14px;max-height:calc(100dvh - 24px)}
+  .task-detail-footer,.task-detail-section-head,.project-detail-header{flex-wrap:wrap}
+}

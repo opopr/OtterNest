@@ -1,3 +1,4 @@
+import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AlertCircle, KeyRound, Plus, RefreshCw, ShieldCheck, Trash2, X } from "lucide-react";
 import { request } from "../api/client";
@@ -131,7 +132,7 @@ export default function AccessPage() {
         <section className="panel">
           <div className="panel-heading"><div className="panel-title"><KeyRound size={17} /><h3>创建临时授权</h3></div><span className="muted-inline">仅项目成员可被授权</span></div>
           <form className="form-panel" onSubmit={createGrant}>
-            <label>智能体<select value={agentId} onChange={(event) => setAgentId(event.target.value)} required><option value="">选择 智能体…</option>{eligibleMembers.map((member) => <option key={member.agent_id} value={member.agent_id}>{member.agent_name} · {member.role}</option>)}</select></label>
+            <label>智能体<select value={agentId} onChange={(event) => setAgentId(event.target.value)} required><option value="">选择 智能体…</option>{eligibleMembers.map((member) => <option key={member.agent_id} value={member.agent_id}>{member.agent_name} · {getUiLabel(member.role)}</option>)}</select></label>
             <label>授权范围（逗号分隔）<input value={scopes} onChange={(event) => setScopes(event.target.value)} placeholder="task.read, artifact.read" /></label>
             <div className="form-grid"><label>最高敏感级<select value={sensitivity} onChange={(event) => setSensitivity(event.target.value)}><option value="public">公开</option><option value="internal">内部</option><option value="confidential">机密</option><option value="restricted">受限</option></select></label><label>有效期（小时）<input type="number" min="1" max="720" value={expires} onChange={(event) => setExpires(event.target.value)} /></label></div>
             <p className="form-hint">授权只作用于所选任务，不替代项目成员身份，也不会绕过任务租约和其他安全门槛。</p>

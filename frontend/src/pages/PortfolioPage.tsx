@@ -1,3 +1,4 @@
+import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   Activity, AlertCircle, Bell, Check, CheckCheck, Clock3, FlaskConical,
@@ -79,7 +80,7 @@ export default function PortfolioPage() {
       setNotifications(inbox);
       if (!projectRows.some((item) => item.id === selectedId)) setSelectedId(projectRows[0]?.id || "");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Portfolio 数据读取失败");
+      setError(reason instanceof Error ? reason.message : "运营分析数据读取失败");
     } finally {
       setLoading(false);
     }
@@ -171,7 +172,7 @@ export default function PortfolioPage() {
   const runSchedule = async () => {
     const confirmed = await dialog.confirm({
       title: "执行跨项目公平调度",
-      message: "将按项目优先级与等待时间执行一次公平调度，并可能为 Agent 分配任务。是否继续？",
+      message: "将按项目优先级与等待时间执行一次公平调度，并可能为智能体分配任务。是否继续？",
       confirmText: "确认执行调度",
     });
     if (!confirmed) return;
@@ -182,7 +183,7 @@ export default function PortfolioPage() {
         method: "POST", body: JSON.stringify({ limit_per_project: 10, heartbeat_ttl_seconds: 180 })
       }));
       await loadOverview();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Portfolio 调度失败"); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "调度失败"); }
     finally { setSaving(false); }
   };
 
@@ -247,7 +248,7 @@ export default function PortfolioPage() {
             <div className="notification-list">
               {notifications.map((item) => <div className={"notification-row " + (item.read ? "is-read" : "")} key={item.id}>
                 <span className={"notification-dot level-" + item.level} />
-                <div className="notification-copy"><div><strong>{item.title}</strong><span className={"status-tag " + (item.level === "urgent" ? "tag-red" : item.level === "important" ? "tag-blue" : "tag-neutral")}>{levelLabel[item.level] || item.level}</span></div><p>{item.body}</p><small>{dateText(item.created_at)} · {item.source_kind}</small></div>
+                <div className="notification-copy"><div><strong>{item.title}</strong><span className={"status-tag " + (item.level === "urgent" ? "tag-red" : item.level === "important" ? "tag-blue" : "tag-neutral")}>{levelLabel[item.level] || getUiLabel(item.level)}</span></div><p>{item.body}</p><small>{dateText(item.created_at)} · {item.source_kind}</small></div>
                 {!item.read && <button className="icon-button" title="标记已读" onClick={() => void markRead(item.id)}><Check size={16} /></button>}
               </div>)}
               {!notifications.length && <div className="empty-state"><Bell size={24} /><strong>收件箱为空</strong><p>系统产生的审批、任务和运行通知会出现在这里。</p></div>}
@@ -270,7 +271,7 @@ export default function PortfolioPage() {
                 const draft = runDrafts[experiment.id] || { baseline: "", candidate: "", samples: "3", notes: "" };
                 const setDraft = (key: keyof typeof draft, value: string) => setRunDrafts((current) => ({ ...current, [experiment.id]: { ...draft, [key]: value } }));
                 return <article className="experiment-card" key={experiment.id}>
-                  <div className="experiment-card-head"><div><strong>{experiment.hypothesis}</strong><small>{experiment.target_kind} · {experiment.target_id}</small></div><span className={"status-tag " + (experiment.status === "promoted" ? "tag-green" : experiment.status === "rolled_back" ? "tag-neutral" : experiment.status === "evaluated" ? "tag-blue" : "tag-amber")}>{statusLabel[experiment.status] || experiment.status}</span></div>
+                  <div className="experiment-card-head"><div><strong>{experiment.hypothesis}</strong><small>{experiment.target_kind} · {experiment.target_id}</small></div><span className={"status-tag " + (experiment.status === "promoted" ? "tag-green" : experiment.status === "rolled_back" ? "tag-neutral" : experiment.status === "evaluated" ? "tag-blue" : "tag-amber")}>{statusLabel[experiment.status] || getUiLabel(experiment.status)}</span></div>
                   {experiment.status === "proposed" && <div className="experiment-run-form">
                     <label>基线分数<input type="number" min="0" max="100" value={draft.baseline} onChange={(event) => setDraft("baseline", event.target.value)} /></label>
                     <label>候选分数<input type="number" min="0" max="100" value={draft.candidate} onChange={(event) => setDraft("candidate", event.target.value)} /></label>

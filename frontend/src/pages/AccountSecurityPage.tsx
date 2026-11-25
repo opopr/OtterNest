@@ -1,3 +1,4 @@
+import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { AlertCircle, Copy, KeyRound, LockKeyhole, RefreshCw, ShieldCheck, ShieldOff, UserRound, History, LogOut } from "lucide-react";
 import { request } from "../api/client";
@@ -303,7 +304,7 @@ export default function AccountSecurityPage() {
         {audit?.findings.map((finding, idx) => (
           <div className="admin-event-row admin-event-row-gap" key={idx}>
             <div className="admin-event-title">
-              <span className={"status-tag " + (finding.level === "pass" ? "tag-green" : finding.level === "warning" ? "tag-amber" : "tag-neutral")}>{finding.level}</span>
+              <span className={"status-tag " + (finding.level === "pass" ? "tag-green" : finding.level === "warning" ? "tag-amber" : "tag-neutral")}>{getUiLabel(finding.level)}</span>
               <strong>{finding.check}</strong>
             </div>
             <small>{finding.message}</small>

@@ -1,3 +1,4 @@
+import { getUiLabel } from "../utils/labels";
 import "./ExternalInterfacesPage.css";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Activity, ArrowUpRight, Bot, Copy, Globe2, Link2, Network, Plus, RefreshCw, ShieldCheck, Webhook, X } from "lucide-react";
@@ -284,7 +285,7 @@ export default function ExternalInterfacesPage() {
       </div>
       <div className="flex-row-gap">
         {capabilities.storage?.backend && <span className="status-tag tag-green">存储: {capabilities.storage.backend.toUpperCase()} ({capabilities.storage.multipart_enabled ? "分块上传已启用" : "标准上传"})</span>}
-        {capabilities.vector_search?.mode && <span className="status-tag tag-green">向量检索: {capabilities.vector_search.mode} ({capabilities.vector_search.embedding_dim ?? "—"}d)</span>}
+        {capabilities.vector_search?.mode && <span className="status-tag tag-green">向量检索: {getUiLabel(capabilities.vector_search.mode)} ({capabilities.vector_search.embedding_dim ?? "—"}d)</span>}
         {capabilities.kms?.key_source && <span className="status-tag tag-green">KMS 密钥源: {capabilities.kms.key_source}</span>}
       </div>
     </section>}
@@ -374,7 +375,7 @@ export default function ExternalInterfacesPage() {
             {item.last_error && <p>最近异常：{item.last_error}</p>}</div>
           <div className="external-endpoint-actions">
             <span className={"status-tag " + (item.status === "unknown" ? "tag-red" : item.status === "submitted" ? "tag-green" : "tag-amber")}>
-              {item.status === "unknown" ? "结果未知" : item.status === "pending" ? "待发送" : item.status === "remote" ? "远端处理中" : item.status === "cancel_requested" ? "取消待确认" : item.status === "submitted" ? "待验收" : item.status}
+              {item.status === "unknown" ? "结果未知" : item.status === "pending" ? "待发送" : item.status === "remote" ? "远端处理中" : item.status === "cancel_requested" ? "取消待确认" : item.status === "submitted" ? "待验收" : getUiLabel(item.status)}
             </span>
             <button className="secondary-button compact" onClick={() => setSelectedTaskId(item.task_id)}>任务详情</button>
           </div>

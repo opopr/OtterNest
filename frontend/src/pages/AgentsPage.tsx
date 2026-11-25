@@ -1,3 +1,4 @@
+import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Bot, Copy, Cpu, Edit3, KeyRound, Plus, Power, RefreshCw, RotateCcw, ShieldCheck,
@@ -407,7 +408,7 @@ export default function AgentsPage() {
           {showRuntimeForm && <form className="form-panel embedded-form" onSubmit={createRuntime}><div className="form-grid"><label>实例标签<input value={runtimeLabel} onChange={(event) => setRuntimeLabel(event.target.value)} required maxLength={120} placeholder="oracle-arm-runner-01" /></label><label>运行环境<input value={runtimeEnvironment} onChange={(event) => setRuntimeEnvironment(event.target.value)} required maxLength={160} placeholder="Oracle ARM / WSL2 / local" /></label></div><div className="form-actions"><button className="primary-button compact" disabled={saving}>创建 运行实例</button></div></form>}
           <div className="runtime-list">{runtimes.map((runtime) => <article className="runtime-card" key={runtime.id}>
             <div className="runtime-card-head"><div><strong>{runtime.label}</strong><small>{runtime.environment} · {runtime.id.slice(0, 12)}</small></div><span className={"status-tag " + (runtime.online ? "tag-green" : runtime.enabled ? "tag-amber" : "tag-neutral")}>{!runtime.enabled ? "已禁用" : runtime.online ? "在线" : "离线"}</span></div>
-            <div className="runtime-meta"><span>状态：{runtime.status}</span><span>最近心跳：{runtime.last_seen ? new Date(runtime.last_seen).toLocaleString("zh-CN", { hour12: false }) : "从未上报"}</span><span>独立凭据：{runtime.has_token ? "已签发" : "未签发"}</span></div>
+            <div className="runtime-meta"><span>状态：{getUiLabel(runtime.status)}</span><span>最近心跳：{runtime.last_seen ? new Date(runtime.last_seen).toLocaleString("zh-CN", { hour12: false }) : "从未上报"}</span><span>独立凭据：{runtime.has_token ? "已签发" : "未签发"}</span></div>
             {Object.keys(runtime.last_health || {}).length > 0 && <pre className="json-preview">{JSON.stringify(runtime.last_health, null, 2)}</pre>}
             <div className="runtime-actions">{runtime.enabled && <button className="secondary-button compact" disabled={saving} onClick={() => void issueRuntimeToken(runtime)}><KeyRound size={13} />签发 / 轮换凭据</button>}{runtime.enabled && <button className="text-button" disabled={saving} onClick={() => void disableRuntime(runtime)}><XCircle size={13} />禁用 运行实例</button>}</div>
           </article>)}{!runtimes.length && <div className="empty-mini">尚未登记 运行实例。创建 运行实例 后，Runner 使用独立凭据定期上报心跳。</div>}</div>

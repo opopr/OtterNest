@@ -1,3 +1,4 @@
+import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity, AlertCircle, Bot, Copy, Cpu, KeyRound,
@@ -37,7 +38,7 @@ export default function RuntimeMonitorPage(){
   setLoading(true);setError("");
   try{
    setRows(await request<RuntimeRow[]>("/runtimes"));
-  }catch(reason){setError(reason instanceof Error?reason.message:"Runtime 状态读取失败");}
+  }catch(reason){setError(reason instanceof Error?reason.message:"运行实例状态读取失败");}
   finally{setLoading(false);}
  },[isOwner]);
 
@@ -61,23 +62,23 @@ export default function RuntimeMonitorPage(){
  },[rows,filter,query]);
 
  const rotateToken=async(row:RuntimeRow)=>{
-  if(!(await dialog.confirm({title:"轮换 Runtime 凭据",message:"为「"+row.label+"」轮换独立 Runtime 凭据？旧凭据将立即失效，必须同步更新对应 Runner 的配置。",confirmText:"确认轮换",tone:"warning"})))return;
+  if(!(await dialog.confirm({title:"轮换运行实例凭据",message:"为「"+row.label+"」轮换独立运行实例凭据？旧凭据将立即失效，必须同步更新对应 Runner 的配置。",confirmText:"确认轮换",tone:"warning"})))return;
   setSaving(true);setError("");
   try{
    const token=await request<RuntimeToken>("/agents/"+encodeURIComponent(row.agent_id)+"/runtimes/"+encodeURIComponent(row.id)+"/token",{method:"POST"});
    setIssuedToken(token);
    await load();
-  }catch(reason){setError(reason instanceof Error?reason.message:"Runtime 凭据轮换失败");}
+  }catch(reason){setError(reason instanceof Error?reason.message:"运行实例凭据轮换失败");}
   finally{setSaving(false);}
  };
 
  const disableRuntime=async(row:RuntimeRow)=>{
-  if(!(await dialog.confirm({title:"禁用 Runtime",message:"确认禁用 Runtime「"+row.label+"」？它将不能再提交心跳。该操作不会自动终止外部机器上的进程。",confirmText:"确认禁用",tone:"warning"})))return;
+  if(!(await dialog.confirm({title:"禁用运行实例",message:"确认禁用运行实例「"+row.label+"」？它将不能再提交心跳。该操作不会自动终止外部机器上的进程。",confirmText:"确认禁用",tone:"warning"})))return;
   setSaving(true);setError("");
   try{
    await request("/agents/"+encodeURIComponent(row.agent_id)+"/runtimes/"+encodeURIComponent(row.id)+"/disable",{method:"POST"});
    await load();
-  }catch(reason){setError(reason instanceof Error?reason.message:"禁用 Runtime 失败");}
+  }catch(reason){setError(reason instanceof Error?reason.message:"禁用运行实例 失败");}
   finally{setSaving(false);}
  };
 
@@ -115,7 +116,7 @@ export default function RuntimeMonitorPage(){
    {loading?<div className="panel-loading"><span className="spinner"/>正在汇总 运行实例 状态…</div>:visible.length?<div className="runtime-monitor-list">{visible.map(row=><article className="runtime-monitor-card" key={row.id}>
     <div className="runtime-monitor-card-head">
      <div className="runtime-monitor-identity"><div className="runtime-monitor-avatar"><Cpu size={18}/></div><div><strong>{row.label}</strong><small>{row.agent_name} · {row.agent_platform}</small><code>{row.id}</code></div></div>
-     <div className="runtime-monitor-badges"><span className={"status-tag "+(!row.enabled?"tag-neutral":row.online?"tag-green":"tag-amber")}>{!row.enabled?"已禁用":row.online?"在线":"离线"}</span><span className="status-tag tag-neutral">{stateLabels[row.status]||row.status}</span>{!row.agent_enabled&&<span className="status-tag tag-red">智能体 已禁用</span>}</div>
+     <div className="runtime-monitor-badges"><span className={"status-tag "+(!row.enabled?"tag-neutral":row.online?"tag-green":"tag-amber")}>{!row.enabled?"已禁用":row.online?"在线":"离线"}</span><span className="status-tag tag-neutral">{stateLabels[row.status]||getUiLabel(row.status)}</span>{!row.agent_enabled&&<span className="status-tag tag-red">智能体 已禁用</span>}</div>
     </div>
     <div className="runtime-monitor-meta">
      <div><small>运行环境</small><strong>{row.environment}</strong></div>
@@ -127,7 +128,7 @@ export default function RuntimeMonitorPage(){
      {row.enabled&&<button className="secondary-button compact" disabled={saving} onClick={()=>void rotateToken(row)}><KeyRound size={13}/>{row.has_token?"轮换凭据":"签发凭据"}</button>}
      {row.enabled&&<button className="text-button" disabled={saving} onClick={()=>void disableRuntime(row)}><XCircle size={13}/>禁用 运行实例</button>}
     </div>
-   </article>)}</div>:<div className="empty-state"><Monitor size={27}/><strong>{rows.length?"没有符合条件的 Runtime":"尚未登记 Runtime"}</strong><p>{rows.length?"调整搜索条件或状态筛选。":"先在 Agent 管理中登记 Agent，再为它创建 Runtime 并签发独立凭据。"}</p>{!rows.length&&<Link className="secondary-button" to="/agents">前往 智能体 管理</Link>}</div>}
+   </article>)}</div>:<div className="empty-state"><Monitor size={27}/><strong>{rows.length?"没有符合条件的运行实例":"尚未登记运行实例"}</strong><p>{rows.length?"调整搜索条件或状态筛选。":"请先登记智能体，再创建运行实例并签发独立凭据。"}</p>{!rows.length&&<Link className="secondary-button" to="/agents">前往 智能体 管理</Link>}</div>}
   </section>
   <p className="runtime-monitor-footnote"><Activity size={13}/>在线状态由服务端按最近 180 秒心跳、运行实例 启用状态和 idle/busy 状态计算；本页面不会自行推断或伪造在线状态。刷新可重新读取服务器快照。</p>
  </div>;

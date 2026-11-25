@@ -1,3 +1,4 @@
+import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertCircle, Bot, Check, CheckCircle2, ClipboardCheck, FileSearch, MessageSquare,
@@ -449,7 +450,7 @@ export default function GovernancePage() {
                                 checked={policySelection.includes(m.agent_id)}
                                 onChange={() => togglePolicyMember(m.agent_id)}
                               />
-                              <span>{m.agent_name} ({m.role})</span>
+                              <span>{m.agent_name} ({getUiLabel(m.role)})</span>
                             </label>
                           ))}
                         </div>
