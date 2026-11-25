@@ -96,7 +96,7 @@ export const NAVIGATION_GROUPS: NavGroup[] = [
     id: "system",
     label: "系统设置",
     icon: "system",
-    items: [{ to: "/system", label: "系统与事件", icon: "system" }]
+    items: [{ to: "/system", label: "系统设置", icon: "system" }]
   }
 ];
 
@@ -108,4 +108,23 @@ export function findNavGroupId(pathname: string): string | null {
 
 export function findNavLabel(pathname: string): string {
   return ALL_NAV_ITEMS.find((item) => item.to === pathname)?.label || "控制中心";
+}
+
+const NAV_ALIASES: Record<string, string> = {
+  "/": "首页 工作台 dashboard overview", "/command": "对话 聊天 指令 AI command chat",
+  "/projects": "项目 project", "/tasks": "待办 任务 task",
+  "/goals-workflows": "目标 流程 goal workflow", "/project-portability": "备份 恢复 导入 导出 backup import export",
+  "/agents": "智能体 机器人 agent bot", "/runtimes": "心跳 执行节点 runtime runner",
+  "/interfaces": "回调 Webhook A2A MCP API 接口", "/knowledge": "知识 记忆 memory knowledge",
+  "/skills": "技能 skill", "/artifacts": "文件 上传 下载 artifact",
+  "/governance": "审批 验收 决策 approval review", "/access": "权限 授权 access",
+  "/account-security": "密码 双重验证 账号 登录 security", "/portfolio": "通知 运营 指标 notification",
+  "/system": "事件 设置 诊断 更新 system"
+};
+export function searchNavigation(query: string): NavItem[] {
+  const terms = query.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
+  return NAVIGATION_GROUPS.flatMap(group => group.items.filter(item => {
+    const haystack = [group.label, item.label, item.to, NAV_ALIASES[item.to] || ""].join(" ").toLocaleLowerCase();
+    return terms.every(term => haystack.includes(term));
+  }));
 }

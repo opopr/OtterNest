@@ -1379,3 +1379,46 @@ input, textarea, select { accent-color: var(--accent); }
  .app-dialog-card{padding:16px}
  .app-dialog-card .form-actions button{flex:1 1 0;min-width:0;white-space:normal}
 }
+
+/* Navigation and compact agent workspace. */
+.page-search-trigger{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;color:var(--text-soft);background:var(--surface);font-size:13px}
+.page-search-trigger kbd{font:inherit;font-size:11px;border:1px solid var(--border);border-radius:4px;padding:1px 4px;color:var(--muted)}
+.page-search-dialog{width:min(100%,480px);max-height:calc(100dvh - 48px);display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:12px;min-width:0;padding:18px}
+.page-search-backdrop{z-index:75}
+.page-search-dialog h3{font-size:16px;margin:0}
+.page-search-field,.agent-search-field{display:flex;align-items:center;gap:8px;min-width:0;padding:9px 11px;border:1px solid var(--border-strong);border-radius:8px;color:var(--text-soft)}
+.page-search-field:focus-within,.agent-search-field:focus-within{border-color:var(--brand-deep-teal)}
+.page-search-field input,.agent-search-field input{min-width:0;width:100%;flex:1;border:0;background:transparent;color:var(--text);font-size:14px;outline:none;box-shadow:none}
+.page-search-field svg,.agent-search-field svg{flex-shrink:0}
+.page-search-results{overflow-y:auto;min-height:0;display:grid;gap:3px}
+.page-search-results a{display:flex;align-items:center;gap:10px;min-height:40px;padding:8px 10px;border-radius:8px;color:var(--text);font-size:14px}
+.page-search-results a:hover,.page-search-results a:focus-visible{background:var(--accent-soft);color:var(--accent-deep)}
+.page-search-results a svg:first-child{color:var(--brand-deep-teal)}
+.page-search-results a svg:last-child{margin-left:auto;color:var(--muted)}
+.nav-sublink{gap:8px}
+.nav-sublink svg{color:var(--brand-deep-teal)}
+.nav-sublink.active svg{color:var(--accent-deep)}
+.user-menu a{display:flex;align-items:center;gap:8px;padding:10px;color:var(--text-soft);font-size:13px;border-radius:6px}
+.user-menu a:hover{background:var(--accent-soft)}
+.agent-filter-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px;min-width:0}
+.agent-search-field{flex:1 1 200px}
+.agent-filter-bar select{min-width:0;max-width:100%;padding:8px 10px;border:1px solid var(--border-strong);border-radius:8px;color:var(--text);background:var(--surface);font-size:13px}
+.agent-card{display:grid;align-content:start;gap:10px;min-width:0}
+.agent-card-head{align-items:flex-start;gap:8px;flex-wrap:wrap}
+.agent-card-identity{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.agent-card-identity>div:last-child{min-width:0}
+.agent-card-identity h3{font-size:15px;line-height:1.4;margin:0 0 4px;overflow-wrap:anywhere}
+.agent-card-identity p{margin:0;color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.agent-card-identity .agent-avatar{flex-shrink:0}
+.agent-identity-details code{display:block;overflow-wrap:anywhere;font-size:12px;color:var(--muted)}
+.agent-more-actions{min-width:0;flex:1 1 100%;border-top:1px solid var(--border);padding-top:8px}
+.agent-more-actions summary{cursor:pointer;display:flex;align-items:center;gap:6px;min-height:32px;color:var(--text-soft);font-size:13px}
+.agent-more-actions summary::-webkit-details-marker{display:none}
+.agent-more-actions[open] summary svg{transform:rotate(180deg)}
+.agent-more-action-list{display:flex;flex-wrap:wrap;gap:6px;padding:4px 0}
+.agent-card-selected{border-color:var(--brand-coral)}
+.task-center-row{padding:11px 0}
+.task-center-main small,.task-center-main p{font-size:12px}
+@media(max-width:1100px){.page-search-trigger kbd{display:none}}
+@media(max-width:820px){.page-search-trigger span{display:none}.page-search-trigger{min-width:36px;justify-content:center;padding:6px}.page-search-dialog{max-height:calc(100dvh - 32px)}}
+@media(max-width:580px){.agent-filter-bar{gap:8px}.agent-search-field{flex:1 1 100%}.agent-filter-bar select{flex:1}.agent-card-head>.status-tag{flex-shrink:0}.agent-card-identity{flex-basis:160px}.page-search-dialog{padding:14px}}

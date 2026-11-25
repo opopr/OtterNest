@@ -2,7 +2,7 @@ import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Bot, Copy, Cpu, Edit3, KeyRound, Plus, Power, RefreshCw, RotateCcw, ShieldCheck,
-  Terminal, Trash2, X, XCircle
+  Terminal, Trash2, X, XCircle, Search, ChevronDown
 } from "lucide-react";
 import { request } from "../api/client";
 import type { Agent } from "../api/types";
@@ -50,7 +50,9 @@ export default function AgentsPage() {
 
   const activeAgents = useMemo(() => agents.filter((agent) => !agent.deleted_at), [agents]);
   const trashedAgents = useMemo(() => agents.filter((agent) => Boolean(agent.deleted_at)), [agents]);
-  const visibleAgents = tab === "active" ? activeAgents : trashedAgents;
+  const [agentQuery, setAgentQuery] = useState("");
+  const [agentFilter, setAgentFilter] = useState("all");
+  const visibleAgents = useMemo(() => (tab === "active" ? activeAgents : trashedAgents).filter(agent => (tab === "trash" || agentFilter === "all" || agent.enabled === (agentFilter === "enabled")) && [agent.name, agent.platform, agent.id, ...(agent.declared_capabilities || []), ...(agent.verified_capabilities || [])].join(" ").toLocaleLowerCase().includes(agentQuery.trim().toLocaleLowerCase())), [tab, activeAgents, trashedAgents, agentQuery, agentFilter]);
   const selectedAgent = useMemo(() => agents.find((agent) => agent.id === selectedAgentId) || null, [agents, selectedAgentId]);
 
   const loadAgents = useCallback(async () => {
@@ -102,7 +104,7 @@ export default function AgentsPage() {
       setShowForm(false);
       await loadAgents();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "创建智能体 失败");
+      setError(reason instanceof Error ? reason.message : "创建智能体失败");
     } finally { setSaving(false); }
   };
 
@@ -174,7 +176,7 @@ export default function AgentsPage() {
 
   const issueRuntimeToken = async (runtime: Runtime) => {
     if (!selectedAgent) return;
-    if (!(await dialog.confirm({ title: "签发或轮换运行实例凭据", message: "为该运行实例 签发或轮换独立凭据？旧凭据会立即失效。", confirmText: "确认签发", tone: "warning" }))) return;
+    if (!(await dialog.confirm({ title: "签发或轮换运行实例凭据", message: "为该运行实例签发或轮换独立凭据？旧凭据会立即失效。", confirmText: "确认签发", tone: "warning" }))) return;
     setSaving(true);
     try {
       const result = await request<RuntimeToken>("/agents/" + encodeURIComponent(selectedAgent.id) + "/runtimes/" + encodeURIComponent(runtime.id) + "/token", { method: "POST" });
@@ -190,7 +192,7 @@ export default function AgentsPage() {
     try {
       await request("/agents/" + encodeURIComponent(selectedAgent.id) + "/runtimes/" + encodeURIComponent(runtime.id) + "/disable", { method: "POST" });
       await loadRuntimes(selectedAgent.id);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "禁用运行实例 失败"); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "禁用运行实例失败"); }
     finally { setSaving(false); }
   };
 
@@ -280,8 +282,8 @@ export default function AgentsPage() {
 
       {createdToken && (
         <div className="panel token-panel">
-          <div className="token-panel-title"><ShieldCheck size={18} /><strong>智能体 已创建：请立即保存令牌</strong></div>
-          <p>令牌只在创建时返回一次。离开本页或刷新后不会再次显示，请只交给可信执行节点 使用。</p>
+          <div className="token-panel-title"><ShieldCheck size={18} /><strong>智能体令牌已签发：请立即保存令牌</strong></div>
+          <p>令牌只在创建时返回一次。离开本页或刷新后不会再次显示，请只交给可信执行节点使用。</p>
           <div className="token-value"><code>{createdToken}</code><button className="secondary-button compact" onClick={() => void copyToken(createdToken)}><Copy size={15} />复制</button></div>
           <button className="text-button" onClick={() => setCreatedToken("")}>我已安全保存</button>
         </div>
@@ -289,8 +291,8 @@ export default function AgentsPage() {
 
       {runtimeToken && (
         <div className="panel token-panel">
-          <div className="token-panel-title"><KeyRound size={18} /><strong>运行实例 独立凭据：请立即保存</strong></div>
-          <p>此凭据只授权给指定 运行实例。轮换后旧凭据立即失效，不要把它当作 智能体 主令牌。</p>
+          <div className="token-panel-title"><KeyRound size={18} /><strong>运行实例独立凭据：请立即保存</strong></div>
+          <p>此凭据只授权给指定运行实例。轮换后旧凭据立即失效，不要把它当作 智能体主令牌。</p>
           <div className="token-value"><code>{runtimeToken.token}</code><button className="secondary-button compact" onClick={() => void copyToken(runtimeToken.token)}><Copy size={15} />复制</button></div>
           <button className="text-button" onClick={() => setRuntimeToken(null)}>我已安全保存</button>
         </div>
@@ -300,12 +302,12 @@ export default function AgentsPage() {
         <form className="panel form-panel" onSubmit={createAgent}>
           <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>登记智能体</h3></div><button type="button" className="icon-button" onClick={() => setShowForm(false)}><X size={17} /></button></div>
           <div className="form-grid three">
-            <label>智能体 名称<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={120} /></label>
+            <label>智能体名称<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={120} /></label>
             <label>平台 / 环境<input value={platform} onChange={(event) => setPlatform(event.target.value)} required maxLength={80} /></label>
             <label>执行方式<select value={executionMode} onChange={(event) => setExecutionMode(event.target.value as Agent["execution_mode"])}><option value="manual">手动</option><option value="polling">执行节点轮询</option><option value="remote">远程接入</option></select></label>
           </div>
           <label>能力声明（逗号分隔）<input value={capabilities} onChange={(event) => setCapabilities(event.target.value)} placeholder="python, browser, filesystem" /></label>
-          <p className="form-hint">能力声明不等于可信能力。所有者必须独立核验后，智能体 才能被分配要求该能力的任务。</p>
+          <p className="form-hint">能力声明不等于可信能力。所有者必须独立核验后，智能体才能被分配要求该能力的任务。</p>
           <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "创建中…" : "创建智能体"}</button></div>
         </form>
       )}
@@ -314,7 +316,7 @@ export default function AgentsPage() {
         <form className="panel form-panel" onSubmit={updateAgent}>
           <div className="panel-heading"><div className="panel-title"><Edit3 size={17} /><h3>编辑智能体：{editingAgent.name}</h3></div><button type="button" className="icon-button" onClick={() => setEditingAgent(null)}><X size={17} /></button></div>
           <div className="form-grid three">
-            <label>智能体 名称<input value={editName} onChange={(event) => setEditName(event.target.value)} required maxLength={120} /></label>
+            <label>智能体名称<input value={editName} onChange={(event) => setEditName(event.target.value)} required maxLength={120} /></label>
             <label>平台 / 环境<input value={editPlatform} onChange={(event) => setEditPlatform(event.target.value)} required maxLength={80} /></label>
             <label>执行方式<select value={editExecutionMode} onChange={(event) => setEditExecutionMode(event.target.value as Agent["execution_mode"])}><option value="manual">手动</option><option value="polling">执行节点轮询</option><option value="remote">远程接入</option></select></label>
           </div>
@@ -335,29 +337,28 @@ export default function AgentsPage() {
         </button>
       </div>
 
+      <div className="panel agent-filter-bar"><label className="agent-search-field"><Search size={16}/><input aria-label="搜索智能体" placeholder="搜索名称、平台或能力" value={agentQuery} onChange={event => setAgentQuery(event.target.value)}/></label>{tab === "active" && <select aria-label="智能体状态" value={agentFilter} onChange={event => setAgentFilter(event.target.value)}><option value="all">全部状态</option><option value="enabled">已启用</option><option value="disabled">已停用</option></select>}<span className="muted-inline">{visibleAgents.length} 项结果</span><button type="button" className="text-button" onClick={() => {setAgentQuery("");setAgentFilter("all");}}>清除筛选</button></div>
       <div className="agent-grid">
         {loading ? <div className="panel-loading"><div className="spinner" /></div> : visibleAgents.length === 0 ? (
           <div className="panel empty-state">
             {tab === "active" ? <Bot size={30} /> : <Trash2 size={30} />}
-            <strong>{tab === "active" ? "尚未登记智能体" : "回收站为空"}</strong>
-            <p>{tab === "active" ? "" : "可恢复或彻底删除。"}</p>
+            <strong>{(tab === "active" ? activeAgents : trashedAgents).length ? "没有符合条件的智能体" : tab === "active" ? "尚未登记智能体" : "回收站为空"}</strong>
           </div>
         ) : visibleAgents.map((agent) => (
           <article className={"panel agent-card " + (selectedAgentId === agent.id ? "agent-card-selected" : "")} key={agent.id}>
             <div className="agent-card-head">
-              <div className="agent-avatar"><Bot size={20} /></div>
+              <div className="agent-card-identity"><div className="agent-avatar"><Bot size={20} /></div><div><h3>{agent.name}</h3><p>{agent.platform} · {getUiLabel(agent.execution_mode)}</p></div></div>
               <span className={"status-tag " + (agent.deleted_at ? "tag-neutral" : agent.enabled ? "tag-green" : "tag-amber")}>
                 {agent.deleted_at ? "已删除" : agent.enabled ? "已启用" : "已停用"}
               </span>
             </div>
-            <h3>{agent.name}</h3><p>{agent.platform} · {getUiLabel(agent.execution_mode)}</p>
             <div className="agent-capabilities"><span>声明能力 {(agent.declared_capabilities || []).length}</span><span>已核验 {(agent.verified_capabilities || []).length}</span></div>
             <div className="capability-list">
               {(agent.verified_capabilities || []).length > 0
                 ? (agent.verified_capabilities || []).map((capability) => <span className="capability-tag verified" key={capability}><ShieldCheck size={12} />{capability}</span>)
                 : <span className="muted-inline">暂无已核验能力</span>}
             </div>
-            <small className="agent-id">ID · {agent.id}</small>
+            <details className="library-disclosure agent-identity-details"><summary>智能体标识</summary><code>{agent.id}</code></details>
             {tab === "active" ? (
               <div className="card-action-row">
                 <button className="secondary-button compact agent-detail-button flex-1" onClick={() => setSelectedAgentId((current) => current === agent.id ? "" : agent.id)}>
@@ -366,6 +367,7 @@ export default function AgentsPage() {
                 <button className="secondary-button compact" disabled={saving} onClick={() => startEditAgent(agent)} title="编辑基本信息">
                   <Edit3 size={14} />编辑
                 </button>
+                <details className="agent-more-actions"><summary>更多操作 <ChevronDown size={13}/></summary><div className="agent-more-action-list">
                 <button className="secondary-button compact" disabled={saving || !agent.enabled} onClick={() => void rotateAgentToken(agent)} title="重置/重新生成主令牌">
                   <KeyRound size={14} />重置令牌
                 </button>
@@ -381,6 +383,7 @@ export default function AgentsPage() {
                 <button className="text-button" disabled={saving} onClick={() => void deleteAgent(agent)} title="移入回收站">
                   <Trash2 size={14} />删除
                 </button>
+                </div></details>
               </div>
             ) : (
               <div className="card-action-row-lg">

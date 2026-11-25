@@ -1,17 +1,17 @@
-import { Component, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
+import { Component, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArchiveRestore, ArrowUpRight, Bell, BookMarked, BookOpen, Bot, CheckCheck, ChevronDown,
   CircleHelp, ClipboardCheck, FileArchive, FolderKanban, Gauge, GitBranch, KeyRound,
-  LayoutDashboard, LockKeyhole, LogOut, Menu, MessageSquare, Monitor, PlugZap, Settings2, X,
+  LayoutDashboard, LockKeyhole, LogOut, Menu, MessageSquare, Monitor, PlugZap, Search, Settings2, X,
   ShieldCheck, Wifi, type LucideIcon
 } from "lucide-react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { getApiOrigin, request } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { useSystemMode } from "../auth/SystemModeProvider";
 import { getSystemModeLabel } from "../utils/labels";
 import BrandMark from "./BrandMark";
-import { NAVIGATION_GROUPS, findNavLabel, findNavGroupId, type NavIconKey } from "../utils/navigation";
+import { NAVIGATION_GROUPS, findNavLabel, findNavGroupId, searchNavigation, type NavIconKey } from "../utils/navigation";
 
 const NAV_ICONS: Record<NavIconKey, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -88,6 +88,42 @@ export default function AppShell() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<TopbarNotification[]>([]);
   const location = useLocation();
+  const navigate = useNavigate();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [pageQuery, setPageQuery] = useState("");
+  const searchTrigger = useRef<HTMLButtonElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const searchDialog = useRef<HTMLElement>(null);
+  const searchResults = searchNavigation(pageQuery);
+  const closeSearch = useCallback(() => { setSearchOpen(false); searchTrigger.current?.focus(); }, []);
+  const openSearch = useCallback(() => { setPageQuery(""); setMenuOpen(false); setNotifOpen(false); setSearchOpen(true); }, []);
+  useEffect(() => {
+    const onShortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k" && !document.querySelector(".app-dialog-card, .task-detail-dialog, .confirm-dialog")) {
+        event.preventDefault(); openSearch();
+      }
+    };
+    document.addEventListener("keydown", onShortcut);
+    return () => document.removeEventListener("keydown", onShortcut);
+  }, [openSearch]);
+  useEffect(() => {
+    if (!searchOpen) return;
+    searchInput.current?.focus();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); closeSearch(); }
+      if (event.key === "Tab") {
+        const items = Array.from(searchDialog.current?.querySelectorAll<HTMLElement>("button, input, a[href]") || []);
+        const first = items[0], last = items[items.length - 1];
+        if (!first || !last) return;
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => { document.body.style.overflow = previousOverflow; document.removeEventListener("keydown", onKeyDown); };
+  }, [searchOpen, closeSearch]);
   const [expandedNavId, setExpandedNavId] = useState<string | null>(
     () => findNavGroupId(location.pathname)
   );
@@ -97,6 +133,7 @@ export default function AppShell() {
     setMobileNavOpen(false);
     setMenuOpen(false);
     setNotifOpen(false);
+    setSearchOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -207,7 +244,8 @@ export default function AppShell() {
                             onClick={() => setMobileNavOpen(false)}
                             className={({ isActive }) => "nav-sublink" + (isActive ? " active" : "")}
                           >
-                            {item.label}
+                            {(() => { const ItemIcon = NAV_ICONS[item.icon]; return <ItemIcon size={15} aria-hidden="true"/>; })()}
+                            <span>{item.label}</span>
                           </NavLink>
                         ))}
                       </div>
@@ -231,6 +269,13 @@ export default function AppShell() {
         
       </aside>
 
+      {searchOpen && <div className="modal-backdrop page-search-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) closeSearch(); }}>
+        <section ref={searchDialog} className="panel page-search-dialog" role="dialog" aria-modal="true" aria-labelledby="page-search-title">
+          <div className="panel-heading"><h3 id="page-search-title">搜索页面</h3><button className="icon-button" type="button" aria-label="关闭页面搜索" onClick={closeSearch}><X size={17}/></button></div>
+          <form className="page-search-field" onSubmit={event => { event.preventDefault(); if (searchResults.length) { closeSearch(); navigate(searchResults[0].to); } }}><Search size={18}/><input ref={searchInput} aria-label="搜索菜单" placeholder="输入页面名称或关键词" value={pageQuery} onChange={event => setPageQuery(event.target.value)}/></form>
+          <div className="page-search-results" aria-label="页面搜索结果">{searchResults.map(item => { const Icon = NAV_ICONS[item.icon]; return <Link key={item.to} to={item.to} onClick={closeSearch}><Icon size={17}/><span>{item.label}</span><ArrowUpRight size={14}/></Link>; })}{!searchResults.length && <div className="empty-mini">没有匹配的页面</div>}</div>
+        </section>
+      </div>}
       <div className="workspace">
         <header className="topbar">
           <div className="breadcrumb">
@@ -238,6 +283,7 @@ export default function AppShell() {
             <strong>{findNavLabel(location.pathname)}</strong>
           </div>
           <div className="topbar-actions">
+            <button ref={searchTrigger} type="button" className="page-search-trigger" aria-label="搜索页面" aria-haspopup="dialog" aria-expanded={searchOpen} onClick={openSearch}><Search size={16}/><span>搜索页面</span><kbd>Ctrl K</kbd></button>
             <div className={"system-pill " + (systemMode?.mode === "normal" ? "is-ok" : "is-warn")}>
               <span className="system-dot" />{modeLabel}
             </div>
@@ -310,6 +356,7 @@ export default function AppShell() {
               </button>
               {menuOpen && (
                 <div className="user-menu">
+                  {user?.kind === "owner" && <Link to="/account-security" onClick={() => setMenuOpen(false)}><LockKeyhole size={15}/>账号安全</Link>}
                   <button onClick={() => { setMenuOpen(false); void logout(); }}>
                     <LogOut size={15} />退出登录
                   </button>

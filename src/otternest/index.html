@@ -1560,7 +1560,7 @@ input,textarea,select,.search-box,.project-pill-wrap{border-radius:8px;min-width
             <select id="projectSelect" aria-label="选择当前工作项目" onchange="onProjectSwitch()"></select>
           </div>
         </div>
-        <div id="pageSub" class="topbar-sub">总览团队项目进度、在线 Agent 与实时审计动态</div>
+        <div id="pageSub" class="topbar-sub">总览团队项目进度、在线智能体 与实时审计动态</div>
       </div>
 
       <div class="topbar-right">
@@ -1757,13 +1757,13 @@ function uiForm({title='填写信息',subtitle='',fields=[],submitText='确定',
 }
 
 const NAV_DEFS=[
-  ['overview','总览','/assets/icons/SVG/导航/home-概览.svg','总览项目任务分布、Agent 在线心跳与最近动态'],
+  ['overview','总览','/assets/icons/SVG/导航/home-概览.svg','总览项目任务分布、智能体在线心跳与最近动态'],
   ['projects','项目与任务','/assets/icons/SVG/导航/folder-项目管理.svg','管理项目、任务图谱、租约核验与执行进度'],
   ['commands','智能指挥中心','/assets/icons/SVG/导航/sparkle-智能指挥中心.svg','受限中文意图解析与 10 分钟二次确认执行预览'],
   ['agents','智能体管理','/assets/icons/SVG/导航/bot-Agent管理.svg','管理可执行节点、运行实例心跳及已独立核验能力'],
   ['approvals','操作审批','/assets/icons/SVG/导航/shield-check-审批管理.svg','集中审批高风险任务、外部副作用核对与跨项目共享提案'],
   ['collaboration','协作与决策','/assets/icons/SVG/导航/network-协作调度.svg','发起团队决策、独立意见审查与二轮协同协商'],
-  ['memories','记忆与知识','/assets/icons/SVG/导航/database-记忆与知识.svg','管理项目记忆修订、Skill 评估记录与跨项目知识发布'],
+  ['memories','记忆与知识','/assets/icons/SVG/导航/database-记忆与知识.svg','管理项目记忆修订、技能评估记录与跨项目知识发布'],
   ['events','事件与审计','/assets/icons/SVG/导航/chart-监控分析.svg','查看不可变项目审计事件流与详细变更载荷'],
   ['settings','系统设置','/assets/icons/SVG/导航/gear-系统设置.svg','管理账号登录与 2FA 安全、项目宪章硬预算及项目导出恢复'],
 ];
@@ -2175,13 +2175,13 @@ function formatEventItem(e,taskNameById){
     return{icon:isWarn?'/assets/icons/SVG/状态/alert-失败.svg':'/assets/icons/SVG/功能/lock-安全权限.svg',text:labels[k]||`管理员认证事件（${k}）`};
   }
   if(k.includes('completed')||k.includes('accepted'))return{icon:'/assets/icons/SVG/状态/check-已完成.svg',text:taskName?`任务「${taskName}」已完成`:'任务已验收完成'};
-  if(k.includes('review')||k.includes('deliberation')||k.includes('opinion'))return{icon:'/assets/icons/SVG/功能/repeat-A2A协作.svg',text:p.stance?`收到新的 Agent 意见（${p.stance}）`:'收到新的 Agent 独立意见'};
+  if(k.includes('review')||k.includes('deliberation')||k.includes('opinion'))return{icon:'/assets/icons/SVG/功能/repeat-A2A协作.svg',text:p.stance?`收到新的智能体意见（${p.stance}）`:'收到新的智能体独立意见'};
   if(k.includes('command')||k.includes('plan'))return{icon:'/assets/icons/SVG/功能/sparkle-智能规划.svg',text:p.action?`创建了新的操作计划（${p.action}）`:'创建了新的操作计划'};
   if(k.includes('side_effect'))return{icon:'/assets/icons/SVG/状态/alert-失败.svg',text:p.target_system?`外部副作用待核对（${p.target_system}）`:'登记了外部副作用记录'};
   if(k.includes('checkpoint'))return{icon:'/assets/icons/SVG/状态/clock-进行中.svg',text:'任务检查点已更新'};
   if(k.includes('lease')||k.includes('claim'))return{icon:'/assets/icons/SVG/状态/clock-进行中.svg',text:taskName?`任务「${taskName}」已更新执行租约`:'任务执行租约已变更'};
-  if(k==='skill.evaluated')return{icon:'/assets/icons/SVG/状态/check-已完成.svg',text:p.verdict?`Skill 已完成效果评价（${p.verdict}）`:'新增一条 Skill 评价记录'};
-  if(k==='skill.published')return{icon:'/assets/icons/SVG/功能/sparkle-智能规划.svg',text:'已发布新的可复用 Skill'};
+  if(k==='skill.evaluated')return{icon:'/assets/icons/SVG/状态/check-已完成.svg',text:p.verdict?`技能已完成效果评价（${p.verdict}）`:'新增一条 技能评价记录'};
+  if(k==='skill.published')return{icon:'/assets/icons/SVG/功能/sparkle-智能规划.svg',text:'已发布新的可复用技能'};
   if(k==='memory.revised'||k==='memory.published')return{icon:'/assets/icons/SVG/功能/book-知识库.svg',text:'项目知识记忆已更新并提升版本'};
   if(k.includes('task'))return{icon:'/assets/icons/SVG/功能/play-执行调度.svg',text:taskName?`任务「${taskName}」状态更新（${k}）`:`任务事件：${k}`};
   if(k.includes('decision'))return{icon:'/assets/icons/SVG/导航/network-协作调度.svg',text:`决策协同更新（${k}）`};
@@ -2320,7 +2320,7 @@ async function render(){
       </div>
       <div class="kpi-tile tone-amber" onclick="setPage('agents')">
         <img class="kpi-icon-img" src="/assets/icons/SVG/导航/bot-Agent管理.svg" alt="">
-        <div class="kpi-meta"><div class="kpi-label">在线 Agent</div><div class="kpi-value">${esc(onlineAgentsCount)}<span class="kpi-total">/ ${esc(totalAgentsCount)}</span></div></div>
+        <div class="kpi-meta"><div class="kpi-label">在线智能体</div><div class="kpi-value">${esc(onlineAgentsCount)}<span class="kpi-total">/ ${esc(totalAgentsCount)}</span></div></div>
       </div>
     </section>
 
@@ -2346,7 +2346,7 @@ async function render(){
 
       <div class="card">
         <div class="card-head">
-          <h2>Agent 状态</h2>
+          <h2>智能体状态</h2>
           <button class="card-link" type="button" onclick="setPage('agents')">查看全部 →</button>
         </div>
         <div class="agent-rows">
@@ -2528,7 +2528,7 @@ async function render(){
         <p class="muted"><strong>验收标准：</strong>${esc(t.acceptance)}</p>
         ${['ready','waiting_dependencies','waiting_approval'].includes(t.status)?`
         <div class="stack stack-grow" style="margin-top:10px">
-          <select id="target-${esc(t.id)}"><option value="">不指定 Agent</option>${eligible.map(m=>`<option value="${esc(m.agent_id)}" ${m.agent_id===t.target_agent_id?'selected':''}>${esc(m.agent_name)}（${esc(m.role)}）</option>`).join('')}</select>
+          <select id="target-${esc(t.id)}"><option value="">不指定智能体</option>${eligible.map(m=>`<option value="${esc(m.agent_id)}" ${m.agent_id===t.target_agent_id?'selected':''}>${esc(m.agent_name)}（${esc(m.role)}）</option>`).join('')}</select>
           <button class="secondary sm" style="flex:0 0 auto" onclick="targetTask('${esc(t.id)}')">保存指派</button>
         </div>`:''}
         <div class="actions">
@@ -2705,7 +2705,7 @@ async function render(){
       <div class="card-head">
         <div class="card-title-group">
           <img class="card-title-icon" src="/assets/icons/SVG/导航/bot-Agent管理.svg" alt="">
-          <h2>已注册 Agent 节点</h2>
+          <h2>已登记智能体</h2>
         </div>
         <span class="chip">共 ${esc(filteredAgents.length)} 个节点</span>
       </div>
@@ -2749,11 +2749,11 @@ async function render(){
         <div class="card-head">
           <div class="card-title-group">
             <img class="card-title-icon" src="/assets/icons/SVG/功能/repeat-A2A协作.svg" alt="">
-            <h2>将 Agent 加入当前项目</h2>
+            <h2>将智能体加入当前项目</h2>
           </div>
         </div>
         <form onsubmit="addMember(event)">
-          <label>选择 Agent</label>
+          <label>选择智能体</label>
           <select name="agent_id">${agents.filter(a=>a.enabled).map(a=>`<option value="${esc(a.id)}">${esc(a.name)}（${esc(a.platform)}）</option>`).join('')}</select>
           <div class="grid-2">
             <div><label>项目角色</label><select name="role"><option value="worker">worker（执行者）</option><option value="manager">manager（项目协调者）</option><option value="reviewer">reviewer（独立评审者）</option><option value="advisor">advisor（顾问）</option></select></div>
@@ -2767,7 +2767,7 @@ async function render(){
         <div class="card-head">
           <div class="card-title-group">
             <img class="card-title-icon" src="/assets/icons/SVG/功能/sparkle-智能规划.svg" alt="">
-            <h2>注册新 Agent</h2>
+            <h2>登记智能体</h2>
           </div>
         </div>
         <form onsubmit="createAgent(event)">
@@ -2776,9 +2776,9 @@ async function render(){
           <label>声明能力（小写英文标识，逗号分隔）</label><input name="capabilities" placeholder="design, docs, coding, testing">
           <label>接入方式</label>
           <select name="execution_mode"><option value="manual">manual（人工接入）</option><option value="polling">polling（主动轮询）</option><option value="remote">remote（远端 A2A/Webhook）</option></select>
-          <div class="actions"><button type="submit">注册 Agent</button></div>
+          <div class="actions"><button type="submit">登记智能体</button></div>
         </form>
-        <p class="muted" style="margin-top:12px">Agent 令牌仅在注册时明文显示一次，服务端只保存 SHA-256 哈希。</p>
+        <p class="muted" style="margin-top:12px">智能体令牌仅在注册时明文显示一次，服务端只保存 SHA-256 哈希。</p>
         <pre id="newToken" hidden></pre>
       </div>
     </div>`;
@@ -2911,7 +2911,7 @@ async function render(){
                 <select name="action" onchange="toggleCommandFields(this.form)">
                   <option value="authorize_task">批准高风险任务</option>
                   <option value="review_task">验收任务</option>
-                  <option value="route_task">设置指定执行 Agent</option>
+                  <option value="route_task">设置指定执行智能体</option>
                   <option value="cancel_task">取消任务</option>
                 </select>
               </div>
@@ -2921,7 +2921,7 @@ async function render(){
               <label>验收说明（拒绝时必填）</label><textarea name="reason" maxlength="3000"></textarea>
             </div>
             <div data-field="route" hidden>
-              <label>指定执行 Agent</label>
+              <label>指定执行智能体</label>
               <select name="target_agent_id"><option value="">不指定（由成员池领取）</option>${members.filter(m=>m.enabled&&['worker','manager','reviewer'].includes(m.role)).map(m=>`<option value="${esc(m.agent_id)}">${esc(m.agent_name)}</option>`).join('')}</select>
             </div>
             <div class="composer-foot">
@@ -2949,8 +2949,8 @@ async function render(){
 
         <div class="card">
           <div class="card-head">
-            <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/导航/bot-Agent管理.svg" alt=""><h2>Agent 实时状态</h2></div>
-            <button class="card-link" type="button" onclick="setPage('agents')">前往全部 Agent →</button>
+            <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/导航/bot-Agent管理.svg" alt=""><h2>智能体实时状态</h2></div>
+            <button class="card-link" type="button" onclick="setPage('agents')">全部智能体 →</button>
           </div>
           <div class="agent-rows">
             ${agents.slice(0,4).map(a=>{
@@ -3002,14 +3002,14 @@ async function render(){
 
         <div class="card">
           <div class="card-head">
-            <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/功能/sparkle-智能规划.svg" alt=""><h2>Agent 能力概览</h2></div>
+            <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/功能/sparkle-智能规划.svg" alt=""><h2>智能体能力</h2></div>
             <span class="chip">${esc(agents.length)} 节点</span>
           </div>
           ${capGroups.map(g=>{
             const count=agents.filter(a=>(a.verified_capabilities||a.declared_capabilities||[]).some(c=>g.keys.includes(c))).length;
             return `<div class="cap-stat-row">
               <span class="stack"><img src="${g.icon}" width="26" height="26" alt=""><strong>${esc(g.label)}</strong></span>
-              <span class="muted">${esc(count)} 个 Agent</span>
+              <span class="muted">${esc(count)} 个智能体</span>
             </div>`;
           }).join('')}
         </div>
@@ -3115,7 +3115,7 @@ async function render(){
         ${pendingKnowledge.map(k=>item(`
           <div class="item-head"><span class="item-title">${esc(k.title)}</span>${knowledgeStatusBadge('proposed',itemKindLabel(k.kind)+' · ')}</div>
           <p class="muted">${esc(k.body)}</p>
-          <div class="actions">${k.kind==='memory'?`<button class="sm" onclick="publish('${esc(k.id)}')">发布记忆</button>`:`<button class="sm" onclick="publishSkill('${esc(k.id)}')">发布 Skill</button>`}</div>
+          <div class="actions">${k.kind==='memory'?`<button class="sm" onclick="publish('${esc(k.id)}')">发布记忆</button>`:`<button class="sm" onclick="publishSkill('${esc(k.id)}')">发布技能</button>`}</div>
         `)).join('')}
         ${!pendingDecisions.length&&!pendingKnowledge.length?'<p class="muted">暂无待审批决策或待发布知识</p>':''}
       </div>
@@ -3213,7 +3213,7 @@ async function render(){
           <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/功能/sparkle-智能规划.svg" alt=""><h2>受控优化实验与回归门禁</h2></div>
           <span class="chip">${esc(exps.length)} 项</span>
         </div>
-        <p class="muted">仅用于 Skill、上下文策略或工作流规则实验；E4 根安全策略禁止由实验自动更改。</p>
+        <p class="muted">仅用于技能、上下文策略或工作流规则实验；E4 根安全策略禁止由实验自动更改。</p>
         ${exps.map(e=>item(`
           <div class="item-head"><span class="item-title">${esc(e.target_kind)} · <code>${esc(e.target_id.slice(0,8))}</code></span><span class="${tagCls(e.status)}">${esc(e.status)}</span></div>
           <p>${esc(e.hypothesis)}</p>
@@ -3287,7 +3287,7 @@ async function render(){
       </div>
       <div class="card">
         <div class="card-head">
-          <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/功能/package-应用扩展.svg" alt=""><h2>Skills 生命周期与结构化评估</h2></div>
+          <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/功能/package-应用扩展.svg" alt=""><h2>技能管理与评估</h2></div>
           <span class="chip">${esc(filteredS.length)} 个</span>
         </div>
         ${filteredS.map(sk=>item(`
@@ -3295,14 +3295,14 @@ async function render(){
           <p>${esc(sk.content)}</p>
           <p class="muted"><strong>来源：</strong>${esc(sk.source)}</p>
           <div class="actions">
-            ${sk.status==='proposed'?`<button class="sm" onclick="publishSkill('${esc(sk.id)}')">发布 Skill</button>`:''}
+            ${sk.status==='proposed'?`<button class="sm" onclick="publishSkill('${esc(sk.id)}')">发布技能</button>`:''}
             <button class="secondary sm" onclick="evaluateSkill('${esc(sk.id)}')">新增评价</button>
             <button class="secondary sm" onclick="showSkillEvaluations('${esc(sk.id)}')">查看评价记录</button>
             ${sk.status!=='archived'?`<button class="secondary sm" onclick="archiveSkill('${esc(sk.id)}')">归档</button>`:''}
             ${sk.status==='published'?`<button class="secondary sm" onclick="proposeShare('skill','${esc(sk.id)}')">跨项目共享</button>`:''}
           </div>
           <div id="skill-evals-${esc(sk.id)}"></div>
-        `)).join('')||'<p class="muted">暂无 Skill 记录</p>'}
+        `)).join('')||'<p class="muted">暂无技能记录</p>'}
       </div>
     </div>`;
     return;
@@ -3426,7 +3426,7 @@ async function render(){
           <div class="card-head">
             <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/操作/upload-上传.svg" alt=""><h2>校验并恢复项目 JSON 包</h2></div>
           </div>
-          <p class="muted">先预览包摘要和条目数量，再创建一个新的暂停项目。恢复不导入凭据、远端连接或成果文件内容；Agent 身份会禁用，任务和知识需要本地复核。</p>
+          <p class="muted">先预览包摘要和条目数量，再创建一个新的暂停项目。恢复不导入凭据、远端连接或成果文件内容；智能体身份会禁用，任务和知识需要本地复核。</p>
           <label for="projectImportFile">OtterNest 导出包（JSON，最大 10 MiB）</label>
           <input id="projectImportFile" type="file" accept="application/json,.json" onchange="pendingImportBundle=null;document.getElementById('import-preview').innerHTML=''">
           <div class="actions"><button type="button" class="secondary" onclick="previewProjectImport()">校验并预览</button></div>
@@ -3456,7 +3456,7 @@ async function render(){
             <select name="mode">
               <option value="normal" ${cachedSystemMode.mode==='normal'?'selected':''}>normal（正常调度与读写）</option>
               <option value="degraded" ${cachedSystemMode.mode==='degraded'?'selected':''}>degraded（降级：暂停新调度，保留审核与恢复）</option>
-              <option value="readonly_protect" ${cachedSystemMode.mode==='readonly_protect'?'selected':''}>readonly_protect（只读保护：阻断新任务与 Agent 写入）</option>
+              <option value="readonly_protect" ${cachedSystemMode.mode==='readonly_protect'?'selected':''}>readonly_protect（只读保护：阻断新任务与 智能体写入）</option>
             </select>
             <label>变更原因（切换到保护模式时至少 5 字）</label>
             <input name="reason" value="${esc(cachedSystemMode.reason||'')}" placeholder="说明进入降级或只读保护的原因">
@@ -3487,7 +3487,7 @@ function showCommandPlan(plan){
   const taskTitle=plan.task_title||taskRec.title||plan.task_id;
   const taskStatus=plan.task_status||taskRec.status||'';
   const taskRisk=plan.task_risk||taskRec.risk||'R1';
-  const actionLabels={authorize_task:'批准高风险任务',review_task:'验收任务结果',route_task:'指派指定执行 Agent',cancel_task:'取消任务'};
+  const actionLabels={authorize_task:'批准高风险任务',review_task:'验收任务结果',route_task:'指派指定执行智能体',cancel_task:'取消任务'};
   dest.hidden=false;
   dest.innerHTML=`
   <div class="card-head">
@@ -3531,18 +3531,18 @@ async function closeDeliberation(id){await safe(async()=>{const vals=await uiFor
 async function resolveDecision(id){await safe(async()=>{const reviews=await api('/decisions/'+id+'/reviews');const hasDissent=reviews.some(x=>x.stance==='oppose'||x.stance==='alternative');const vals=await uiForm({title:'最终批准与裁决决策',subtitle:hasDissent?'检测到反对或替代方案意见，请填写充分的裁决依据。':'记录本次决策批准依据并归档异议统计。',fields:[{name:'note',label:hasDissent?'处理不同意见的依据（至少 10 字）':'决策批准说明（存在二轮异议时至少 10 字）',type:'textarea',required:hasDissent,minlength:hasDissent?10:undefined}],submitText:'批准决策'});if(!vals)return;const response=await api('/decisions/'+id+'/resolve','POST',{owner_note:(vals.note||'').trim()});notice('已确认决策，记录异议数：'+response.dissent_count);await refresh()})}
 const form=e=>Object.fromEntries(new FormData(e.target).entries());
 function parseCapabilities(value){return String(value||'').split(',').map(x=>x.trim()).filter(Boolean)}
-async function schedule(){await safe(async()=>{const result=await api('/projects/'+project+'/schedule','POST',{limit:20});notice('已匹配 '+result.count+' 项任务；实际执行仍须 Agent 主动领取');await refresh()})}
+async function schedule(){await safe(async()=>{const result=await api('/projects/'+project+'/schedule','POST',{limit:20});notice('已匹配 '+result.count+' 项任务；实际执行仍须 智能体主动领取');await refresh()})}
 async function showRuntimes(id){await safe(async()=>{const list=await api('/agents/'+id+'/runtimes');const el=document.getElementById('runtime-'+id);el.innerHTML=`<div class="continuity-box"><h3>已登记运行实例</h3>`+(list.map(r=>item(`<div class="item-head"><strong>${esc(r.label)}</strong><div class="stack"><span class="chip">${r.has_token?'已签发独立 Token':'共用 Agent Token'}</span><span class="tag ${r.online?'tag-ok':'tag-warn'}">${r.online?'在线心跳':'离线/未知'}</span></div></div><p class="muted">执行环境：${esc(r.environment)} · 最近上报：${esc(r.last_seen||'从未')}${r.enabled?'':' · 已禁用'}</p>${r.last_health&&Object.keys(r.last_health).length?`<p class="muted">自报诊断：<code>${esc(JSON.stringify(r.last_health))}</code></p>`:''}<div class="actions"><button class="secondary sm" onclick="issueRuntimeToken('${esc(id)}','${esc(r.id)}')">签发/轮换 Runtime 凭据</button></div><pre id="rt-tok-${esc(r.id)}" hidden></pre>`)).join('')||'<p class="muted">暂无运行实例</p>')+`<h3>新增运行实例</h3><form onsubmit="registerRuntime(event,'${esc(id)}')"><div class="grid-2"><div><label>实例标签</label><input name="label" required></div><div><label>运行环境</label><input name="environment" required></div></div><div class="actions"><button type="submit">注册实例</button></div></form></div>`})}
 async function issueRuntimeToken(agentId,runtimeId){await safe(async()=>{const res=await api('/agents/'+agentId+'/runtimes/'+runtimeId+'/token','POST',{});const pre=document.getElementById('rt-tok-'+runtimeId);if(pre){pre.hidden=false;pre.textContent='一次性 Runtime 凭据（仅显示一次）：'+res.token;}notice('已签发独立 Runtime 凭据')})}
-async function registerRuntime(e,id){e.preventDefault();await safe(async()=>{await api('/agents/'+id+'/runtimes','POST',form(e));notice('实例已注册，后续须由该 Agent 主动上报心跳');await refresh();await showRuntimes(id)})}
-async function verifyCapabilities(id){await safe(async()=>{const record=agents.find(a=>a.id===id);if(!record)return;const declared=record.declared_capabilities||[];if(!declared.length){notice('该 Agent 尚未声明任何能力，无法核验',true);return}const vals=await uiForm({title:`核验 Agent 能力：${record.name}`,subtitle:'仅勾选已经独立验证的能力（不得超出其声明范围）。',fields:[{name:'caps',label:'已声明能力列表',type:'checks',options:declared.map(c=>({value:c,label:c})),value:record.verified_capabilities||[]}],submitText:'保存核验结果'});if(!vals)return;const approved=vals.caps||[];if(!approved.every(c=>declared.includes(c))){notice('不能验证未声明的能力',true);return}await api('/agents/'+id+'/verified-capabilities','PUT',{capabilities:approved});notice('已保存能力核验记录');await refresh()})}
+async function registerRuntime(e,id){e.preventDefault();await safe(async()=>{await api('/agents/'+id+'/runtimes','POST',form(e));notice('实例已注册，后续须由该智能体主动上报心跳');await refresh();await showRuntimes(id)})}
+async function verifyCapabilities(id){await safe(async()=>{const record=agents.find(a=>a.id===id);if(!record)return;const declared=record.declared_capabilities||[];if(!declared.length){notice('该智能体尚未声明任何能力，无法核验',true);return}const vals=await uiForm({title:`核验 Agent 能力：${record.name}`,subtitle:'仅勾选已经独立验证的能力（不得超出其声明范围）。',fields:[{name:'caps',label:'已声明能力列表',type:'checks',options:declared.map(c=>({value:c,label:c})),value:record.verified_capabilities||[]}],submitText:'保存核验结果'});if(!vals)return;const approved=vals.caps||[];if(!approved.every(c=>declared.includes(c))){notice('不能验证未声明的能力',true);return}await api('/agents/'+id+'/verified-capabilities','PUT',{capabilities:approved});notice('已保存能力核验记录');await refresh()})}
 async function createProject(e){e.preventDefault();await safe(async()=>{const body=form(e);body.priority=Number(body.priority||50);await api('/projects','POST',body);showNewProjectForm=false;notice('项目已创建');await refresh()})}
 async function createGoal(e){e.preventDefault();await safe(async()=>{const body=form(e);body.priority=Number(body.priority||50);await api('/projects/'+project+'/goals','POST',body);notice('项目目标已创建');await refresh()})}
 async function setGoalStatus(id,status){await safe(async()=>{await api('/goals/'+id+'/status','POST',{status});notice(status==='paused'?'目标已暂停':'目标已恢复');await refresh()})}
 async function completeGoal(id){await safe(async()=>{const vals=await uiForm({title:'完成项目目标',subtitle:'完成是终态。请确认前置目标和关联任务均已完成，并记录简短完成依据。',fields:[{name:'note',label:'完成依据（至少 5 字，会记录在项目事件中）',type:'textarea',required:true,minlength:5}],submitText:'确认完成目标'});if(!vals)return;await api('/goals/'+id+'/status','POST',{status:'completed',note:vals.note.trim()});notice('目标已完成，依赖该目标的后续目标现在可以完成');await refresh()})}
 async function addGoalDependency(goalId){await safe(async()=>{const predecessorId=document.getElementById('goal-dep-'+goalId)?.value;if(!predecessorId)throw Error('请选择一个前置目标');await api('/goals/'+goalId+'/dependencies','POST',{predecessor_id:predecessorId});notice('已添加目标依赖');await refresh()})}
 async function removeGoalDependency(goalId,predecessorId){await safe(async()=>{await api('/goals/'+goalId+'/dependencies/'+predecessorId,'DELETE');notice('已移除目标依赖');await refresh()})}
-async function createAgent(e){e.preventDefault();await safe(async()=>{const body=form(e);body.capabilities=parseCapabilities(body.capabilities);const a=await api('/agents','POST',body);await refresh();const pre=document.getElementById('newToken');pre.hidden=false;pre.textContent='一次性 Agent 令牌（请立即妥善保存）：'+a.token;notice('Agent 已注册，请为其分配项目角色')})}
+async function createAgent(e){e.preventDefault();await safe(async()=>{const body=form(e);body.capabilities=parseCapabilities(body.capabilities);const a=await api('/agents','POST',body);await refresh();const pre=document.getElementById('newToken');pre.hidden=false;pre.textContent='一次性 智能体令牌（请立即妥善保存）：'+a.token;notice('Agent 已注册，请为其分配项目角色')})}
 async function addMember(e){e.preventDefault();await safe(async()=>{const body=form(e);if(body.expires_in_hours){body.expires_in_hours=Number(body.expires_in_hours)}else{delete body.expires_in_hours}await api('/projects/'+project+'/members','POST',body);notice('已分配项目角色与 ABAC 敏感度权限');await refresh()})}
 async function createTask(e){e.preventDefault();await safe(async()=>{const body=form(e);body.priority=Number(body.priority);body.goal_id=body.goal_id||null;body.required_capabilities=parseCapabilities(body.required_capabilities);body.dependency_ids=[...new FormData(e.target).getAll('dependencies')];delete body.dependencies;await api('/projects/'+project+'/tasks','POST',body);showNewTaskForm=false;notice('任务已创建');await refresh()})}
 async function targetTask(id){await safe(async()=>{const target=document.getElementById('target-'+id).value;await api('/tasks/'+id+'/target','PUT',{agent_id:target||null});notice('执行者指向已保存；远程节点需自行领取');await refresh()})}
@@ -3565,10 +3565,10 @@ async function previewProjectImport(){await safe(async()=>{const input=document.
 async function commitProjectImport(){await safe(async()=>{if(!pendingImportBundle)throw Error('请先校验并预览一个导出包');const suggested=pendingImportBundle.project?.name?`${String(pendingImportBundle.project.name).slice(0,154)} (导入)`:'';const vals=await uiForm({title:'创建暂停的恢复项目',subtitle:'恢复项目将保持 paused，未完成任务保持 blocked 且 Agent 身份默认禁用，确认后创建。',fields:[{name:'new_name',label:'恢复项目名称',type:'text',value:suggested,required:true}],submitText:'确认创建恢复项目'});if(!vals)return;const result=await api('/projects/import','POST',{bundle:pendingImportBundle,new_name:(vals.new_name||'').trim()||undefined,confirm_restore:true});pendingImportBundle=null;project=result.project_id;await refresh();notice(`已创建暂停的恢复项目「${result.project_name}」。检查任务、知识和 Agent 后再决定是否启用。`)})}
 async function reviseMemory(id){await safe(async()=>{const cur=(globalThis._memMap&&globalThis._memMap[id])||{};const vals=await uiForm({title:'修订项目记忆（保留版本历史）',fields:[{name:'title',label:'修订后标题',type:'text',value:cur.title||'',required:true},{name:'content',label:'修订后内容',type:'textarea',value:cur.content||'',required:true},{name:'source',label:'修订后出处',type:'text',value:cur.source||'',required:true},{name:'reason',label:'修订原因（至少 5 字）',type:'textarea',required:true,minlength:5}],submitText:'保存并升级版本'});if(!vals)return;await api('/memories/'+id+'/revise','POST',{title:vals.title,content:vals.content,source:vals.source,reason:vals.reason.trim()});notice('记忆已修订并提升版本号');await refresh()})}
 async function archiveMemory(id){await safe(async()=>{const vals=await uiForm({title:'归档项目记忆',subtitle:'归档后不再注入后续任务上下文，历史版本仍保留审计。',fields:[{name:'reason',label:'归档原因（至少 5 字）',type:'textarea',required:true,minlength:5}],submitText:'确认归档',danger:true});if(!vals)return;await api('/memories/'+id+'/archive','POST',{reason:vals.reason.trim()});notice('记忆已归档');await refresh()})}
-async function publishSkill(id){await safe(async()=>{await api('/skills/'+id+'/publish','POST',{});notice('Skill 已发布');await refresh()})}
-async function evaluateSkill(id){await safe(async()=>{const taskOpts=[{value:'',label:'不关联特定任务'},...(cachedTasks||[]).map(t=>({value:t.id,label:t.title}))];const vals=await uiForm({title:'录入 Skill 评价',fields:[{name:'verdict',label:'评价结论',type:'select',value:'pass',options:[{value:'pass',label:'pass（通过）'},{value:'concern',label:'concern（需关注）'},{value:'fail',label:'fail（不通过）'}]},{name:'notes',label:'评价依据（至少 5 字）',type:'textarea',required:true,minlength:5},{name:'task_id',label:'关联任务（可选）',type:'select',value:'',options:taskOpts}],submitText:'保存评价'});if(!vals)return;await api('/skills/'+id+'/evaluations','POST',{verdict:vals.verdict,notes:vals.notes.trim(),task_id:(vals.task_id||'').trim()||null});notice('Skill 评价已记录');await showSkillEvaluations(id)})}
+async function publishSkill(id){await safe(async()=>{await api('/skills/'+id+'/publish','POST',{});notice('技能已发布');await refresh()})}
+async function evaluateSkill(id){await safe(async()=>{const taskOpts=[{value:'',label:'不关联特定任务'},...(cachedTasks||[]).map(t=>({value:t.id,label:t.title}))];const vals=await uiForm({title:'录入技能评价',fields:[{name:'verdict',label:'评价结论',type:'select',value:'pass',options:[{value:'pass',label:'pass（通过）'},{value:'concern',label:'concern（需关注）'},{value:'fail',label:'fail（不通过）'}]},{name:'notes',label:'评价依据（至少 5 字）',type:'textarea',required:true,minlength:5},{name:'task_id',label:'关联任务（可选）',type:'select',value:'',options:taskOpts}],submitText:'保存评价'});if(!vals)return;await api('/skills/'+id+'/evaluations','POST',{verdict:vals.verdict,notes:vals.notes.trim(),task_id:(vals.task_id||'').trim()||null});notice('Skill 评价已记录');await showSkillEvaluations(id)})}
 async function showSkillEvaluations(id){await safe(async()=>{const rows=await api('/skills/'+id+'/evaluations');const el=document.getElementById('skill-evals-'+id);if(!el)return;el.innerHTML=`<div class="continuity-box"><h3>Skill 评价历史</h3>`+(rows.map(ev=>item(`<div class="item-head">${verdictBadge(ev.verdict)}<span class="muted">${esc(ev.actor_kind)}: <code>${esc(ev.actor_id)}</code>${ev.task_id?` · task <code>${esc(ev.task_id)}</code>`:''}</span></div><p>${esc(ev.notes)}</p>`)).join('')||'<p class="muted">暂无评价记录</p>')+`</div>`})}
-async function archiveSkill(id){await safe(async()=>{const vals=await uiForm({title:'归档 Skill',subtitle:'归档后仅保留审计不对外展示。',fields:[{name:'reason',label:'归档原因（至少 5 字）',type:'textarea',required:true,minlength:5}],submitText:'确认归档',danger:true});if(!vals)return;await api('/skills/'+id+'/archive','POST',{reason:vals.reason.trim()});notice('Skill 已归档');await refresh()})}
+async function archiveSkill(id){await safe(async()=>{const vals=await uiForm({title:'归档技能',subtitle:'归档后仅保留审计不对外展示。',fields:[{name:'reason',label:'归档原因（至少 5 字）',type:'textarea',required:true,minlength:5}],submitText:'确认归档',danger:true});if(!vals)return;await api('/skills/'+id+'/archive','POST',{reason:vals.reason.trim()});notice('Skill 已归档');await refresh()})}
 async function proposeShare(itemKind,itemId){await safe(async()=>{const otherProjects=(projects||[]).filter(p=>p.id!==project);const vals=await uiForm({title:'提交跨项目知识共享提案',subtitle:'跨项目共享需经管理员审批后以只读快照克隆到目标项目。',fields:[otherProjects.length?{name:'target_project_id',label:'目标项目',type:'select',options:otherProjects.map(p=>({value:p.id,label:p.name})),required:true}:{name:'target_project_id',label:'目标 Project ID',type:'text',required:true},{name:'rationale',label:'共享理由（至少 5 字）',type:'textarea',required:true,minlength:5}],submitText:'提交提案'});if(!vals)return;await api('/projects/'+project+'/knowledge-shares','POST',{target_project_id:vals.target_project_id.trim(),item_kind:itemKind,source_item_id:itemId,rationale:vals.rationale.trim()});notice('已提交跨项目共享提案，等待管理员审批');await refresh()})}
 async function resolveShare(shareId,approved){await safe(async()=>{const vals=await uiForm({title:approved?'批准跨项目共享':'拒绝跨项目共享',fields:[{name:'note',label:approved?'批准共享备注（至少 5 字）':'拒绝共享备注（至少 5 字）',type:'textarea',required:true,minlength:5}],submitText:approved?'批准并克隆':'拒绝提案',danger:!approved});if(!vals)return;await api('/knowledge-shares/'+shareId+'/resolve','POST',{approved,note:vals.note.trim()});notice(approved?'已批准共享并克隆到目标项目':'已拒绝共享提案');await refresh()})}
 
