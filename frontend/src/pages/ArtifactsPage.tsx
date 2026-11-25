@@ -1,3 +1,4 @@
+import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { getUiLabel } from "../utils/labels";
@@ -89,8 +90,10 @@ export default function ArtifactsPage() {
 
   const beginProjectRequest = useScopedRequest(selectedProjectId);
   const beginArtifactRequest = useScopedRequest(selectedTaskId);
-  const changeProject = (id: string) => { if (saving || id === selectedProjectId) return; setTasks([]); setArtifacts([]); setSelectedTaskId(""); setUploadFile(null); setRestoreFile(null); setGcResult(null); setGcPreviewKey(""); setRestoreResult(null); setFileQuery(""); setReviewFilter("all"); setLoading(true); setSelectedProjectId(id); };
-  const changeTask = (id: string) => { if (saving || id === selectedTaskId) return; setArtifacts([]); setUploadFile(null); setFileQuery(""); setReviewFilter("all"); setSelectedTaskId(id); };
+  const hasUnsavedDraft = Boolean(uploadFile || restoreFile);
+  const confirmDiscard = useDraftGuard(hasUnsavedDraft);
+  const changeProject = async (id: string) => { if (saving || id === selectedProjectId) return; if (!(await confirmDiscard())) return; setTasks([]); setArtifacts([]); setSelectedTaskId(""); setUploadFile(null); setRestoreFile(null); setGcResult(null); setGcPreviewKey(""); setRestoreResult(null); setFileQuery(""); setReviewFilter("all"); setLoading(true); setSelectedProjectId(id); };
+  const changeTask = async (id: string) => { if (saving || id === selectedTaskId) return; if (uploadFile && !(await confirmDiscard())) return; setArtifacts([]); setUploadFile(null); setFileQuery(""); setReviewFilter("all"); setSelectedTaskId(id); };
   const loadProjectTasks = useCallback(async (projectId: string) => {
     const isCurrent = beginProjectRequest(projectId); if (!isCurrent()) return;
     setLoading(true);
@@ -269,7 +272,8 @@ export default function ArtifactsPage() {
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedTaskId && void loadArtifacts(selectedTaskId)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
-      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedProjectId} onChange={changeProject} disabled={saving} /><label className="task-select"><span>选择任务</span><select aria-label="选择任务" value={selectedTaskId} disabled={saving || loading} onChange={(event) => changeTask(event.target.value)}><option value="">选择任务…</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label></section>
+      <UnsavedDraftNotice dirty={hasUnsavedDraft} />
+      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedProjectId} onChange={id => void changeProject(id)} disabled={saving} /><label className="task-select"><span>选择任务</span><select aria-label="选择任务" value={selectedTaskId} disabled={saving || loading} onChange={(event) => void changeTask(event.target.value)}><option value="">选择任务…</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label></section>
       <section className="panel">
         <div className="panel-heading"><div className="panel-title"><FileCheck2 size={17} /><h3>成果版本</h3><span className="count-chip">{artifacts.length}</span></div></div>
         <p className="form-hint">任务：{selectedTask?.title || "未选择任务"}</p>

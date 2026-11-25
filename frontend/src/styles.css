@@ -1532,3 +1532,7 @@ input, textarea, select { accent-color: var(--accent); }
 :root[data-ui-theme="dark"] :is(.nav-link:hover,.nav-sublink:hover,.icon-button:hover){background:var(--legacy-surface-hover);color:var(--text)}
 :root[data-ui-theme="dark"] :is(.nav-link.active:hover,.nav-sublink.active:hover){background:var(--accent-soft);color:var(--accent-deep)}
 @media(min-width:821px){.breadcrumb{display:flex;min-width:0}.breadcrumb strong{overflow-wrap:anywhere}}
+
+/* Unsaved drafts stay visible without adding decorative text. */
+.unsaved-draft-notice{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--border-strong);border-radius:8px;background:var(--amber-soft);color:var(--legacy-text-warning);font-size:13px;line-height:1.5;min-width:0}
+.unsaved-draft-notice svg{flex-shrink:0}

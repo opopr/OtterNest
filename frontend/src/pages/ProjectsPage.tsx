@@ -1,3 +1,4 @@
+import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
@@ -122,7 +123,9 @@ export default function ProjectsPage() {
 
   const beginProjectRequest = useScopedRequest(selectedId);
   const resetProjectView = () => { setTasks([]); setMembers([]); setGoals([]); setBriefing(null); setDetailSelection(null); setEditingProject(false); setShowTaskForm(false); setShowMemberForm(false); setTaskTitle(""); setTaskInstruction(""); setTaskAcceptance(""); setTaskGoalId(""); setTaskRisk("R1"); setTaskPriority("50"); setTaskSensitivity("internal"); setNewMemberAgentId(""); setNewMemberRole("worker"); };
-  const changeProject = (id: string) => { if (id === selectedId || saving) return; resetProjectView(); setDetailLoading(true); setError(""); setSelectedId(id); };
+  const hasUnsavedDraft = Boolean(taskTitle || taskInstruction || taskAcceptance || taskGoalId || taskRisk !== "R1" || taskPriority !== "50" || taskSensitivity !== "internal" || newMemberAgentId || newMemberRole !== "worker" || (editingProject && selectedProject && (editProjectName !== selectedProject.name || editProjectDescription !== (selectedProject.description || "") || editProjectPriority !== String(selectedProject.priority))));
+  const confirmDiscard = useDraftGuard(hasUnsavedDraft);
+  const changeProject = async (id: string) => { if (id === selectedId || saving) return; if (!(await confirmDiscard())) return; resetProjectView(); setDetailLoading(true); setError(""); setSelectedId(id); setSearchParams({ project: id }); setDetailTab("tasks"); };
 
   const loadProjectDetail = useCallback(async (projectId: string) => {
     const isCurrent = beginProjectRequest(projectId);
@@ -375,6 +378,7 @@ export default function ProjectsPage() {
         </form>
       )}
 
+      <UnsavedDraftNotice dirty={hasUnsavedDraft} />
       <div className="projects-layout">
         <section className="panel project-list-panel">
           <div className="panel-heading"><div className="panel-title"><FolderKanban size={17} /><h3>项目</h3><span className="count-chip">{projects.length}</span></div></div>
@@ -386,7 +390,7 @@ export default function ProjectsPage() {
             <div className="project-list">
               {visibleProjects.map((project) => (
                 <button key={project.id} className={"project-list-item " + (project.id === selectedId ? "selected" : "")}
-                  disabled={saving} aria-pressed={project.id === selectedId} onClick={() => { changeProject(project.id); setSearchParams({ project: project.id }); setDetailTab("tasks"); }}>
+                  disabled={saving} aria-pressed={project.id === selectedId} onClick={() => void changeProject(project.id)}>
                   <span className="project-list-icon"><FolderKanban size={17} /></span>
                   <span className="project-list-copy"><strong>{project.name}</strong><small>{getUiLabel(project.status)} · 优先级 {project.priority}</small></span>
                   <span className="project-list-arrow">›</span>

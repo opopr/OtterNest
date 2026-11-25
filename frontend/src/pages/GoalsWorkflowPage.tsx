@@ -1,3 +1,4 @@
+import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import { dependencyLayers } from "../utils/dependencyLayers";
 import ListPagination, { useListPage } from "../components/ListPagination";
@@ -114,7 +115,9 @@ export default function GoalsWorkflowPage() {
 
   const beginProjectRequest = useScopedRequest(selectedId);
   const resetProjectView = () => { setBoard(null); setRules([]); setRuns([]); setEditingGoal(null); setShowGoalForm(false); setShowRuleForm(false); setGoalTitle(""); setGoalCriteria(""); setGoalPriority("50"); setRuleName(""); setActionTitle(""); setEventPrefix("task.completed"); setActionKind("notify_inbox"); setMaxDepth("3"); setCooldown("60"); setDependencySelections({}); setRunFilter("all"); };
-  const changeProject = (id: string) => { if (id === selectedId || saving) return; resetProjectView(); setLoading(true); setError(""); setSelectedId(id); };
+  const hasUnsavedDraft = Boolean(goalTitle || goalCriteria || goalPriority !== "50" || ruleName || actionTitle || eventPrefix !== "task.completed" || actionKind !== "notify_inbox" || maxDepth !== "3" || cooldown !== "60" || (editingGoal && (editGoalTitle !== editingGoal.title || editGoalCriteria !== editingGoal.success_criteria || editGoalPriority !== String(editingGoal.priority))));
+  const confirmDiscard = useDraftGuard(hasUnsavedDraft);
+  const changeProject = async (id: string) => { if (id === selectedId || saving) return; if (!(await confirmDiscard())) return; resetProjectView(); setLoading(true); setError(""); setSelectedId(id);  };
 
   const loadProjectData = useCallback(async (projectId: string) => {
     const isCurrent = beginProjectRequest(projectId);
@@ -330,7 +333,8 @@ export default function GoalsWorkflowPage() {
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadProjectData(selectedId)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
-      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={changeProject} disabled={saving} /><span className="muted-inline">{board?.goals?.length ?? 0} 个目标 · {rules.length} 条规则 · {runs.length} 条运行记录</span></section>
+      <UnsavedDraftNotice dirty={hasUnsavedDraft} />
+      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={id => void changeProject(id)} disabled={saving} /><span className="muted-inline">{board?.goals?.length ?? 0} 个目标 · {rules.length} 条规则 · {runs.length} 条运行记录</span></section>
       <div className="governance-tabs">
         <button className={tab === "goals" ? "selected" : ""} onClick={() => setTab("goals")}><GitBranch size={16} />目标依赖图 <span>{board?.goals?.length ?? 0}</span></button>
         <button className={tab === "rules" ? "selected" : ""} onClick={() => setTab("rules")}><Workflow size={16} />工作流规则 <span>{rules.length}</span></button>

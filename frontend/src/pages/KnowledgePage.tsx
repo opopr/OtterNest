@@ -1,3 +1,4 @@
+import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
@@ -104,7 +105,9 @@ export default function KnowledgePage() {
 
   const beginProjectRequest = useScopedRequest(selectedId);
   const resetProjectView = () => { setMemories([]); setShares([]); setCharter(null); setCharterDraft({scope_boundary:"",stop_conditions:"",max_concurrent_tasks:"5",max_total_tasks:"200"}); setShowMemoryForm(false); setEditingId(""); setMemoryDraft(emptyDraft); setRevisionReason(""); setShareMemoryId(""); setShareRationale(""); setTargetProjectId(""); setSearchQuery(""); setSensitivityFilter("all"); setMemoryStatus("all"); };
-  const changeProject = (id: string) => { if (id === selectedId || saving) return; resetProjectView(); setLoading(true); setError(""); setSelectedId(id); };
+  const hasUnsavedDraft = Boolean(JSON.stringify(memoryDraft) !== JSON.stringify(emptyDraft) || revisionReason || shareMemoryId || shareRationale || (charter && (charterDraft.scope_boundary !== (charter.scope_boundary ?? "") || charterDraft.stop_conditions !== (charter.stop_conditions ?? "") || charterDraft.max_concurrent_tasks !== String(charter.max_concurrent_tasks ?? 5) || charterDraft.max_total_tasks !== String(charter.max_total_tasks ?? 200))));
+  const confirmDiscard = useDraftGuard(hasUnsavedDraft);
+  const changeProject = async (id: string) => { if (id === selectedId || saving) return; if (!(await confirmDiscard())) return; resetProjectView(); setLoading(true); setError(""); setSelectedId(id);  };
 
   const loadProjectData = useCallback(async (projectId: string, q?: string) => {
     const isCurrent = beginProjectRequest(projectId);
@@ -271,7 +274,8 @@ export default function KnowledgePage() {
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadProjectData(selectedId, searchQuery)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
-      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={changeProject} disabled={saving} /><span className="muted-inline">{memories.length} 条记忆 · {publishedMemories.length} 条已发布</span></section>
+      <UnsavedDraftNotice dirty={hasUnsavedDraft} />
+      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={id => void changeProject(id)} disabled={saving} /><span className="muted-inline">{memories.length} 条记忆 · {publishedMemories.length} 条已发布</span></section>
       <div className="governance-tabs knowledge-tabs">
         <button className={tab === "memories" ? "selected" : ""} onClick={() => setTab("memories")}><BookOpen size={16} />项目记忆 <span>{memories.length}</span></button>
         <button className={tab === "charter" ? "selected" : ""} onClick={() => setTab("charter")}><ShieldCheck size={16} />项目章程</button>

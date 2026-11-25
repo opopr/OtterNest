@@ -1,3 +1,4 @@
+import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
@@ -70,7 +71,9 @@ export default function SkillsPage() {
 
   const beginProjectRequest = useScopedRequest(selectedId);
   const resetProjectView = () => { setSkills([]); setEvaluations({}); setShowForm(false); setName(""); setVersion("1.0.0"); setContent(""); setSource(""); setSkillQuery(""); setSkillFilter("all"); };
-  const changeProject = (id: string) => { if (id === selectedId || saving) return; resetProjectView(); setLoading(true); setError(""); setSelectedId(id); };
+  const hasUnsavedDraft = Boolean(name || content || source || version !== "1.0.0");
+  const confirmDiscard = useDraftGuard(hasUnsavedDraft);
+  const changeProject = async (id: string) => { if (id === selectedId || saving) return; if (!(await confirmDiscard())) return; resetProjectView(); setLoading(true); setError(""); setSelectedId(id);  };
 
   const loadSkills = useCallback(async (projectId: string) => {
     const isCurrent = beginProjectRequest(projectId);
@@ -191,7 +194,8 @@ export default function SkillsPage() {
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadSkills(selectedId)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
-      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={changeProject} disabled={saving} /><span className="muted-inline">{skills.length} 个技能版本</span></section>
+      <UnsavedDraftNotice dirty={hasUnsavedDraft} />
+      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={id => void changeProject(id)} disabled={saving} /><span className="muted-inline">{skills.length} 个技能版本</span></section>
       <section className="panel">
         <div className="panel-heading"><div className="panel-title"><BookMarked size={17} /><h3>项目技能</h3><span className="count-chip">{visibleSkills.length}</span></div><button className="primary-button compact" onClick={() => setShowForm((value) => !value)} disabled={!selectedId}><Plus size={15} />提交技能提案</button></div>
         <div className="library-filter-bar"><label>关键词<input aria-label="搜索技能" value={skillQuery} onChange={event => setSkillQuery(event.target.value)} placeholder="搜索名称、版本或内容" /></label><label>状态<select aria-label="技能状态" value={skillFilter} onChange={event => setSkillFilter(event.target.value)}><option value="all">全部状态</option><option value="proposed">待发布</option><option value="published">已发布</option><option value="archived">已归档</option></select></label><button className="text-button" type="button" onClick={() => { setSkillQuery(""); setSkillFilter("all"); }}>清除筛选</button></div>
