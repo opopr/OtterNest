@@ -52,6 +52,10 @@ export default function PortfolioPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [metrics, setMetrics] = useState<PortfolioMetrics | null>(null);
+  const [projectSort, setProjectSort] = useState("priority");
+  const [projectQuery, setProjectQuery] = useState("");
+  const projectRows = (metrics?.projects || []).filter(row => (projects.find(p => p.id === row.project_id)?.name || row.project_id).toLocaleLowerCase().includes(projectQuery.trim().toLocaleLowerCase())).slice().sort((a,b) => projectSort === "blocked" ? b.blocked_count-a.blocked_count : projectSort === "completion" ? (b.total_tasks ? b.completed_count/b.total_tasks : -1) - (a.total_tasks ? a.completed_count/a.total_tasks : -1) : 0);
+  const projectPage = useListPage(projectRows, JSON.stringify([projectSort,projectQuery]));
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationFilter, setNotificationFilter] = useState("all");
@@ -223,19 +227,20 @@ export default function PortfolioPage() {
           </section>}
           <div className="portfolio-grid">
             <section className="panel">
-              <div className="panel-heading"><div className="panel-title"><Gauge size={17} /><h3>项目运行表现</h3></div><span className="muted-inline">按优先级排序</span></div>
+              <div className="panel-heading"><div className="panel-title"><Gauge size={17} /><h3>项目运行表现</h3></div><span className="muted-inline">{projectRows.length} 个项目</span></div>
+              <div className="library-filter-bar"><label>项目<input aria-label="搜索运营项目" value={projectQuery} onChange={e => setProjectQuery(e.target.value)} placeholder="搜索项目名称"/></label><label>排序<select aria-label="项目指标排序" value={projectSort} onChange={e=>setProjectSort(e.target.value)}><option value="priority">默认优先级</option><option value="blocked">阻塞任务数</option><option value="completion">完成率</option></select></label></div>
               <div className="portfolio-project-list">
-                {(metrics?.projects || []).map((item) => {
+                {projectPage.rows.map((item) => {
                   const project = projects.find((row) => row.id === item.project_id);
                   const rate = item.total_tasks ? item.completed_count / item.total_tasks : 0;
                   return <div className="portfolio-project-row" key={item.project_id}>
                     <div className="portfolio-project-main"><Link className="portfolio-project-link" to={"/projects?project="+encodeURIComponent(item.project_id)}>{project?.name || item.project_id.slice(0, 8)}</Link><small>{item.completed_count}/{item.total_tasks} 项完成 · {item.blocked_count} 项阻塞</small></div>
                     <div className="portfolio-progress"><span style={{ width: Math.round(rate * 100) + "%" }} /></div>
-                    <strong className="portfolio-rate">{Math.round(rate * 100)}%</strong>
+                    <strong className="portfolio-rate">{item.total_tasks ? Math.round(rate * 100) + "%" : "—"}</strong>
                   </div>;
                 })}
-                {!metrics?.projects.length && <div className="empty-mini">尚无项目指标</div>}
-              </div>
+                {!projectRows.length && <div className="empty-mini">{metrics?.projects.length ? "没有符合条件的项目" : "尚无项目指标"}</div>}
+              </div><ListPagination {...projectPage} label="运营项目分页" />
             </section>
 
             <section className="panel">

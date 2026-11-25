@@ -125,17 +125,18 @@ export default function CommandChatPanel({ projectId, tasks, onPlan }: Props) {
       setMessages((current) => [...current, assistantMessage]);
       setHistory([...nextHistory, assistantTurn].slice(-20));
       if (response.focus_task_id) setFocusTaskId(response.focus_task_id);
-      if (response.plan) onPlan(response.plan);
+      if (response.plan && response.plan.project_id === projectId) onPlan(response.plan);
     } catch (reason) {
       if (activeRequest.current !== requestId) return;
       const message = reason instanceof Error ? reason.message : "指挥中心请求失败";
       setError(message);
-      const assistantTurn: ChatTurn = { role: "assistant", text: "请求未完成：" + message };
-      setMessages((current) => [...current, { ...assistantTurn, id: "error-" + Date.now(), status: "error" }]);
-      setHistory([...nextHistory, assistantTurn].slice(-20));
+      setMessages((current) => current.filter(item => item.id !== userMessage.id));
+      setHistory(history);
+      setText(current => current.trim() ? current : utterance);
     } finally { if (activeRequest.current === requestId) setSending(false); }
   };
 
+  const fillSuggestion = (value: string) => { setText(value); composerRef.current?.focus(); };
   const clear = () => {
     setMessages([]);
     setHistory([]);
@@ -157,12 +158,12 @@ export default function CommandChatPanel({ projectId, tasks, onPlan }: Props) {
     <section className="panel command-chat-panel">
       <div className="panel-heading"><div className="panel-title"><MessageSquare size={17} /><h3>项目对话</h3></div><button className="text-button" onClick={clear} disabled={sending}><RefreshCw size={13} />清空会话</button></div>
       <div className="command-chat-toolbar">
-        <label>解析模式<select value={mode} onChange={(event) => setMode(event.target.value as "template" | "model")}><option value="template">规则模板（不调用外部模型）</option><option value="model" disabled={!plannerStatus.enabled}>模型建议{plannerStatus.enabled && plannerStatus.model ? " · " + plannerStatus.model : "（服务器未配置）"}</option></select></label>
-        <label>关联任务<select value={focusTaskId} onChange={(event) => setFocusTaskId(event.target.value)}><option value="">自动识别</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title} · {statusLabel[task.status] || task.status}</option>)}</select></label>
+        <label>解析模式<select aria-label="解析模式" disabled={sending} value={mode} onChange={(event) => setMode(event.target.value as "template" | "model")}><option value="template">规则模板（不调用外部模型）</option><option value="model" disabled={!plannerStatus.enabled}>模型建议{plannerStatus.enabled && plannerStatus.model ? " · " + plannerStatus.model : "（服务器未配置）"}</option></select></label>
+        <label>关联任务<select aria-label="关联任务" disabled={sending} value={focusTaskId} onChange={(event) => setFocusTaskId(event.target.value)}><option value="">自动识别</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title} · {statusLabel[task.status] || task.status}</option>)}</select></label>
         <span className="muted-inline">{mode === "model" ? "模型将接收当前项目任务摘要、智能体名称及最近 20 轮对话" : "本地解析，不发送项目内容至外部模型"}</span>
       </div>
       <div className="command-chat-transcript" ref={transcriptRef} role="log" aria-label="项目对话记录" onScroll={event=>{const el=event.currentTarget;setNearBottom(el.scrollHeight-el.scrollTop-el.clientHeight<64);}}>
-        {!messages.length && <div className="chat-welcome"><div className="chat-welcome-icon"><Sparkles size={21} /></div><strong>输入指令或选择任务</strong><div className="chat-suggestions"><button onClick={() => setText("查看项目状态和指标")}>查看项目状态</button><button onClick={() => setText("为什么任务被阻塞？")}>查看阻塞原因</button><button onClick={() => setText("请批准它")}>批准当前任务</button></div></div>}
+        {!messages.length && <div className="chat-welcome"><div className="chat-welcome-icon"><Sparkles size={21} /></div><strong>输入指令或选择任务</strong><div className="chat-suggestions"><button onClick={() => fillSuggestion("查看项目状态和指标")}>查看项目状态</button><button onClick={() => fillSuggestion("为什么任务被阻塞？")}>查看阻塞原因</button><button onClick={() => fillSuggestion("请批准它")}>批准当前任务</button></div></div>}
         {messages.map((message) => <article className={"chat-message " + (message.role === "user" ? "from-user" : "from-assistant")} key={message.id}>
           <div className="chat-message-avatar">{message.role === "user" ? <UserRound size={15} /> : <Bot size={15} />}</div>
           <div className="chat-message-body"><div className="chat-message-meta"><strong>{message.role === "user" ? "你" : "智能助手"}</strong>{message.status === "plan_ready" && <span className="status-tag tag-green">已生成预览</span>}{message.status === "needs_clarification" && <span className="status-tag tag-amber">需要澄清</span>}</div>
@@ -174,10 +175,10 @@ export default function CommandChatPanel({ projectId, tasks, onPlan }: Props) {
         {sending && <div className="chat-typing"><span className="spinner" />正在分析…</div>}
       </div>
       {!nearBottom && <button type="button" className="secondary-button compact chat-scroll-latest" onClick={scrollLatest}>跳到最新消息</button>}
-      {error && <div className="inline-error"><span>{error}</span></div>}
+      {error && <div className="inline-error" role="alert"><span>{error}。请求未完成，指令已保留，请核对后重试。</span></div>}
       <form className="command-chat-composer" onSubmit={(event) => void send(event)}>
-        <textarea ref={composerRef} rows={3} value={text} onChange={(event) => setText(event.target.value)} maxLength={3500} onKeyDown={event=>{if ((event.ctrlKey || event.metaKey) && event.key==="Enter" && !event.nativeEvent.isComposing) {event.preventDefault();void send();}}} aria-label="输入指令" placeholder="输入项目问题或任务指令…" />
-        <div className="command-chat-composer-foot"><span>操作须确认 · <span className="chat-send-shortcut">Ctrl + Enter 发送</span></span><button className="primary-button compact" disabled={sending || !text.trim()}><Send size={14} />发送</button></div>
+        <textarea ref={composerRef} disabled={sending} rows={3} value={text} onChange={(event) => setText(event.target.value)} maxLength={3500} onKeyDown={event=>{if ((event.ctrlKey || event.metaKey) && event.key==="Enter" && !event.nativeEvent.isComposing) {event.preventDefault();void send();}}} aria-label="输入指令" placeholder="输入项目问题或任务指令…" />
+        <div className="command-chat-composer-foot"><span>操作须确认 · <span className="chat-send-shortcut">Ctrl + Enter 发送</span></span><span className="chat-character-count">{text.length}/3500</span><button className="primary-button compact" disabled={sending || !projectId || !text.trim()}><Send size={14} />发送</button></div>
       </form>
     </section>
   );

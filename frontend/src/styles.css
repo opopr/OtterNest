@@ -1484,3 +1484,10 @@ input, textarea, select { accent-color: var(--accent); }
 .command-chat-composer textarea{line-height:1.6}
 .chat-message-body{min-width:0}
 @media(max-width:580px){.goal-layer-grid{grid-template-columns:minmax(0,1fr)}.goal-card-actions{justify-content:flex-start}.goal-layer-heading{align-items:flex-start}.chat-send-shortcut{display:none}.distribution-legend{gap:8px 12px}}
+
+/* Focused navigation from dependency overview and compact chat composer. */
+.goal-card-focused{border-color:var(--brand-deep-teal);box-shadow:0 0 0 2px #BFE4D7}
+.goal-card:focus-visible{outline:2px solid var(--brand-deep-teal);outline-offset:2px}
+.chat-character-count{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;margin-left:auto}
+.command-chat-composer-foot{flex-wrap:wrap;gap:8px}
+@media(max-width:580px){.chat-character-count{font-size:11px}.command-chat-composer-foot>span:first-child{flex-basis:100%}}

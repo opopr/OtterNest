@@ -91,6 +91,13 @@ export default function GoalsWorkflowPage() {
   const [cooldown, setCooldown] = useState("60");
   const [dependencySelections, setDependencySelections] = useState<Record<string, string>>({});
   const [tab, setTab] = useState<"goals" | "rules">("goals");
+  const [goalQuery, setGoalQuery] = useState("");
+  const [goalFilter, setGoalFilter] = useState("all");
+  const shownGoals = (board?.goals || []).filter(goal => (goalFilter === "all" || (goalFilter === "waiting" ? !goal.dependencies_satisfied && goal.status !== "completed" : goal.status === goalFilter)) && [goal.title,goal.success_criteria,goal.id].join(" ").toLocaleLowerCase().includes(goalQuery.trim().toLocaleLowerCase()));
+  const [focusedGoal, setFocusedGoal] = useState("");
+  const revealGoal = (id: string) => { setGoalQuery(""); setGoalFilter("all"); setFocusedGoal(id); };
+  useEffect(() => { if (focusedGoal) { const node = document.getElementById("goal-card-" + focusedGoal); node?.scrollIntoView({block:"nearest"}); node?.focus({preventScroll:true}); } }, [focusedGoal, goalQuery, goalFilter]);
+  useEffect(() => { setGoalQuery(""); setGoalFilter("all"); setFocusedGoal(""); }, [selectedId]);
 
   const selectedProject = useMemo(() => projects.find((item) => item.id === selectedId) || null, [projects, selectedId]);
 
@@ -342,14 +349,14 @@ export default function GoalsWorkflowPage() {
           </form>}
           {Boolean(board?.goals.length) && <section className="goal-layer-board" aria-label="目标依赖概览">
             <div className="goal-layer-heading"><strong>目标依赖顺序</strong><span className="muted-inline">按前置依赖分层，不代表执行状态</span></div>
-            <div className="goal-layer-grid">{goalGraph.layers.map((layer,index) => <div className="goal-layer" key={index}><span className="goal-layer-label">第 {index+1} 层</span>{layer.map(goal => <button type="button" key={goal.id} className="goal-layer-node" onClick={() => document.getElementById("goal-card-" + goal.id)?.scrollIntoView({block:"nearest"})}><strong>{goal.title}</strong><span className={"status-tag " + (goal.status === "completed" ? "tag-green" : !goal.dependencies_satisfied ? "tag-amber" : "tag-neutral")}>{goal.status === "completed" ? "已完成" : !goal.dependencies_satisfied ? "等待前置目标" : goalStatus[goal.status] || goal.status}</span></button>)}</div>)}</div>
+            <div className="goal-layer-grid">{goalGraph.layers.map((layer,index) => <div className="goal-layer" key={index}><span className="goal-layer-label">第 {index+1} 层</span>{layer.map(goal => <button type="button" key={goal.id} className="goal-layer-node" onClick={() => revealGoal(goal.id)}><strong>{goal.title}</strong><span className={"status-tag " + (goal.status === "completed" ? "tag-green" : !goal.dependencies_satisfied ? "tag-amber" : "tag-neutral")}>{goal.status === "completed" ? "已完成" : !goal.dependencies_satisfied ? "等待前置目标" : goalStatus[goal.status] || goal.status}</span></button>)}</div>)}</div>
             {goalGraph.unresolved.length > 0 && <div className="inline-error">无法确定依赖顺序：{goalGraph.unresolved.map(goal=>goal.title).join("、")}</div>}
           </section>}
-          <div className="goal-board">
-            {(board?.goals || []).map((goal, index) => {
+          <div className="library-filter-bar"><label>目标<input aria-label="搜索目标" value={goalQuery} onChange={e=>{setGoalQuery(e.target.value);setFocusedGoal("");}} placeholder="搜索目标名称或成功标准"/></label><label>状态<select aria-label="目标状态" value={goalFilter} onChange={e=>{setGoalFilter(e.target.value);setFocusedGoal("");}}><option value="all">全部状态</option><option value="active">进行中</option><option value="waiting">等待前置目标</option><option value="paused">已暂停</option><option value="completed">已完成</option></select></label><span className="muted-inline">{shownGoals.length} 个目标</span></div><div className="goal-board">
+            {shownGoals.map((goal, index) => {
               const predecessorOptions = (board?.goals || []).filter((item) => item.id !== goal.id && !goal.depends_on.some((edge) => edge.id === item.id));
               const progress = goal.task_count ? Math.round(goal.completed_task_count / goal.task_count * 100) : 0;
-              return <article className="goal-card" id={"goal-card-" + goal.id} key={goal.id}>
+              return <article tabIndex={-1} className={"goal-card" + (focusedGoal === goal.id ? " goal-card-focused" : "")} id={"goal-card-" + goal.id} key={goal.id}>
                 <div className="goal-card-top"><span className="goal-number">{String(index + 1).padStart(2, "0")}</span><span className={"status-tag " + (goal.status === "completed" ? "tag-green" : goal.status === "paused" ? "tag-neutral" : "tag-blue")}>{goalStatus[goal.status] || goal.status}</span></div>
                 <h3>{goal.title}</h3><details className="library-disclosure"><summary>成功标准</summary><p>{goal.success_criteria}</p></details>
                 <div className="goal-progress-label"><span>关联任务 {goal.completed_task_count}/{goal.task_count}</span><strong>{progress}%</strong></div><div className="progress-track"><span style={{ width: progress + "%" }} /></div>
@@ -360,7 +367,7 @@ export default function GoalsWorkflowPage() {
                 <div className="goal-card-actions">{goal.status === "active" && <button className="text-button" onClick={() => void changeGoalStatus(goal, "paused")}>暂停</button>}{goal.status === "paused" && <button className="text-button" onClick={() => void changeGoalStatus(goal, "active")}>恢复</button>}{goal.status !== "completed" && <button className="secondary-button compact" disabled={!goal.can_complete || saving} onClick={() => void changeGoalStatus(goal, "completed")}>完成目标</button>}<button className="text-button" disabled={saving} onClick={() => startEditGoal(goal)}><Pencil size={13} />编辑</button><button className="text-button" disabled={saving} onClick={() => void deleteGoal(goal)}><Trash2 size={13} />删除</button></div>
               </article>;
             })}
-            {!(board?.goals?.length) && <div className="empty-state"><GitBranch size={25} /><strong>尚未定义目标</strong><p>创建目标后，可以为目标添加前置依赖。系统会阻止循环依赖和不满足完成条件的目标被标记为完成。</p></div>}
+            {!shownGoals.length && <div className="empty-state"><GitBranch size={25} /><strong>{board?.goals.length ? "没有符合条件的目标" : "尚未定义目标"}</strong></div>}
           </div>
         </section>
         </div>

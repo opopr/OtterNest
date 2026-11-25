@@ -1,5 +1,5 @@
 import { getUiLabel } from "../utils/labels";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Activity, AlertCircle, CheckCircle2, Clock3, FileCode2, MessageSquare, RefreshCw, Search, ShieldCheck, X } from "lucide-react";
 import { request } from "../api/client";
 import type { Project, Task } from "../api/types";
@@ -64,6 +64,12 @@ export default function CommandCenterPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [taskProjectId, setTaskProjectId] = useState("");
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const taskRequest = useRef(0);
+  const currentProject = useRef(selectedId);
+  currentProject.current = selectedId;
+  const currentTasks = taskProjectId === selectedId ? tasks : [];
   const [plan, setPlan] = useState<CommandPlan | null>(null);
   const [recentPlanIds, setRecentPlanIds] = useState<string[]>([]);
   const [planLookupId, setPlanLookupId] = useState("");
@@ -92,34 +98,42 @@ export default function CommandCenterPage() {
   }, []);
 
   const loadTasks = useCallback(async (projectId: string) => {
+    if (projectId !== currentProject.current) return;
+    const requestId = ++taskRequest.current;
     if (!projectId) {
+      setTaskProjectId("");
+      setTasksLoading(false);
       setTasks([]);
       setAgUiData(null);
       return;
     }
+    setTasksLoading(true);
     try {
       const [taskRows, agUiRows] = await Promise.all([
         request<Task[]>("/projects/" + encodeURIComponent(projectId) + "/tasks"),
         request<AgUiSnapshotResponse>("/projects/" + encodeURIComponent(projectId) + "/ag-ui/events?limit=25").catch(() => null)
       ]);
+      if (requestId !== taskRequest.current || currentProject.current !== projectId) return;
+      setTaskProjectId(projectId);
       setTasks(taskRows);
       setAgUiData(agUiRows);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "项目任务读取失败");
-    }
+      if (requestId === taskRequest.current && currentProject.current === projectId) setError(reason instanceof Error ? reason.message : "项目任务读取失败");
+    } finally { if (requestId === taskRequest.current) setTasksLoading(false); }
   }, []);
 
   useEffect(() => { void loadProjects(); }, [loadProjects]);
-  useEffect(() => { void loadTasks(selectedId); }, [selectedId, loadTasks]);
+  useEffect(() => { setPlan(null); setAgUiData(null); setNotice(""); void loadTasks(selectedId); return () => { taskRequest.current += 1; }; }, [selectedId, loadTasks]);
 
   const handlePlanGenerated = (nextPlan: CommandPlan) => {
+    if (nextPlan.project_id !== currentProject.current) return;
     setPlan(nextPlan);
     setPlanLookupId(nextPlan.id);
     setRecentPlanIds((cur) => [nextPlan.id, ...cur.filter((id) => id !== nextPlan.id)].slice(0, 6));
   };
 
   const confirmPlan = async () => {
-    if (!plan) return;
+    if (!plan || plan.project_id !== currentProject.current) return;
     setSaving(true);
     setError("");
     setNotice("");
@@ -160,9 +174,10 @@ export default function CommandCenterPage() {
     setToolsBusy(true);
     setError("");
     try {
-      setAgUiData(await request<AgUiSnapshotResponse>("/projects/" + encodeURIComponent(selectedId) + "/ag-ui/events?limit=25"));
+      const snapshot = await request<AgUiSnapshotResponse>("/projects/" + encodeURIComponent(selectedId) + "/ag-ui/events?limit=25");
+      if (currentProject.current === selectedId) setAgUiData(snapshot);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "读取 AG-UI 投影事件失败");
+      setError(reason instanceof Error ? reason.message : "读取事件投影失败");
     } finally {
       setToolsBusy(false);
     }
@@ -208,18 +223,18 @@ export default function CommandCenterPage() {
 
       <section className="panel command-project-bar">
         <label>当前项目
-          <select value={selectedId} onChange={(event) => setSelectedId(event.target.value)} disabled={loading || projects.length === 0}>
+          <select aria-label="指挥中心项目" value={selectedId} onChange={(event) => setSelectedId(event.target.value)} disabled={loading || saving || projects.length === 0}>
             {projects.length === 0 && <option value="">暂无项目</option>}
             {projects.map((project) => <option key={project.id} value={project.id}>{project.name} · {getUiLabel(project.status)}</option>)}
           </select>
         </label>
         <div>
-          <span className="status-tag tag-neutral">{tasks.length} 项任务</span>
+          <span className="status-tag tag-neutral">{tasksLoading ? "读取任务中…" : taskProjectId !== selectedId ? "任务尚未读取" : currentTasks.length + " 项任务"}</span>
         </div>
       </section>
 
       {selectedId ? (
-        <CommandChatPanel key={selectedId} projectId={selectedId} tasks={tasks} onPlan={handlePlanGenerated} />
+        <CommandChatPanel key={selectedId} projectId={selectedId} tasks={currentTasks} onPlan={handlePlanGenerated} />
       ) : (
         <div className="panel empty-state">
           <MessageSquare size={28} />
@@ -241,7 +256,7 @@ export default function CommandCenterPage() {
                 className="flex-1"
                 value={planLookupId}
                 onChange={(e) => setPlanLookupId(e.target.value)}
-                placeholder="输入命令计划 UUID 查询执行状态与版本结果…"
+                aria-label="操作计划编号" placeholder="输入操作计划编号"
               />
               <button type="submit" className="secondary-button compact" disabled={toolsBusy || !planLookupId.trim()}>
                 <Search size={13} />查询
