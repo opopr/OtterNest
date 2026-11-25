@@ -2,7 +2,7 @@ import { Component, Suspense, useCallback, useEffect, useRef, useState, type Rea
 import {
   ArchiveRestore, ArrowUpRight, Bell, BookMarked, BookOpen, Bot, CheckCheck, ChevronDown,
   CircleHelp, ClipboardCheck, FileArchive, FolderKanban, Gauge, GitBranch, KeyRound,
-  LayoutDashboard, LockKeyhole, LogOut, Menu, MessageSquare, Monitor, PlugZap, Search, Settings2, X,
+  LayoutDashboard, LockKeyhole, LogOut, Menu, MessageSquare, Monitor, PlugZap, Search, Settings2, X, Moon, Sun, PanelLeftClose, PanelLeftOpen,
   ShieldCheck, Wifi, type LucideIcon
 } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -84,6 +84,10 @@ export default function AppShell() {
   const { user, logout } = useAuth();
   const { systemMode } = useSystemMode();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [darkTheme, setDarkTheme] = useState(() => { try { return localStorage.getItem("otternest-ui-theme") === "dark"; } catch { return false; } });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => { try { return localStorage.getItem("otternest-sidebar-collapsed") === "true"; } catch { return false; } });
+  useEffect(() => { document.documentElement.dataset.uiTheme = darkTheme ? "dark" : "light"; try { localStorage.setItem("otternest-ui-theme", darkTheme ? "dark" : "light"); } catch {} }, [darkTheme]);
+  useEffect(() => { try { localStorage.setItem("otternest-sidebar-collapsed", String(sidebarCollapsed)); } catch {} }, [sidebarCollapsed]);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<TopbarNotification[]>([]);
@@ -190,7 +194,7 @@ export default function AppShell() {
   const modeLabel = getSystemModeLabel(systemMode?.mode);
 
   return (
-    <div className="app-shell">
+    <div className={"app-shell" + (sidebarCollapsed ? " sidebar-collapsed" : "")}>
       <aside className={"sidebar" + (mobileNavOpen ? " mobile-open" : "")}>
         <div className="brand-row-mobile">
         <Link className="brand" to="/" aria-label="OtterNest 首页" onClick={() => setMobileNavOpen(false)}>
@@ -212,6 +216,8 @@ export default function AppShell() {
                   <NavLink
                     to={onlyItem.to}
                     end={onlyItem.end}
+                    title={group.label}
+                    aria-label={group.label}
                     onClick={() => setMobileNavOpen(false)}
                     className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}
                   >
@@ -223,6 +229,8 @@ export default function AppShell() {
                     <button
                       type="button"
                       className={"nav-link nav-parent" + (isActiveGroup ? " active" : "")}
+                      title={group.label}
+                      aria-label={group.label}
                       aria-expanded={isExpanded}
                       aria-controls={"nav-submenu-" + group.id}
                       onClick={() => setExpandedNavId(isExpanded ? null : group.id)}
@@ -241,6 +249,8 @@ export default function AppShell() {
                             key={item.to}
                             to={item.to}
                             end={item.end}
+                            title={item.label}
+                            aria-label={item.label}
                             onClick={() => setMobileNavOpen(false)}
                             className={({ isActive }) => "nav-sublink" + (isActive ? " active" : "")}
                           >
@@ -259,11 +269,11 @@ export default function AppShell() {
 
         <div className="sidebar-spacer" />
         <div className="sidebar-tools">
-        <a className="side-link" href={getApiOrigin() + "/legacy"} target="_blank" rel="noreferrer">
-          <ArrowUpRight size={16} />旧版管理台
+        <a className="side-link" title="旧版管理台" aria-label="旧版管理台" href={getApiOrigin() + "/legacy"} target="_blank" rel="noreferrer">
+          <ArrowUpRight size={16} /><span>旧版管理台</span>
         </a>
-        <a className="side-link" href={getApiOrigin() + "/api/docs"} target="_blank" rel="noreferrer">
-          <CircleHelp size={16} />接口文档
+        <a className="side-link" title="接口文档" aria-label="接口文档" href={getApiOrigin() + "/api/docs"} target="_blank" rel="noreferrer">
+          <CircleHelp size={16} /><span>接口文档</span>
         </a>
         </div>
         
@@ -279,10 +289,12 @@ export default function AppShell() {
       <div className="workspace">
         <header className="topbar">
           <div className="breadcrumb">
+            <button type="button" className="icon-button desktop-sidebar-toggle" aria-label={sidebarCollapsed ? "展开侧边栏" : "折叠侧边栏"} title={sidebarCollapsed ? "展开侧边栏" : "折叠侧边栏"} aria-expanded={!sidebarCollapsed} aria-controls="main-navigation" onClick={()=>setSidebarCollapsed(v=>!v)}>{sidebarCollapsed ? <PanelLeftOpen size={18}/> : <PanelLeftClose size={18}/>}</button>
             <span>OtterNest</span><span className="breadcrumb-sep">/</span>
             <strong>{findNavLabel(location.pathname)}</strong>
           </div>
           <div className="topbar-actions">
+            <button type="button" className="icon-button theme-toggle" aria-label={darkTheme ? "切换浅色主题" : "切换深色主题"} title={darkTheme ? "切换浅色主题" : "切换深色主题"} aria-pressed={darkTheme} onClick={()=>setDarkTheme(v=>!v)}>{darkTheme ? <Sun size={17}/> : <Moon size={17}/>}</button>
             <button ref={searchTrigger} type="button" className="page-search-trigger" aria-label="搜索页面" aria-haspopup="dialog" aria-expanded={searchOpen} onClick={openSearch}><Search size={16}/><span>搜索页面</span><kbd>Ctrl K</kbd></button>
             <div className={"system-pill " + (systemMode?.mode === "normal" ? "is-ok" : "is-warn")}>
               <span className="system-dot" />{modeLabel}
