@@ -1,3 +1,4 @@
+import { useScopedRequest } from "../utils/useScopedRequest";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AlertCircle, Eye, FolderKanban, Pencil, Plus, RefreshCw, Search, Target, Trash2, Users, X } from "lucide-react";
@@ -119,7 +120,13 @@ export default function ProjectsPage() {
 
   useEffect(() => { void loadProjects(); }, [loadProjects]);
 
+  const beginProjectRequest = useScopedRequest(selectedId);
+  const resetProjectView = () => { setTasks([]); setMembers([]); setGoals([]); setBriefing(null); setDetailSelection(null); setEditingProject(false); setShowTaskForm(false); setShowMemberForm(false); setTaskTitle(""); setTaskInstruction(""); setTaskAcceptance(""); setTaskGoalId(""); setTaskRisk("R1"); setTaskPriority("50"); setTaskSensitivity("internal"); setNewMemberAgentId(""); setNewMemberRole("worker"); };
+  const changeProject = (id: string) => { if (id === selectedId || saving) return; resetProjectView(); setDetailLoading(true); setError(""); setSelectedId(id); };
+
   const loadProjectDetail = useCallback(async (projectId: string) => {
+    const isCurrent = beginProjectRequest(projectId);
+    if (!isCurrent()) return;
     setDetailLoading(true);
     try {
       const encoded = encodeURIComponent(projectId);
@@ -130,17 +137,18 @@ export default function ProjectsPage() {
         request<GoalSummary[]>("/projects/" + encoded + "/goals").catch(() => [] as GoalSummary[]),
         request<ProjectBriefing>("/projects/" + encoded + "/briefing").catch(() => null)
       ]);
+      if (!isCurrent()) return;
       setTasks(taskRows);
       setMembers(memberRows);
       setAgents(agentRows);
       setGoals(goalRows);
       setBriefing(briefingRow);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "项目详情读取失败");
+      if (isCurrent()) setError(reason instanceof Error ? reason.message : "项目详情读取失败");
     } finally {
-      setDetailLoading(false);
+      if (isCurrent()) setDetailLoading(false);
     }
-  }, []);
+  }, [beginProjectRequest]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -378,7 +386,7 @@ export default function ProjectsPage() {
             <div className="project-list">
               {visibleProjects.map((project) => (
                 <button key={project.id} className={"project-list-item " + (project.id === selectedId ? "selected" : "")}
-                  aria-pressed={project.id === selectedId} onClick={() => { setSelectedId(project.id); setSearchParams({ project: project.id }); setDetailTab("tasks"); }}>
+                  disabled={saving} aria-pressed={project.id === selectedId} onClick={() => { changeProject(project.id); setSearchParams({ project: project.id }); setDetailTab("tasks"); }}>
                   <span className="project-list-icon"><FolderKanban size={17} /></span>
                   <span className="project-list-copy"><strong>{project.name}</strong><small>{getUiLabel(project.status)} · 优先级 {project.priority}</small></span>
                   <span className="project-list-arrow">›</span>
@@ -547,7 +555,7 @@ export default function ProjectsPage() {
 
               <div className="panel task-table-panel">
                 <div className="project-content-filter"><input aria-label="搜索项目成员" placeholder="搜索成员或角色" value={memberQuery} onChange={event => setMemberQuery(event.target.value)} /><span className="muted-inline">{visibleMembers.length}/{members.length} 位</span></div>
-                {visibleMembers.length === 0 ? (
+                {detailLoading ? <div className="panel-loading"><div className="spinner" /></div> : visibleMembers.length === 0 ? (
                   <div className="empty-state"><Users size={24} /><strong>{members.length ? "没有符合条件的成员" : "暂无项目成员"}</strong></div>
                 ) : (
                   <div className="task-list">
@@ -583,7 +591,7 @@ export default function ProjectsPage() {
         </section>
       </div>
 
-      {detailSelection && (
+      {detailSelection && detailSelection.projectId === selectedId && (
         <TaskDetailPanel
           selection={detailSelection}
           isOwner={user?.kind === "owner"}

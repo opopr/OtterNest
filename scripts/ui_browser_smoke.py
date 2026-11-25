@@ -339,6 +339,55 @@ def legacy_checks(browser, problems):
         context.close()
 
 
+def project_scope_checks(browser, problems):
+    # Separate fixture after the original single-project checks.
+    with httpx.Client(base_url=ORIGIN, timeout=15, headers={"Authorization": "Bearer " + OWNER}) as client:
+        response = client.get("/api/v1/projects")
+        response.raise_for_status()
+        first = next(p for p in response.json() if p["name"] == "界面验收项目")
+        response = client.post("/api/v1/projects", json={"name": "项目切换验收项目"})
+        response.raise_for_status()
+        second = response.json()
+    context = browser.new_context(viewport={"width": 390, "height": 844}, locale="zh-CN", reduced_motion="reduce")
+    page = context.new_page()
+    page.on("pageerror", lambda error: problems.append(f"project-scope: JS error {error}"))
+    try:
+        page.goto(ORIGIN)
+        page.get_by_label("用户名", exact=True).fill("ui-admin")
+        page.get_by_label("密码", exact=True).fill(PASSWORD)
+        page.get_by_role("button", name="登录", exact=True).click()
+        expect(page.locator("main h1")).to_have_text("总览", timeout=20000)
+        page.goto(ORIGIN + "/projects?project=" + first["id"])
+        expect(page.get_by_text("界面验收任务", exact=True)).to_be_visible()
+        page.get_by_role("button", name="新建任务", exact=True).click()
+        page.get_by_label("任务标题", exact=True).fill("未保存的测试草稿")
+        page.locator(".project-list-item").filter(has_text=second["name"]).click()
+        expect(page.get_by_text("暂无任务", exact=True)).to_be_visible()
+        expect(page.get_by_text("界面验收任务", exact=True)).to_have_count(0)
+        expect(page.get_by_label("任务标题", exact=True)).to_have_count(0)
+        page.get_by_role("button", name="新建任务", exact=True).click()
+        expect(page.get_by_label("任务标题", exact=True)).to_have_value("")
+        check_width(page, "project-scope-switch", problems)
+        page.goto(ORIGIN + "/goals-workflows")
+        selector = page.get_by_label("选择项目", exact=True)
+        selector.select_option(first["id"])
+        expect(page.locator(".goal-layer-node").filter(has_text="前置验收目标")).to_be_visible()
+        selector.select_option(second["id"])
+        expect(page.get_by_text("尚未定义目标", exact=True)).to_be_visible()
+        expect(page.locator(".goal-layer-node")).to_have_count(0)
+        page.goto(ORIGIN + "/artifacts")
+        page.get_by_label("选择项目", exact=True).select_option(second["id"])
+        page.get_by_text("归档与回收", exact=True).click()
+        page.get_by_role("button", name="预览回收范围", exact=True).click()
+        expect(page.locator(".gc-result")).to_be_visible()
+        page.get_by_label("保留版本数", exact=True).fill("3")
+        expect(page.locator(".gc-result")).to_have_count(0)
+        expect(page.get_by_role("button", name="确认回收", exact=True)).to_be_disabled()
+        screenshot(page, "project-scope-gc-preview")
+    finally:
+        context.close()
+
+
 def main():
     if not (ROOT / "frontend/dist/index.html").is_file():
         raise RuntimeError("Run npm run build before the UI test.")
@@ -380,6 +429,7 @@ def main():
                         ]:
                             react_checks(browser, name, width, height, problems)
                         legacy_checks(browser, problems)
+                        project_scope_checks(browser, problems)
                     finally:
                         browser.close()
                 if problems:

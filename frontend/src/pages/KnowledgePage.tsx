@@ -1,3 +1,4 @@
+import { useScopedRequest } from "../utils/useScopedRequest";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
@@ -101,7 +102,13 @@ export default function KnowledgePage() {
     finally { setLoading(false); }
   }, [selectedId]);
 
+  const beginProjectRequest = useScopedRequest(selectedId);
+  const resetProjectView = () => { setMemories([]); setShares([]); setCharter(null); setCharterDraft({scope_boundary:"",stop_conditions:"",max_concurrent_tasks:"5",max_total_tasks:"200"}); setShowMemoryForm(false); setEditingId(""); setMemoryDraft(emptyDraft); setRevisionReason(""); setShareMemoryId(""); setShareRationale(""); setTargetProjectId(""); setSearchQuery(""); setSensitivityFilter("all"); setMemoryStatus("all"); };
+  const changeProject = (id: string) => { if (id === selectedId || saving) return; resetProjectView(); setLoading(true); setError(""); setSelectedId(id); };
+
   const loadProjectData = useCallback(async (projectId: string, q?: string) => {
+    const isCurrent = beginProjectRequest(projectId);
+    if (!isCurrent()) return;
     setLoading(true);
     setError("");
     try {
@@ -115,6 +122,7 @@ export default function KnowledgePage() {
         request<Charter>("/projects/" + encoded + "/charter"),
         request<KnowledgeShare[]>("/projects/" + encoded + "/knowledge-shares")
       ]);
+      if (!isCurrent()) return;
       setMemories(Array.isArray(memoryRows) ? memoryRows : []);
       setCharter(projectCharter || null);
       setShares(Array.isArray(shareRows) ? shareRows : []);
@@ -124,12 +132,12 @@ export default function KnowledgePage() {
         max_concurrent_tasks: String(projectCharter?.max_concurrent_tasks ?? 5),
         max_total_tasks: String(projectCharter?.max_total_tasks ?? 200)
       });
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "知识与项目章程读取失败"); }
-    finally { setLoading(false); }
-  }, []);
+    } catch (reason) { if (isCurrent()) setError(reason instanceof Error ? reason.message : "知识与项目章程读取失败"); }
+    finally { if (isCurrent()) setLoading(false); }
+  }, [beginProjectRequest]);
 
   useEffect(() => { void loadProjects(); }, []);
-  useEffect(() => { if (selectedId) void loadProjectData(selectedId, searchQuery); else { setMemories([]); setShares([]); setCharter(null); } }, [selectedId, loadProjectData]);
+  useEffect(() => { if (selectedId) void loadProjectData(selectedId); else { setMemories([]); setShares([]); setCharter(null); } }, [selectedId, loadProjectData]);
 
   const setDraftField = (key: keyof MemoryDraft, value: string) => setMemoryDraft((current) => ({ ...current, [key]: value }));
 
@@ -263,13 +271,13 @@ export default function KnowledgePage() {
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadProjectData(selectedId, searchQuery)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
-      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={setSelectedId} /><span className="muted-inline">{memories.length} 条记忆 · {publishedMemories.length} 条已发布</span></section>
+      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={changeProject} disabled={saving} /><span className="muted-inline">{memories.length} 条记忆 · {publishedMemories.length} 条已发布</span></section>
       <div className="governance-tabs knowledge-tabs">
         <button className={tab === "memories" ? "selected" : ""} onClick={() => setTab("memories")}><BookOpen size={16} />项目记忆 <span>{memories.length}</span></button>
         <button className={tab === "charter" ? "selected" : ""} onClick={() => setTab("charter")}><ShieldCheck size={16} />项目章程</button>
         <button className={tab === "sharing" ? "selected" : ""} onClick={() => setTab("sharing")}><Share2 size={16} />跨项目共享 <span>{shares.filter((item) => item.status === "proposed").length}</span></button>
       </div>
-      {loading && !selectedProject ? <div className="panel-loading"><div className="spinner" />正在读取项目知识…</div> : tab === "memories" ? (
+      {loading ? <div className="panel-loading"><div className="spinner" />正在读取项目知识…</div> : tab === "memories" ? (
         <section className="panel">
           <div className="panel-heading">
             <div className="panel-title"><Database size={17} /><h3>项目知识</h3><span className="count-chip">{visibleMemories.length}</span></div>

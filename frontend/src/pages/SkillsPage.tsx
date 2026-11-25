@@ -1,3 +1,4 @@
+import { useScopedRequest } from "../utils/useScopedRequest";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
@@ -67,11 +68,18 @@ export default function SkillsPage() {
     finally { setLoading(false); }
   }, []);
 
+  const beginProjectRequest = useScopedRequest(selectedId);
+  const resetProjectView = () => { setSkills([]); setEvaluations({}); setShowForm(false); setName(""); setVersion("1.0.0"); setContent(""); setSource(""); setSkillQuery(""); setSkillFilter("all"); };
+  const changeProject = (id: string) => { if (id === selectedId || saving) return; resetProjectView(); setLoading(true); setError(""); setSelectedId(id); };
+
   const loadSkills = useCallback(async (projectId: string) => {
+    const isCurrent = beginProjectRequest(projectId);
+    if (!isCurrent()) return;
     setLoading(true);
     setError("");
     try {
       const rows = await request<Skill[]>("/projects/" + encodeURIComponent(projectId) + "/skills");
+      if (!isCurrent()) return;
       setSkills(rows);
       const pairs = await Promise.all(rows.map(async (skill) => {
         try {
@@ -81,10 +89,10 @@ export default function SkillsPage() {
           return [skill.id, []] as const;
         }
       }));
-      setEvaluations(Object.fromEntries(pairs));
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "技能列表读取失败"); }
-    finally { setLoading(false); }
-  }, []);
+      if (isCurrent()) setEvaluations(Object.fromEntries(pairs));
+    } catch (reason) { if (isCurrent()) setError(reason instanceof Error ? reason.message : "技能列表读取失败"); }
+    finally { if (isCurrent()) setLoading(false); }
+  }, [beginProjectRequest]);
 
   useEffect(() => { void loadProjects(); }, [loadProjects]);
   useEffect(() => { if (selectedId) void loadSkills(selectedId); else { setSkills([]); setEvaluations({}); } }, [selectedId, loadSkills]);
@@ -108,7 +116,7 @@ export default function SkillsPage() {
   const publishSkill = async (skill: Skill) => {
     const confirmed = await dialog.confirm({
       title: "发布技能",
-      message: `确认发布技能「${skill.name}」？发布后该项目的智能体 才能读取它。`,
+      message: `确认发布技能「${skill.name}」？发布后该项目的智能体才能读取它。`,
       confirmText: "确认发布",
     });
     if (!confirmed) return;
@@ -116,7 +124,7 @@ export default function SkillsPage() {
     try {
       await request("/skills/" + encodeURIComponent(skill.id) + "/publish", { method: "POST" });
       await loadSkills(selectedId);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "发布技能 失败"); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "发布技能失败"); }
     finally { setSaving(false); }
   };
 
@@ -127,9 +135,9 @@ export default function SkillsPage() {
       label: "评价结论",
       defaultValue: "pass",
       choices: [
-        { value: "pass", label: "通过 (pass)" },
-        { value: "concern", label: "有疑虑 (concern)" },
-        { value: "fail", label: "未通过 (fail)" },
+        { value: "pass", label: "通过" },
+        { value: "concern", label: "有疑虑" },
+        { value: "fail", label: "未通过" },
       ],
       confirmText: "下一步",
     });
@@ -183,7 +191,7 @@ export default function SkillsPage() {
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadSkills(selectedId)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
-      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={setSelectedId} /><span className="muted-inline">{skills.length} 个技能版本</span></section>
+      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={changeProject} disabled={saving} /><span className="muted-inline">{skills.length} 个技能版本</span></section>
       <section className="panel">
         <div className="panel-heading"><div className="panel-title"><BookMarked size={17} /><h3>项目技能</h3><span className="count-chip">{visibleSkills.length}</span></div><button className="primary-button compact" onClick={() => setShowForm((value) => !value)} disabled={!selectedId}><Plus size={15} />提交技能提案</button></div>
         <div className="library-filter-bar"><label>关键词<input aria-label="搜索技能" value={skillQuery} onChange={event => setSkillQuery(event.target.value)} placeholder="搜索名称、版本或内容" /></label><label>状态<select aria-label="技能状态" value={skillFilter} onChange={event => setSkillFilter(event.target.value)}><option value="all">全部状态</option><option value="proposed">待发布</option><option value="published">已发布</option><option value="archived">已归档</option></select></label><button className="text-button" type="button" onClick={() => { setSkillQuery(""); setSkillFilter("all"); }}>清除筛选</button></div>

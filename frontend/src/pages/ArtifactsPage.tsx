@@ -1,3 +1,4 @@
+import { useScopedRequest } from "../utils/useScopedRequest";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -61,6 +62,10 @@ export default function ArtifactsPage() {
   const [keepVersions, setKeepVersions] = useState("2");
   const [includeRejected, setIncludeRejected] = useState(true);
   const [gcResult, setGcResult] = useState<GCResult | null>(null);
+  const [gcPreviewKey, setGcPreviewKey] = useState("");
+  const gcKey = JSON.stringify([selectedProjectId,keepVersions,includeRejected]);
+  const validKeepVersions = Number.isInteger(Number(keepVersions)) && Number(keepVersions) >= 1 && Number(keepVersions) <= 50;
+  const canConfirmGC = validKeepVersions && gcResult?.dry_run === true && gcResult.project_id === selectedProjectId && gcResult.candidate_count > 0 && gcPreviewKey === gcKey;
   const [restoreResult, setRestoreResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -82,26 +87,33 @@ export default function ArtifactsPage() {
     finally { setLoading(false); }
   }, []);
 
+  const beginProjectRequest = useScopedRequest(selectedProjectId);
+  const beginArtifactRequest = useScopedRequest(selectedTaskId);
+  const changeProject = (id: string) => { if (saving || id === selectedProjectId) return; setTasks([]); setArtifacts([]); setSelectedTaskId(""); setUploadFile(null); setRestoreFile(null); setGcResult(null); setGcPreviewKey(""); setRestoreResult(null); setFileQuery(""); setReviewFilter("all"); setLoading(true); setSelectedProjectId(id); };
+  const changeTask = (id: string) => { if (saving || id === selectedTaskId) return; setArtifacts([]); setUploadFile(null); setFileQuery(""); setReviewFilter("all"); setSelectedTaskId(id); };
   const loadProjectTasks = useCallback(async (projectId: string) => {
+    const isCurrent = beginProjectRequest(projectId); if (!isCurrent()) return;
     setLoading(true);
     try {
       const raw = await request<Task[]>("/projects/" + encodeURIComponent(projectId) + "/tasks");
       const rows = Array.isArray(raw) ? raw : [];
+      if (!isCurrent()) return;
       setTasks(rows);
       setSelectedTaskId((current) => rows.some((item) => item.id === current) ? current : rows[0]?.id || "");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "项目任务读取失败"); }
-    finally { setLoading(false); }
-  }, []);
+    } catch (reason) { if (isCurrent()) setError(reason instanceof Error ? reason.message : "项目任务读取失败"); }
+    finally { if (isCurrent()) setLoading(false); }
+  }, [beginProjectRequest]);
 
   const loadArtifacts = useCallback(async (taskId: string) => {
+    const isCurrent = beginArtifactRequest(taskId); if (!isCurrent()) return;
     if (!taskId) { setArtifacts([]); return; }
     setLoading(true);
     try {
       const raw = await request<Artifact[]>("/tasks/" + encodeURIComponent(taskId) + "/artifacts");
-      setArtifacts(Array.isArray(raw) ? raw : []);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "成果列表读取失败"); }
-    finally { setLoading(false); }
-  }, []);
+      if (isCurrent()) setArtifacts(Array.isArray(raw) ? raw : []);
+    } catch (reason) { if (isCurrent()) setError(reason instanceof Error ? reason.message : "成果列表读取失败"); }
+    finally { if (isCurrent()) setLoading(false); }
+  }, [beginArtifactRequest]);
 
   useEffect(() => { void loadProjects(); }, [loadProjects]);
   useEffect(() => { if (selectedProjectId) void loadProjectTasks(selectedProjectId); else { setTasks([]); setArtifacts([]); } }, [selectedProjectId, loadProjectTasks]);
@@ -223,7 +235,7 @@ export default function ArtifactsPage() {
   };
 
   const runGC = async (dryRun: boolean) => {
-    if (!selectedProjectId) return;
+    if (!selectedProjectId || !validKeepVersions || (!dryRun && !canConfirmGC)) return;
     if (!dryRun) {
       const confirmed = await dialog.confirm({
         title: "确认执行文件回收",
@@ -235,6 +247,7 @@ export default function ArtifactsPage() {
     }
     setSaving(true);
     setError("");
+    setGcPreviewKey("");
     try {
       const result = await request<GCResult>("/projects/" + encodeURIComponent(selectedProjectId) + "/artifacts/gc", {
         method: "POST",
@@ -243,8 +256,9 @@ export default function ArtifactsPage() {
         })
       });
       setGcResult(result);
+      if (dryRun) setGcPreviewKey(gcKey);
       if (!dryRun && selectedTaskId) await loadArtifacts(selectedTaskId);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "成果 GC 操作失败"); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "成果回收失败"); }
     finally { setSaving(false); }
   };
 
@@ -255,12 +269,12 @@ export default function ArtifactsPage() {
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedTaskId && void loadArtifacts(selectedTaskId)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
-      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedProjectId} onChange={setSelectedProjectId} /><label className="task-select"><span>选择任务</span><select value={selectedTaskId} onChange={(event) => setSelectedTaskId(event.target.value)}><option value="">选择任务…</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label></section>
+      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedProjectId} onChange={changeProject} disabled={saving} /><label className="task-select"><span>选择任务</span><select aria-label="选择任务" value={selectedTaskId} disabled={saving || loading} onChange={(event) => changeTask(event.target.value)}><option value="">选择任务…</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label></section>
       <section className="panel">
         <div className="panel-heading"><div className="panel-title"><FileCheck2 size={17} /><h3>成果版本</h3><span className="count-chip">{artifacts.length}</span></div></div>
         <p className="form-hint">任务：{selectedTask?.title || "未选择任务"}</p>
         <details className="library-disclosure artifact-upload-disclosure"><summary>上传新版本</summary><div className="artifact-upload">
-          <label>上传文件<input type="file" onChange={(event) => setUploadFile(event.target.files?.[0] || null)} /></label>
+          <label>上传文件<input key={selectedTaskId} type="file" disabled={saving} onChange={(event) => setUploadFile(event.target.files?.[0] || null)} /></label>
           <label>敏感级<select value={sensitivity} onChange={(event) => setSensitivity(event.target.value)}><option value="public">公开</option><option value="internal">内部</option><option value="confidential">机密</option><option value="restricted">受限</option></select></label>
           <button className="primary-button compact" disabled={saving || !selectedTaskId || !uploadFile} onClick={() => void uploadArtifact()}>
             <FileUp size={14} />{uploadProgress !== null ? `上传中 ${uploadProgress}%` : "上传为新版本"}
@@ -281,15 +295,15 @@ export default function ArtifactsPage() {
           <div className="panel-heading"><div className="panel-title"><FileArchive size={17} /><h3>成果归档</h3></div></div>
           <p className="form-hint">导出当前项目内可读取且 SHA-256 校验通过的文件。恢复前会先完整验证归档包，再写入目标文件。</p>
           <div className="artifact-archive-actions"><button className="secondary-button compact" disabled={saving || !selectedProjectId} onClick={() => void exportArchive()}><Download size={14} />导出 .tar.gz</button></div>
-          <label className="field-label">选择归档包<input type="file" accept=".gz,.tgz,application/gzip" onChange={(event) => setRestoreFile(event.target.files?.[0] || null)} /></label>
+          <label className="field-label">选择归档包<input key={selectedProjectId} disabled={saving} type="file" accept=".gz,.tgz,application/gzip" onChange={(event) => setRestoreFile(event.target.files?.[0] || null)} /></label>
           <div className="form-actions"><button className="primary-button compact" disabled={saving || !restoreFile || !selectedProjectId} onClick={() => void restoreArchive()}><RotateCcw size={14} />校验并恢复</button></div>
           {restoreResult && <pre className="json-preview">{JSON.stringify(restoreResult, null, 2)}</pre>}
         </section>
         <section className="panel">
           <div className="panel-heading"><div className="panel-title"><Trash2 size={17} /><h3>文件回收</h3></div></div>
           <p className="form-hint">先预览回收范围。已验收成果不会被回收，驳回版本可按选项纳入。</p>
-          <div className="form-grid"><label>每个版本族保留版本数<input type="number" min="1" max="50" value={keepVersions} onChange={(event) => setKeepVersions(event.target.value)} /></label><label className="checkbox-field"><input type="checkbox" checked={includeRejected} onChange={(event) => setIncludeRejected(event.target.checked)} />包含已驳回版本</label></div>
-          <div className="artifact-archive-actions"><button className="secondary-button compact" disabled={saving || !selectedProjectId} onClick={() => void runGC(true)}>预览回收范围</button><button className="primary-button compact" disabled={saving || !gcResult || gcResult.candidate_count === 0 || gcResult.dry_run === false} onClick={() => void runGC(false)}>确认回收</button></div>
+          <div className="form-grid"><label>每个版本族保留版本数<input type="number" min="1" max="50" aria-label="保留版本数" disabled={saving} value={keepVersions} onChange={(event) => {setKeepVersions(event.target.value);setGcResult(null);setGcPreviewKey("");}} /></label><label className="checkbox-field"><input type="checkbox" disabled={saving} checked={includeRejected} onChange={(event) => {setIncludeRejected(event.target.checked);setGcResult(null);setGcPreviewKey("");}} />包含已驳回版本</label></div>
+          <div className="artifact-archive-actions"><button className="secondary-button compact" disabled={saving || !selectedProjectId || !validKeepVersions} onClick={() => void runGC(true)}>预览回收范围</button><button className="primary-button compact" disabled={saving || !canConfirmGC} onClick={() => void runGC(false)}>确认回收</button></div>
           {gcResult && <div className="gc-result"><strong>{gcResult.dry_run ? "预览结果" : "执行结果"}</strong><span>{gcResult.candidate_count} 个候选文件</span><span>预计释放 {sizeText(gcResult.reclaimed_bytes)}</span><small>{gcResult.candidate_ids.length ? gcResult.candidate_ids.slice(0, 5).join(" · ") : "没有符合条件的文件"}{gcResult.candidate_ids.length > 5 ? " …" : ""}</small></div>}
         </section>
       </div></details>
