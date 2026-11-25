@@ -10,10 +10,10 @@
 .safety-item-head { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
 .safety-item-head > div:first-child { display: grid; gap: 5px; min-width: 0; }
 .safety-item-head strong { color: #294e4c; font-size: 13px; }
-.safety-item-head code, .safety-item-head small { color: #6e827d; font-size: 11px; overflow-wrap: anywhere; }
+.safety-item-head code, .safety-item-head small { color: #526b66; font-size: 11px; overflow-wrap: anywhere; }
 .safety-item .status-tag { flex: 0 0 auto; }
 .safety-item > p { margin: 0; color: #57706e; font-size: 12px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
-.safety-item > small { color: #6e827d; font-size: 11px; }
+.safety-item > small { color: #526b66; font-size: 11px; }
 .safety-item .secondary-button { justify-self: start; }
 .safety-form { display: grid; gap: 12px; padding: 13px; border: 1px solid #f8f1e7; border-radius: 10px; background: #fffaf5; }
 .safety-form > strong { color: #57706e; font-size: 13px; }

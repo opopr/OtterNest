@@ -62,7 +62,7 @@ export default function LoginPage() {
         {challenge ? (
           <form className="login-form" onSubmit={handleMfa}>
             <div className="login-form-heading"><ShieldCheck size={19} /><strong>双重身份验证</strong></div>
-            <p className="form-hint">请输入验证器应用 的 6 位动态验证码，或 8 位一次性备用恢复码。</p>
+            <p className="form-hint">请输入验证器应用的 6 位动态验证码，或 8 位一次性备用恢复码。</p>
             <label>验证码 / 恢复码<input autoFocus value={code} onChange={(event) => setCode(event.target.value)} autoComplete="one-time-code" required /></label>
             {error && <div className="form-error">{error}</div>}
             <button className="primary-button" disabled={busy}>{busy ? "正在验证…" : "验证并进入"}<ArrowRight size={16} /></button>
@@ -108,15 +108,15 @@ export default function LoginPage() {
           <>
             {authError && !error && <div className="form-error mb-10">{authError}</div>}
             <div className="login-tabs">
-              <button className={mode === "account" ? "selected" : ""} onClick={() => { setMode("account"); setError(""); }}>账号登录</button>
-              <button className={mode === "token" ? "selected" : ""} onClick={() => { setMode("token"); setError(""); }}>管理员令牌</button>
+              <button type="button" aria-pressed={mode === "account"} className={mode === "account" ? "selected" : ""} onClick={() => { setMode("account"); setError(""); }}>账号登录</button>
+              <button type="button" aria-pressed={mode === "token"} className={mode === "token" ? "selected" : ""} onClick={() => { setMode("token"); setError(""); }}>管理员令牌</button>
             </div>
             {mode === "account" ? (
               <form className="login-form" onSubmit={handleLogin}>
                 <label>用户名<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required /></label>
                 <label>密码<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
                 {error && <div className="form-error">{error}</div>}
-                <button className="primary-button" disabled={busy}>{busy ? "正在登录…" : "登录 OtterNest"}<ArrowRight size={16} /></button>
+                <button className="primary-button" disabled={busy}>{busy ? "正在登录…" : "登录"}<ArrowRight size={16} /></button>
               </form>
             ) : (
               <form className="login-form" onSubmit={handleToken}>
@@ -127,7 +127,7 @@ export default function LoginPage() {
             )}
           </>
         )}
-        <div className="login-footnote"><ShieldCheck size={15} /><span>身份验证由 FastAPI 完成 · 会话令牌仅保存在当前页面内存中</span></div>
+        <div className="login-footnote"><ShieldCheck size={15} /><span>会话令牌仅保存在当前页面内存中</span></div>
       </div>
     </div>
   );

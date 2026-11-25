@@ -192,7 +192,7 @@ export default function PortfolioPage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><h1>运营分析 总览</h1><p>跨项目运行指标、每日简报、通知收件箱与受控实验。</p></div>
+        <div><h1>运营分析</h1><p>跨项目运行指标、每日简报、通知收件箱与受控实验。</p></div>
         <div className="heading-actions">
           <button className="secondary-button" onClick={() => void loadOverview()} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button>
           <button className="primary-button compact" onClick={() => void runSchedule()} disabled={saving}><Play size={15} />执行公平调度</button>

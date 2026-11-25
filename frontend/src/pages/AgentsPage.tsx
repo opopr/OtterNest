@@ -62,7 +62,7 @@ export default function AgentsPage() {
       setError("");
       setSelectedAgentId((current) => safeRows.some((agent) => agent.id === current && !agent.deleted_at) ? current : "");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Agent 列表读取失败");
+      setError(reason instanceof Error ? reason.message : "智能体列表读取失败");
     } finally { setLoading(false); }
   }, []);
 
@@ -72,7 +72,7 @@ export default function AgentsPage() {
       const rows = await request<Runtime[]>("/agents/" + encodeURIComponent(agentId) + "/runtimes");
       setRuntimes(Array.isArray(rows) ? rows : []);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Runtime 列表读取失败");
+      setError(reason instanceof Error ? reason.message : "运行实例列表读取失败");
     }
   }, []);
 
@@ -102,7 +102,7 @@ export default function AgentsPage() {
       setShowForm(false);
       await loadAgents();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "创建 Agent 失败");
+      setError(reason instanceof Error ? reason.message : "创建智能体 失败");
     } finally { setSaving(false); }
   };
 
@@ -133,13 +133,13 @@ export default function AgentsPage() {
       setEditingAgent(null);
       await loadAgents();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "更新 Agent 失败");
+      setError(reason instanceof Error ? reason.message : "更新智能体失败");
     } finally { setSaving(false); }
   };
 
   const rotateAgentToken = async (agent: Agent) => {
     if (!(await dialog.confirm({
-      title: "重新生成 Agent 主令牌",
+      title: "重新生成智能体主令牌",
       message: `确认重新生成并轮换 Agent「${agent.name}」的主令牌？旧令牌将立即失效！`,
       confirmText: "确认轮换",
       tone: "warning"
@@ -168,29 +168,29 @@ export default function AgentsPage() {
       setRuntimeEnvironment("local");
       setShowRuntimeForm(false);
       await loadRuntimes(selectedAgent.id);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "注册 Runtime 失败"); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "注册运行实例失败"); }
     finally { setSaving(false); }
   };
 
   const issueRuntimeToken = async (runtime: Runtime) => {
     if (!selectedAgent) return;
-    if (!(await dialog.confirm({ title: "签发 / 轮换 Runtime 凭据", message: "为该 Runtime 签发或轮换独立凭据？旧凭据会立即失效。", confirmText: "确认签发", tone: "warning" }))) return;
+    if (!(await dialog.confirm({ title: "签发或轮换运行实例凭据", message: "为该运行实例 签发或轮换独立凭据？旧凭据会立即失效。", confirmText: "确认签发", tone: "warning" }))) return;
     setSaving(true);
     try {
       const result = await request<RuntimeToken>("/agents/" + encodeURIComponent(selectedAgent.id) + "/runtimes/" + encodeURIComponent(runtime.id) + "/token", { method: "POST" });
       setRuntimeToken(result);
       await loadRuntimes(selectedAgent.id);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Runtime 凭据签发失败"); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "运行实例凭据签发失败"); }
     finally { setSaving(false); }
   };
 
   const disableRuntime = async (runtime: Runtime) => {
-    if (!selectedAgent || !(await dialog.confirm({ title: "确认禁用 Runtime", message: "确认禁用该 Runtime？它将不能再提交心跳。", confirmText: "确认禁用", tone: "warning" }))) return;
+    if (!selectedAgent || !(await dialog.confirm({ title: "确认禁用运行实例", message: "确认禁用该运行实例？它将不能再提交心跳。", confirmText: "确认禁用", tone: "warning" }))) return;
     setSaving(true);
     try {
       await request("/agents/" + encodeURIComponent(selectedAgent.id) + "/runtimes/" + encodeURIComponent(runtime.id) + "/disable", { method: "POST" });
       await loadRuntimes(selectedAgent.id);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "禁用 Runtime 失败"); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "禁用运行实例 失败"); }
     finally { setSaving(false); }
   };
 
@@ -198,7 +198,7 @@ export default function AgentsPage() {
     if (!selectedAgent) return;
     const values = verifiedCapabilities.split(",").map((item) => item.trim()).filter(Boolean);
     if (values.some((item) => !selectedAgent.declared_capabilities.includes(item))) {
-      setError("只能核验 Agent 已声明的能力。");
+      setError("只能核验 智能体已声明的能力。");
       return;
     }
     if (!(await dialog.confirm({ title: "保存能力核验", message: "确认保存能力核验结果？这表示你已在外部验证这些能力确实可用。", confirmText: "保存核验" }))) return;
@@ -213,12 +213,12 @@ export default function AgentsPage() {
   };
 
   const disableAgent = async (agent: Agent) => {
-    if (!(await dialog.confirm({ title: "停用 Agent", message: `确认停用 Agent「${agent.name}」？它将无法继续领取新任务或鉴权。`, confirmText: "确认停用", tone: "warning" }))) return;
+    if (!(await dialog.confirm({ title: "停用智能体", message: `确认停用智能体「${agent.name}」？它将无法继续领取新任务或鉴权。`, confirmText: "确认停用", tone: "warning" }))) return;
     setSaving(true);
     try {
       await request("/agents/" + encodeURIComponent(agent.id) + "/disable", { method: "POST" });
       await loadAgents();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "停用 Agent 失败"); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "停用智能体 失败"); }
     finally { setSaving(false); }
   };
 
@@ -227,18 +227,18 @@ export default function AgentsPage() {
     try {
       await request("/agents/" + encodeURIComponent(agent.id) + "/enable", { method: "POST" });
       await loadAgents();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "启用 Agent 失败"); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "启用智能体 失败"); }
     finally { setSaving(false); }
   };
 
   const deleteAgent = async (agent: Agent) => {
-    if (!(await dialog.confirm({ title: "移入回收站", message: `确认删除 Agent「${agent.name}」并移入回收站？它将被立即停用，稍后可在回收站恢复。`, confirmText: "移入回收站", tone: "warning" }))) return;
+    if (!(await dialog.confirm({ title: "移入回收站", message: `确认删除智能体「${agent.name}」并移入回收站？它将被立即停用，稍后可在回收站恢复。`, confirmText: "移入回收站", tone: "warning" }))) return;
     setSaving(true);
     try {
       await request("/agents/" + encodeURIComponent(agent.id), { method: "DELETE" });
       if (selectedAgentId === agent.id) setSelectedAgentId("");
       await loadAgents();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "删除 Agent 失败"); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "删除智能体 失败"); }
     finally { setSaving(false); }
   };
 
@@ -247,17 +247,17 @@ export default function AgentsPage() {
     try {
       await request("/agents/" + encodeURIComponent(agent.id) + "/restore", { method: "POST" });
       await loadAgents();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "恢复 Agent 失败"); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "恢复智能体 失败"); }
     finally { setSaving(false); }
   };
 
   const permanentDeleteAgent = async (agent: Agent) => {
-    if (!(await dialog.confirm({ title: "永久删除 Agent", message: `警告：确认彻底永久删除 Agent「${agent.name}」？此操作不可恢复。`, confirmText: "永久删除", tone: "danger" }))) return;
+    if (!(await dialog.confirm({ title: "永久删除智能体", message: `警告：确认彻底永久删除智能体「${agent.name}」？此操作不可恢复。`, confirmText: "永久删除", tone: "danger" }))) return;
     setSaving(true);
     try {
       await request("/agents/" + encodeURIComponent(agent.id) + "/permanent", { method: "DELETE" });
       await loadAgents();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "彻底删除 Agent 失败"); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "彻底删除智能体 失败"); }
     finally { setSaving(false); }
   };
 
@@ -269,10 +269,10 @@ export default function AgentsPage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><h1>智能体 管理</h1><p>启用不代表在线。</p></div>
+        <div><h1>智能体管理</h1><p>启用不代表在线。</p></div>
         <div className="heading-actions">
           <button className="secondary-button" onClick={() => void loadAgents()} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button>
-          <button className="primary-button compact" onClick={() => setShowForm(true)}><Plus size={16} />登记 智能体</button>
+          <button className="primary-button compact" onClick={() => setShowForm(true)}><Plus size={16} />登记智能体</button>
         </div>
       </div>
 
@@ -306,7 +306,7 @@ export default function AgentsPage() {
           </div>
           <label>能力声明（逗号分隔）<input value={capabilities} onChange={(event) => setCapabilities(event.target.value)} placeholder="python, browser, filesystem" /></label>
           <p className="form-hint">能力声明不等于可信能力。所有者必须独立核验后，智能体 才能被分配要求该能力的任务。</p>
-          <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "创建中…" : "创建 Agent"}</button></div>
+          <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "创建中…" : "创建智能体"}</button></div>
         </form>
       )}
 
@@ -328,7 +328,7 @@ export default function AgentsPage() {
 
       <div className="governance-tabs">
         <button className={tab === "active" ? "selected" : ""} onClick={() => setTab("active")}>
-          <Bot size={16} />已登记 智能体 <span>{activeAgents.length}</span>
+          <Bot size={16} />已登记智能体 <span>{activeAgents.length}</span>
         </button>
         <button className={tab === "trash" ? "selected" : ""} onClick={() => { setTab("trash"); setSelectedAgentId(""); }}>
           <Trash2 size={16} />回收站 <span>{trashedAgents.length}</span>
@@ -404,7 +404,7 @@ export default function AgentsPage() {
             <label>已核验能力（逗号分隔）<input value={verifiedCapabilities} onChange={(event) => setVerifiedCapabilities(event.target.value)} placeholder="从声明能力中选择" /></label>
             <button className="secondary-button compact" disabled={saving} onClick={() => void saveVerifiedCapabilities()}>保存核验</button>
           </div>
-          <div className="panel-heading runtime-heading"><div className="panel-title"><Cpu size={16} /><h3>独立运行实例</h3><span className="count-chip">{runtimes.length}</span></div><button className="primary-button compact" onClick={() => setShowRuntimeForm((value) => !value)} disabled={!selectedAgent.enabled}><Plus size={14} />注册 运行实例</button></div>
+          <div className="panel-heading runtime-heading"><div className="panel-title"><Cpu size={16} /><h3>独立运行实例</h3><span className="count-chip">{runtimes.length}</span></div><button className="primary-button compact" onClick={() => setShowRuntimeForm((value) => !value)} disabled={!selectedAgent.enabled}><Plus size={14} />注册运行实例</button></div>
           {showRuntimeForm && <form className="form-panel embedded-form" onSubmit={createRuntime}><div className="form-grid"><label>实例标签<input value={runtimeLabel} onChange={(event) => setRuntimeLabel(event.target.value)} required maxLength={120} placeholder="oracle-arm-runner-01" /></label><label>运行环境<input value={runtimeEnvironment} onChange={(event) => setRuntimeEnvironment(event.target.value)} required maxLength={160} placeholder="Oracle ARM / WSL2 / local" /></label></div><div className="form-actions"><button className="primary-button compact" disabled={saving}>创建 运行实例</button></div></form>}
           <div className="runtime-list">{runtimes.map((runtime) => <article className="runtime-card" key={runtime.id}>
             <div className="runtime-card-head"><div><strong>{runtime.label}</strong><small>{runtime.environment} · {runtime.id.slice(0, 12)}</small></div><span className={"status-tag " + (runtime.online ? "tag-green" : runtime.enabled ? "tag-amber" : "tag-neutral")}>{!runtime.enabled ? "已禁用" : runtime.online ? "在线" : "离线"}</span></div>

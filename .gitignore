@@ -17,3 +17,6 @@ frontend/.env
 frontend/.env.local
 frontend/.env.*.local
 var/
+
+# Local browser smoke-test screenshots and logs
+ui-test-output/

@@ -88,10 +88,10 @@ export default function RuntimeMonitorPage(){
   catch{setError("浏览器未授予剪贴板权限，请手动复制令牌");}
  };
 
- if(!isOwner)return <div className="page-stack"><div className="page-heading"><div><h1>运行实例 监控</h1><p>统一查看 智能体 运行实例和心跳状态。</p></div></div><div className="panel empty-state"><ShieldCheck size={28}/><strong>仅所有者可以查看 运行实例 全局状态</strong><p>智能体 运行实例、独立凭据和健康信息属于平台管理数据。</p></div></div>;
+ if(!isOwner)return <div className="page-stack"><div className="page-heading"><div><h1>运行监控</h1><p>统一查看智能体 运行实例和心跳状态。</p></div></div><div className="panel empty-state"><ShieldCheck size={28}/><strong>仅所有者可以查看运行实例 全局状态</strong><p>智能体 运行实例、独立凭据和健康信息属于平台管理数据。</p></div></div>;
 
  return <div className="page-stack">
-  <div className="page-heading"><div><h1>运行实例 监控</h1><p>跨 智能体 汇总运行实例、180 秒心跳在线状态、健康信息和独立凭据。</p></div><div className="heading-actions"><button className="secondary-button" onClick={()=>void load()} disabled={loading}><RefreshCw size={15} className={loading?"spin":""}/>刷新状态</button><Link className="secondary-button" to="/agents"><Bot size={15}/>智能体 管理</Link></div></div>
+  <div className="page-heading"><div><h1>运行监控</h1><p>跨智能体 汇总运行实例、180 秒心跳在线状态、健康信息和独立凭据。</p></div><div className="heading-actions"><button className="secondary-button" onClick={()=>void load()} disabled={loading}><RefreshCw size={15} className={loading?"spin":""}/>刷新状态</button><Link className="secondary-button" to="/agents"><Bot size={15}/>智能体管理</Link></div></div>
   {error&&<div className="inline-error"><AlertCircle size={16}/>{error}<button onClick={()=>setError("")}><X size={14}/></button></div>}
   {issuedToken&&<section className="panel token-panel runtime-token-panel">
    <div className="token-panel-title"><KeyRound size={18}/><strong>运行实例 凭据已签发：请立即保存</strong></div>
@@ -113,10 +113,10 @@ export default function RuntimeMonitorPage(){
      <option value="all">全部状态</option><option value="online">在线</option><option value="offline">离线</option><option value="disabled">已禁用</option><option value="missing_token">缺少凭据</option>
     </select>
    </div>
-   {loading?<div className="panel-loading"><span className="spinner"/>正在汇总 运行实例 状态…</div>:visible.length?<div className="runtime-monitor-list">{visible.map(row=><article className="runtime-monitor-card" key={row.id}>
+   {loading?<div className="panel-loading"><span className="spinner"/>正在汇总运行实例状态…</div>:visible.length?<div className="runtime-monitor-list">{visible.map(row=><article className="runtime-monitor-card" key={row.id}>
     <div className="runtime-monitor-card-head">
      <div className="runtime-monitor-identity"><div className="runtime-monitor-avatar"><Cpu size={18}/></div><div><strong>{row.label}</strong><small>{row.agent_name} · {row.agent_platform}</small><code>{row.id}</code></div></div>
-     <div className="runtime-monitor-badges"><span className={"status-tag "+(!row.enabled?"tag-neutral":row.online?"tag-green":"tag-amber")}>{!row.enabled?"已禁用":row.online?"在线":"离线"}</span><span className="status-tag tag-neutral">{stateLabels[row.status]||getUiLabel(row.status)}</span>{!row.agent_enabled&&<span className="status-tag tag-red">智能体 已禁用</span>}</div>
+     <div className="runtime-monitor-badges"><span className={"status-tag "+(!row.enabled?"tag-neutral":row.online?"tag-green":"tag-amber")}>{!row.enabled?"已禁用":row.online?"在线":"离线"}</span><span className="status-tag tag-neutral">{stateLabels[row.status]||getUiLabel(row.status)}</span>{!row.agent_enabled&&<span className="status-tag tag-red">智能体已禁用</span>}</div>
     </div>
     <div className="runtime-monitor-meta">
      <div><small>运行环境</small><strong>{row.environment}</strong></div>
@@ -128,7 +128,7 @@ export default function RuntimeMonitorPage(){
      {row.enabled&&<button className="secondary-button compact" disabled={saving} onClick={()=>void rotateToken(row)}><KeyRound size={13}/>{row.has_token?"轮换凭据":"签发凭据"}</button>}
      {row.enabled&&<button className="text-button" disabled={saving} onClick={()=>void disableRuntime(row)}><XCircle size={13}/>禁用 运行实例</button>}
     </div>
-   </article>)}</div>:<div className="empty-state"><Monitor size={27}/><strong>{rows.length?"没有符合条件的运行实例":"尚未登记运行实例"}</strong><p>{rows.length?"调整搜索条件或状态筛选。":"请先登记智能体，再创建运行实例并签发独立凭据。"}</p>{!rows.length&&<Link className="secondary-button" to="/agents">前往 智能体 管理</Link>}</div>}
+   </article>)}</div>:<div className="empty-state"><Monitor size={27}/><strong>{rows.length?"没有符合条件的运行实例":"尚未登记运行实例"}</strong><p>{rows.length?"调整搜索条件或状态筛选。":"请先登记智能体，再创建运行实例并签发独立凭据。"}</p>{!rows.length&&<Link className="secondary-button" to="/agents">前往 智能体管理</Link>}</div>}
   </section>
   <p className="runtime-monitor-footnote"><Activity size={13}/>在线状态由服务端按最近 180 秒心跳、运行实例 启用状态和 idle/busy 状态计算；本页面不会自行推断或伪造在线状态。刷新可重新读取服务器快照。</p>
  </div>;

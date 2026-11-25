@@ -149,7 +149,7 @@ export default function SkillsPage() {
   const archiveSkill = async (skill: Skill) => {
     const reason = await dialog.prompt({
       title: `归档 Skill「${skill.name}」`,
-      message: "归档后该 Skill 不再提供给 Agent，但会保留历史评价记录。",
+      message: "归档后该技能不再提供给智能体，但会保留历史评价记录。",
       label: "归档原因（至少 5 个字符）",
       placeholder: "说明归档或替代原因…",
       multiline: true,

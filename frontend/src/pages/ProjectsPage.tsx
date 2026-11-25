@@ -517,7 +517,7 @@ export default function ProjectsPage() {
                 <form className="panel form-panel" onSubmit={addMember}>
                   <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>添加项目成员</h3></div><button type="button" className="icon-button" onClick={() => setShowMemberForm(false)}><X size={17} /></button></div>
                   <div className="form-grid">
-                    <label>选择 智能体<select value={newMemberAgentId} onChange={(e) => setNewMemberAgentId(e.target.value)} required>
+                    <label>选择智能体<select value={newMemberAgentId} onChange={(e) => setNewMemberAgentId(e.target.value)} required>
                       <option value="">选择已启用 智能体…</option>
                       {availableAgentsToAdd.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.platform})</option>)}
                     </select></label>

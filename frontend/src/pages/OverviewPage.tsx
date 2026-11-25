@@ -181,7 +181,7 @@ export default function OverviewPage() {
     }));
   }, [data]);
 
-  if (loading && !data) return <div className="loading-panel"><div className="spinner" />正在读取真实项目数据…</div>;
+  if (loading && !data) return <div className="loading-panel"><div className="spinner" />正在读取项目数据…</div>;
   if (error && !data) return <div className="error-panel"><AlertCircle size={18} />{error}<button onClick={() => void refresh()}>重试</button></div>;
 
   const briefing = data?.briefing;
@@ -209,7 +209,7 @@ export default function OverviewPage() {
         <StatCard label="任务总数" value={metrics?.total_tasks ?? 0} hint="" icon={Activity} tone="blue" />
         <StatCard label="已完成任务" value={metrics?.completed_count ?? 0} hint="" icon={CheckCircle2} tone="green" />
         <StatCard label="阻塞任务" value={metrics?.blocked_count ?? 0} hint="" icon={AlertCircle} tone="amber" />
-        <StatCard label="启用 智能体" value={briefing?.enabled_agents ?? 0} hint="" icon={Bot} tone="violet" />
+        <StatCard label="已启用智能体" value={briefing?.enabled_agents ?? 0} hint="" icon={Bot} tone="violet" />
       </div>
 
       <div className="section-heading">
@@ -253,7 +253,7 @@ export default function OverviewPage() {
           (briefing.pending_review_tasks?.length ?? 0) === 0 &&
           (briefing.blocked_tasks?.length ?? 0) === 0
         )) && (
-          <div className="all-clear"><CheckCircle2 size={22} /><strong>目前没有待处理的任务异常</strong></div>
+          <div className="all-clear"><CheckCircle2 size={22} /><strong>暂无待处理事项</strong></div>
         )}
       </div>
       <div className="data-footnote">

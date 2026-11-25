@@ -2,7 +2,7 @@ import { Component, Suspense, useCallback, useEffect, useState, type ReactNode }
 import {
   ArchiveRestore, ArrowUpRight, Bell, BookMarked, BookOpen, Bot, CheckCheck, ChevronDown,
   CircleHelp, ClipboardCheck, FileArchive, FolderKanban, Gauge, GitBranch, KeyRound,
-  LayoutDashboard, LockKeyhole, LogOut, MessageSquare, Monitor, PlugZap, Settings2,
+  LayoutDashboard, LockKeyhole, LogOut, Menu, MessageSquare, Monitor, PlugZap, Settings2, X,
   ShieldCheck, Wifi, type LucideIcon
 } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
@@ -84,6 +84,7 @@ export default function AppShell() {
   const { user, logout } = useAuth();
   const { systemMode } = useSystemMode();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<TopbarNotification[]>([]);
   const location = useLocation();
@@ -93,7 +94,29 @@ export default function AppShell() {
 
   useEffect(() => {
     setExpandedNavId(findNavGroupId(location.pathname));
+    setMobileNavOpen(false);
+    setMenuOpen(false);
+    setNotifOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!menuOpen && !notifOpen) return;
+    const closeOnOutside = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (!target.closest(".user-menu-wrap")) setMenuOpen(false);
+      if (!target.closest(".notif-menu-wrap")) setNotifOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setMenuOpen(false); setNotifOpen(false); }
+    };
+    document.addEventListener("pointerdown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [menuOpen, notifOpen]);
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -131,13 +154,16 @@ export default function AppShell() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <Link className="brand" to="/" aria-label="OtterNest 首页">
+      <aside className={"sidebar" + (mobileNavOpen ? " mobile-open" : "")}>
+        <div className="brand-row-mobile">
+        <Link className="brand" to="/" aria-label="OtterNest 首页" onClick={() => setMobileNavOpen(false)}>
           <span className="brand-mascot"><BrandMark /></span>
           <span><strong>OtterNest</strong><small>水獭窝</small></span>
         </Link>
+        <button type="button" className="mobile-nav-toggle" aria-expanded={mobileNavOpen} aria-controls="main-navigation" onClick={() => setMobileNavOpen(open => !open)}>{mobileNavOpen ? <X size={18} /> : <Menu size={18} />}<span>{mobileNavOpen ? "收起菜单" : "菜单"}</span></button>
+        </div>
 
-        <nav className="side-nav-grouped" aria-label="主导航">
+        <nav id="main-navigation" className="side-nav-grouped" aria-label="主导航">
           {NAVIGATION_GROUPS.map((group) => {
             const Icon = NAV_ICONS[group.icon];
             const onlyItem = group.items.length === 1 ? group.items[0] : null;
@@ -149,6 +175,7 @@ export default function AppShell() {
                   <NavLink
                     to={onlyItem.to}
                     end={onlyItem.end}
+                    onClick={() => setMobileNavOpen(false)}
                     className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}
                   >
                     <Icon size={17} strokeWidth={1.8} />
@@ -177,6 +204,7 @@ export default function AppShell() {
                             key={item.to}
                             to={item.to}
                             end={item.end}
+                            onClick={() => setMobileNavOpen(false)}
                             className={({ isActive }) => "nav-sublink" + (isActive ? " active" : "")}
                           >
                             {item.label}
@@ -192,12 +220,14 @@ export default function AppShell() {
         </nav>
 
         <div className="sidebar-spacer" />
+        <div className="sidebar-tools">
         <a className="side-link" href={getApiOrigin() + "/legacy"} target="_blank" rel="noreferrer">
           <ArrowUpRight size={16} />旧版管理台
         </a>
         <a className="side-link" href={getApiOrigin() + "/api/docs"} target="_blank" rel="noreferrer">
           <CircleHelp size={16} />接口文档
         </a>
+        </div>
         
       </aside>
 
@@ -219,6 +249,7 @@ export default function AppShell() {
                 type="button"
                 className="notif-button"
                 aria-label="通知收件箱"
+                aria-expanded={notifOpen}
                 onClick={() => {
                   setMenuOpen(false);
                   setNotifOpen((open) => {
@@ -272,8 +303,8 @@ export default function AppShell() {
               )}
             </div>
             <div className="user-menu-wrap">
-              <button className="user-button" onClick={() => { setNotifOpen(false); setMenuOpen((open) => !open); }}>
-                <span className="user-avatar">O</span>
+              <button className="user-button" aria-label="账户菜单" aria-expanded={menuOpen} onClick={() => { setNotifOpen(false); setMenuOpen((open) => !open); }}>
+                <span className="user-avatar" aria-hidden="true">主</span>
                 <span className="user-name">{user?.id === "owner" ? "所有者" : user?.id || "账户"}</span>
                 <ChevronDown size={15} />
               </button>

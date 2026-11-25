@@ -7,7 +7,7 @@
 .continuity-checkpoint-title { display: flex; align-items: start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .continuity-checkpoint-title strong { font-size: 13px; color: #294e4c; }
 .continuity-checkpoint p { margin: 0; font-size: 12px; line-height: 1.7; color: #57706e; white-space: pre-wrap; overflow-wrap: anywhere; }
-.continuity-checkpoint small { font-size: 11px; color: #6e827d; }
+.continuity-checkpoint small { font-size: 11px; color: #526b66; }
 .continuity-checkpoint > button { justify-self: start; }
 .continuity-form { display: grid; gap: 11px; padding: 14px; border: 1px solid #f8f1e7; border-radius: 10px; background: #fffaf5; }
 .continuity-form strong { font-size: 13px; color: #57706e; }

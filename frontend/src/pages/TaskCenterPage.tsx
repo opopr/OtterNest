@@ -205,7 +205,7 @@ export default function TaskCenterPage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><h1>任务中心</h1><p>跨项目汇总任务状态；授权、验收和任务调度均由服务端治理。</p></div>
+        <div><h1>任务中心</h1></div>
         <div className="heading-actions">
           <button className="secondary-button" onClick={() => void load()} disabled={loading || dispatching}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button>
           <button className="primary-button compact" onClick={() => void dispatchNow()} disabled={loading || dispatching || saving}><GitBranch size={15} />{dispatching ? "正在调度…" : "立即调度"}</button>
