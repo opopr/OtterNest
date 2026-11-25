@@ -34,9 +34,9 @@ interface ImportResult {
 }
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const nameMap: Record<string, string> = {
-  agents: "Agent", goals: "目标", tasks: "任务", memberships: "成员关系", memories: "记忆",
+  agents: "智能体", goals: "目标", tasks: "任务", memberships: "成员关系", memories: "记忆",
   decisions: "决策", artifacts: "成果元数据", checkpoints: "检查点", side_effects: "副作用",
-  skills: "Skills", events: "事件", workflow_rules: "工作流规则", decision_reviews: "决策复核",
+  skills: "技能", events: "事件", workflow_rules: "工作流规则", decision_reviews: "决策复核",
   task_dependencies: "任务依赖", goal_dependencies: "目标依赖",
 };
 const failText = (reason: unknown) => reason instanceof Error ? reason.message : "请求失败";
@@ -151,7 +151,7 @@ export default function ProjectPortabilityPage() {
 
   return <div className="page-stack admin-gap-page">
     <div className="page-heading"><div><h1>项目导入导出</h1>
-      <p>备份项目的可携带 JSON 记录，预检后恢复成全新、默认暂停的项目。</p></div>
+      </div>
       <button className="secondary-button compact" onClick={() => void refresh()} disabled={loading || busy}><RefreshCw size={14} />刷新</button></div>
     {error && <div className="inline-error"><AlertCircle size={15} />{error}<button onClick={() => setError("")}><X size={14} /></button></div>}
     {success && <div className="success-notice"><ShieldCheck size={15} />{success}<button onClick={() => setSuccess("")}>关闭</button></div>}
@@ -162,17 +162,17 @@ export default function ProjectPortabilityPage() {
         <p className="form-hint">导出项目任务、目标、记忆、决策、检查点等元数据。真实成果文件与第三方访问凭据不会包含在 JSON 包中。</p>
         <ProjectSelect projects={projects} value={projectId} onChange={setProjectId} disabled={loading || busy} />
         <button className="primary-button compact" disabled={!projectId || busy} onClick={() => void exportBundle()}><Download size={15} />{busy ? "处理中…" : "导出 JSON"}</button>
-        <p className="form-hint">要保留成果文件本身，请另外使用<Link to="/artifacts" className="admin-inline-link">成果中心的二进制归档</Link>。此功能不能替代 PostgreSQL 数据库备份。</p>
+        <p className="form-hint">要保留成果文件本身，请另外使用<Link to="/artifacts" className="admin-inline-link">成果中心归档</Link>。此功能不能替代 PostgreSQL 数据库备份。</p>
       </section>
 
       <section className="panel admin-portable-card">
         <div className="panel-heading"><div className="panel-title"><UploadCloud size={17} /><h3>导入项目包</h3></div></div>
-        <p className="form-hint">先选择文件，再提交后端校验版本、SHA-256 摘要、引用一致性和大小。仅通过预检后才能恢复。</p>
+        <div className="import-steps" aria-label="导入进度">{["选择文件","安全预检","确认恢复"].map((label,index)=><div key={label} className={(result ? 3 : preview ? 2 : bundle ? 1 : 0) >= index ? "current" : ""}><span>{index+1}</span>{label}</div>)}</div><p className="form-hint">仅通过服务端完整性预检后才能恢复。</p>
         <label className="admin-file-field"><FileJson size={19} />选择 JSON 项目包（最大 10 MiB）
           <input type="file" accept=".json,application/json" onChange={(event) => void readFile(event)} disabled={busy} /></label>
         {bundle && <div className="admin-bundle-brief"><strong>{bundle.project?.name || "待校验项目"}</strong>
           <code>{bundle.sha256_digest}</code>
-          <span>请点击预检，验证来自该文件的完整内容。</span></div>}
+          <span>等待安全预检</span></div>}
         <button className="secondary-button compact" onClick={() => void validate()} disabled={!bundle || busy}><ShieldCheck size={14} />{busy ? "处理中…" : "预检项目包"}</button>
       </section>
     </div>
@@ -186,7 +186,7 @@ export default function ProjectPortabilityPage() {
       <div className="admin-import-warnings"><ShieldAlert size={18} />
         <div><strong>恢复是保守操作，不会自动续跑或恢复连接</strong>
           <ul><li>新项目默认暂停；未完成任务通常保持阻塞或等待重新审批。</li>
-            <li>智能体 身份恢复为禁用状态，密钥与外部连接不会恢复。</li>
+            <li>智能体身份恢复为禁用状态，密钥与外部连接不会恢复。</li>
             <li>成果仅恢复元数据，需要重新校验并恢复二进制文件。</li></ul>
         </div></div>
       <form className="form-panel admin-stack-form" onSubmit={(event) => void restore(event)}>
@@ -201,7 +201,7 @@ export default function ProjectPortabilityPage() {
     {result && <section className="panel">
       <div className="panel-heading"><div className="panel-title"><ShieldCheck size={17} /><h3>导入结果</h3></div><span className="status-tag tag-amber">项目已暂停</span></div>
       <p>已创建：<strong>{result.project_name}</strong></p>
-      <p className="form-hint">禁用 Agent：{result.disabled_agents} · 待重建的成果文件元数据：{result.artifacts_metadata_only}</p>
+      <p className="form-hint">已禁用智能体：{result.disabled_agents} · 待重建的成果文件元数据：{result.artifacts_metadata_only}</p>
       <Link className="secondary-button compact" to={"/projects?project=" + encodeURIComponent(result.project_id)}>查看新项目</Link>
     </section>}
   </div>;

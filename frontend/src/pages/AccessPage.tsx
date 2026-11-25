@@ -35,6 +35,9 @@ export default function AccessPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [grants, setGrants] = useState<TaskGrant[]>([]);
+  const [grantFilter, setGrantFilter] = useState("all");
+  const grantStatus = (grant: TaskGrant) => grant.revoked ? "revoked" : new Date(grant.expires_at).getTime() <= Date.now() ? "expired" : "active";
+  const visibleGrants = grants.filter(grant => grantFilter === "all" || grantStatus(grant) === grantFilter);
   const [agentId, setAgentId] = useState("");
   const [scopes, setScopes] = useState("task.read, artifact.read");
   const [sensitivity, setSensitivity] = useState("internal");
@@ -123,7 +126,7 @@ export default function AccessPage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><h1>任务临时授权</h1><p>为项目成员授予限定任务范围、敏感级别与有效期的临时访问权限。</p></div>
+        <div><h1>任务临时授权</h1></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedProjectId && void loadProject(selectedProjectId)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
@@ -132,24 +135,24 @@ export default function AccessPage() {
         <section className="panel">
           <div className="panel-heading"><div className="panel-title"><KeyRound size={17} /><h3>创建临时授权</h3></div><span className="muted-inline">仅项目成员可被授权</span></div>
           <form className="form-panel" onSubmit={createGrant}>
-            <label>智能体<select value={agentId} onChange={(event) => setAgentId(event.target.value)} required><option value="">选择 智能体…</option>{eligibleMembers.map((member) => <option key={member.agent_id} value={member.agent_id}>{member.agent_name} · {getUiLabel(member.role)}</option>)}</select></label>
+            <label>智能体<select value={agentId} onChange={(event) => setAgentId(event.target.value)} required><option value="">选择智能体…</option>{eligibleMembers.map((member) => <option key={member.agent_id} value={member.agent_id}>{member.agent_name} · {getUiLabel(member.role)}</option>)}</select></label>
             <label>授权范围（逗号分隔）<input value={scopes} onChange={(event) => setScopes(event.target.value)} placeholder="task.read, artifact.read" /></label>
             <div className="form-grid"><label>最高敏感级<select value={sensitivity} onChange={(event) => setSensitivity(event.target.value)}><option value="public">公开</option><option value="internal">内部</option><option value="confidential">机密</option><option value="restricted">受限</option></select></label><label>有效期（小时）<input type="number" min="1" max="720" value={expires} onChange={(event) => setExpires(event.target.value)} /></label></div>
             <p className="form-hint">授权只作用于所选任务，不替代项目成员身份，也不会绕过任务租约和其他安全门槛。</p>
             <div className="form-actions"><button className="primary-button compact" disabled={saving || !selectedTaskId || !agentId || eligibleMembers.length === 0}><Plus size={14} />创建授权</button></div>
           </form>
-          {!eligibleMembers.length && <p className="form-hint">当前项目没有已启用的成员 智能体。请先在项目成员管理中添加 智能体。</p>}
+          {!eligibleMembers.length && <p className="form-hint">当前项目没有已启用的成员智能体。请先在项目成员管理中添加智能体。</p>}
         </section>
         <section className="panel">
           <div className="panel-heading"><div className="panel-title"><ShieldCheck size={17} /><h3>当前任务授权</h3></div><span className="count-chip">{grants.length}</span></div>
           {selectedTask && <p className="form-hint">任务：{selectedTask.title}</p>}
-          <div className="grant-list">{grants.map((grant) => <article className="grant-card" key={grant.id}>
+          <div className="approval-switch" role="group" aria-label="授权状态">{[{key:"all",label:"全部"},{key:"active",label:"有效"},{key:"expired",label:"已过期"},{key:"revoked",label:"已撤销"}].map(item => <button type="button" key={item.key} aria-pressed={grantFilter === item.key} className={grantFilter === item.key ? "selected" : ""} onClick={() => setGrantFilter(item.key)}>{item.label}</button>)}</div><div className="grant-list">{visibleGrants.map((grant) => <article className="grant-card" key={grant.id}>
             <div className="grant-card-head"><strong>{members.find((member) => member.agent_id === grant.agent_id)?.agent_name || grant.agent_id.slice(0, 8)}</strong><span className={"status-tag " + (grant.revoked ? "tag-neutral" : new Date(grant.expires_at).getTime() <= Date.now() ? "tag-red" : "tag-green")}>{grant.revoked ? "已撤销" : new Date(grant.expires_at).getTime() <= Date.now() ? "已过期" : "有效"}</span></div>
             <div className="grant-scopes">{grant.granted_scopes.map((scope) => <code key={scope}>{scope}</code>)}</div>
             <small>敏感级上限：{sensitivityLabels[grant.max_sensitivity] || grant.max_sensitivity}</small>
             <small>到期：{new Date(grant.expires_at).toLocaleString("zh-CN", { hour12: false })}</small>
             {!grant.revoked && new Date(grant.expires_at).getTime() > Date.now() && <button className="text-button grant-revoke" disabled={saving} onClick={() => void revokeGrant(grant)}><Trash2 size={13} />撤销授权</button>}
-          </article>)}{!grants.length && <div className="empty-state"><KeyRound size={24} /><strong>暂无临时授权</strong><p>选择任务并向已加入项目的 智能体 授予最小必要权限。</p></div>}</div>
+          </article>)}{!visibleGrants.length && <div className="empty-state"><KeyRound size={24} /><strong>{grants.length ? "没有符合条件的授权" : "暂无临时授权"}</strong></div>}</div>
         </section>
       </div>
     </div>
