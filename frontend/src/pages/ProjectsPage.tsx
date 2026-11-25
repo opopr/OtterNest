@@ -65,6 +65,7 @@ export default function ProjectsPage() {
   const [newMemberAgentId, setNewMemberAgentId] = useState("");
   const [newMemberRole, setNewMemberRole] = useState<ProjectMember["role"]>("worker");
   const [showMemberForm, setShowMemberForm] = useState(false);
+  const [detailTab, setDetailTab] = useState<"tasks" | "members">("tasks");
   const [editingProject, setEditingProject] = useState(false);
   const [editProjectName, setEditProjectName] = useState("");
   const [editProjectDescription, setEditProjectDescription] = useState("");
@@ -337,9 +338,7 @@ export default function ProjectsPage() {
     <div className="page-stack">
       <div className="page-heading">
         <div>
-          <div className="eyebrow">当前项目</div>
           <h1>项目与任务</h1>
-          <p>项目、任务、成员与简报的统一入口；任务状态与权限仍由服务端治理。</p>
         </div>
         <div className="heading-actions">
           <Link to="/goals-workflows" className="secondary-button compact"><Target size={14} />目标与工作流</Link>
@@ -363,7 +362,7 @@ export default function ProjectsPage() {
 
       <div className="projects-layout">
         <section className="panel project-list-panel">
-          <div className="panel-heading"><div className="panel-title"><FolderKanban size={17} /><h3>项目空间</h3><span className="count-chip">{projects.length}</span></div></div>
+          <div className="panel-heading"><div className="panel-title"><FolderKanban size={17} /><h3>项目</h3><span className="count-chip">{projects.length}</span></div></div>
           <div className="search-field"><Search size={15} /><input placeholder="搜索项目…" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
           {loading ? <div className="panel-loading"><div className="spinner" /></div> : visibleProjects.length === 0 ? (
             <div className="empty-mini">没有匹配的项目</div>
@@ -371,7 +370,7 @@ export default function ProjectsPage() {
             <div className="project-list">
               {visibleProjects.map((project) => (
                 <button key={project.id} className={"project-list-item " + (project.id === selectedId ? "selected" : "")}
-                  onClick={() => { setSelectedId(project.id); setSearchParams({ project: project.id }); }}>
+                  aria-pressed={project.id === selectedId} onClick={() => { setSelectedId(project.id); setSearchParams({ project: project.id }); setDetailTab("tasks"); }}>
                   <span className="project-list-icon"><FolderKanban size={17} /></span>
                   <span className="project-list-copy"><strong>{project.name}</strong><small>{getUiLabel(project.status)} · 优先级 {project.priority}</small></span>
                   <span className="project-list-arrow">›</span>
@@ -389,7 +388,7 @@ export default function ProjectsPage() {
               <div className="panel project-detail-header">
                 <div className="project-detail-title">
                   <div className="project-avatar large"><FolderKanban size={21} /></div>
-                  <div><div className="eyebrow">当前项目</div><h2>{selectedProject.name}</h2><p>{selectedProject.description || "暂无项目说明"}</p></div>
+                  <div><h2>{selectedProject.name}</h2>{selectedProject.description && <p>{selectedProject.description}</p>}</div>
                 </div>
                 <div className="flex-row-gap">
                   <span className={"status-tag " + (selectedProject.status === "active" ? "tag-green" : "tag-neutral")}>{getUiLabel(selectedProject.status)}</span>
@@ -420,8 +419,13 @@ export default function ProjectsPage() {
                 </form>
               )}
 
+              <div className="workspace-switch" role="group" aria-label="项目内容">
+                <button type="button" aria-pressed={detailTab === "tasks"} className={detailTab === "tasks" ? "selected" : ""} onClick={() => setDetailTab("tasks")}>任务 <span>{tasks.length}</span></button>
+                <button type="button" aria-pressed={detailTab === "members"} className={detailTab === "members" ? "selected" : ""} onClick={() => setDetailTab("members")}>成员 <span>{members.length}</span></button>
+              </div>
+              {detailTab === "tasks" && <div className="project-tab-content">
               <div className="section-heading compact-heading">
-                <div><h2>任务列表</h2><p>{tasks.length} 项任务 · 点击任务行或「详情」查看依赖图、检查点与副作用</p></div>
+                <div><h2>任务列表</h2></div>
                 <button className="primary-button compact" onClick={() => setShowTaskForm((value) => !value)}><Plus size={15} />新建任务</button>
               </div>
 
@@ -446,10 +450,10 @@ export default function ProjectsPage() {
                     </label>
                     <label>敏感级别
                       <select value={taskSensitivity} onChange={(e) => setTaskSensitivity(e.target.value as "public" | "internal" | "confidential" | "restricted")}>
-                        <option value="public">public（公开）</option>
-                        <option value="internal">internal（内部）</option>
-                        <option value="confidential">confidential（机密）</option>
-                        <option value="restricted">restricted（受限）</option>
+                        <option value="public">公开</option>
+                        <option value="internal">内部</option>
+                        <option value="confidential">机密</option>
+                        <option value="restricted">受限</option>
                       </select>
                     </label>
                     <label>优先级 (0-100)
@@ -508,8 +512,10 @@ export default function ProjectsPage() {
                 )}
               </div>
 
-              <div className="section-heading compact-heading section-spacer-top">
-                <div><h2>项目成员管理</h2><p>{members.length} 位成员 · 支持添加、改角色与移除</p></div>
+              </div>}
+              {detailTab === "members" && <div className="project-tab-content">
+              <div className="section-heading compact-heading">
+                <div><h2>项目成员</h2></div>
                 <button className="secondary-button compact" onClick={() => setShowMemberForm((v) => !v)}><Users size={15} />添加成员</button>
               </div>
 
@@ -518,14 +524,14 @@ export default function ProjectsPage() {
                   <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>添加项目成员</h3></div><button type="button" className="icon-button" onClick={() => setShowMemberForm(false)}><X size={17} /></button></div>
                   <div className="form-grid">
                     <label>选择智能体<select value={newMemberAgentId} onChange={(e) => setNewMemberAgentId(e.target.value)} required>
-                      <option value="">选择已启用 智能体…</option>
+                      <option value="">选择已启用智能体…</option>
                       {availableAgentsToAdd.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.platform})</option>)}
                     </select></label>
                     <label>项目角色<select value={newMemberRole} onChange={(e) => setNewMemberRole(e.target.value as ProjectMember["role"])}>
-                      <option value="worker">worker（执行者）</option>
-                      <option value="manager">manager（管理者/可建任务）</option>
-                      <option value="reviewer">reviewer（审查者）</option>
-                      <option value="advisor">advisor（顾问）</option>
+                      <option value="worker">执行者</option>
+                      <option value="manager">管理者（可创建任务）</option>
+                      <option value="reviewer">审查者</option>
+                      <option value="advisor">顾问</option>
                     </select></label>
                   </div>
                   <div className="form-actions"><button className="primary-button compact" disabled={saving || !newMemberAgentId}>加入项目</button></div>
@@ -534,14 +540,14 @@ export default function ProjectsPage() {
 
               <div className="panel task-table-panel">
                 {members.length === 0 ? (
-                  <div className="empty-state"><Users size={24} /><strong>暂无项目成员</strong><p>点击上方「添加成员」将 智能体 加入当前项目。</p></div>
+                  <div className="empty-state"><Users size={24} /><strong>暂无项目成员</strong><p>点击上方「添加成员」将智能体加入当前项目。</p></div>
                 ) : (
                   <div className="task-list">
                     {members.map((member) => (
                       <div className="task-row flex-row-gap" key={member.id}>
                         <div className="task-main">
                           <strong>{member.agent_name}</strong>
-                          <small>{member.agent_id.slice(0, 12)} · 敏感级上限 {member.max_sensitivity} · {member.enabled ? "已启用" : "已停用"}</small>
+                          <small>{member.agent_id.slice(0, 12)} · 敏感级上限 {getUiLabel(member.max_sensitivity)} · {member.enabled ? "已启用" : "已停用"}</small>
                         </div>
                         <select
                           aria-label={`${member.agent_name} 角色`}
@@ -563,6 +569,7 @@ export default function ProjectsPage() {
                   </div>
                 )}
               </div>
+              </div>}
             </>
           )}
         </section>

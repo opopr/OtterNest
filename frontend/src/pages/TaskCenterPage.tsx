@@ -1,6 +1,7 @@
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, ClipboardCheck, Eye, Filter, GitBranch, RefreshCw, RotateCcw, ShieldCheck, X } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { request } from "../api/client";
 import type { Agent, Project, Task } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
@@ -45,10 +46,11 @@ export default function TaskCenterPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Row[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [project, setProject] = useState("all");
-  const [status, setStatus] = useState("all");
+  const [searchParams] = useSearchParams();
+  const [project, setProject] = useState(searchParams.get("project") || "all");
+  const [status, setStatus] = useState(() => Object.prototype.hasOwnProperty.call(labels, searchParams.get("status") || "") ? searchParams.get("status")! : "all");
   const [risk, setRisk] = useState("all");
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(searchParams.get("q") || "");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dispatching, setDispatching] = useState(false);
@@ -75,6 +77,13 @@ export default function TaskCenterPage() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const nextStatus = searchParams.get("status") || "";
+    setProject(searchParams.get("project") || "all");
+    setStatus(Object.prototype.hasOwnProperty.call(labels, nextStatus) ? nextStatus : "all");
+    setRisk("all");
+    setQuery(searchParams.get("q") || "");
+  }, [searchParams]);
 
   const rows = useMemo(() => {
     const q = query.trim().toLocaleLowerCase();
@@ -215,7 +224,7 @@ export default function TaskCenterPage() {
       {dispatchNotice && (
         <section className="panel dispatch-notice">
           <div className="dispatch-notice-head">
-            <div><strong>本轮调度结果</strong><p>扫描 {dispatchNotice.project_count} 个活动项目，成功路由 {dispatchNotice.routes.length} 个任务。</p></div>
+            <div><strong>本轮调度结果</strong><p>扫描 {dispatchNotice.project_count} 个活动项目，成功分配 {dispatchNotice.routes.length} 个任务。</p></div>
             <button className="icon-button" onClick={() => setDispatchNotice(null)} aria-label="关闭调度结果"><X size={15} /></button>
           </div>
           {dispatchNotice.routes.length > 0 ? (
@@ -226,14 +235,14 @@ export default function TaskCenterPage() {
                   <div><strong>{route.task_title}</strong><small>{route.project_name}</small></div>
                   <span className="dispatch-route-arrow">→</span>
                   <div><strong>{route.agent_name}</strong><small>{route.agent_id.slice(0, 8)}</small></div>
-                  <span className="status-tag tag-green">已路由</span>
+                  <span className="status-tag tag-green">已分配</span>
                 </div>
               ))}
             </div>
           ) : (
             <div className="dispatch-empty">本轮未分配任务。请检查执行节点是否在线且空闲、智能体能力是否已核验，以及任务是否待执行。</div>
           )}
-          {dispatchNotice.routes.length > 12 && <p className="form-hint">另有 {dispatchNotice.routes.length - 12} 个路由结果未在此处展开，可在任务列表查看。</p>}
+          {dispatchNotice.routes.length > 12 && <p className="form-hint">另有 {dispatchNotice.routes.length - 12} 个分配结果未在此处展开，可在任务列表查看。</p>}
           {dispatchNotice.errors.length > 0 && <div className="dispatch-errors">{dispatchNotice.errors.map((item, index) => <p key={index}><AlertCircle size={13} />{item}</p>)}</div>}
           <p className="dispatch-disclaimer">调度只记录目标智能体与审计事件，不会启动远程进程。执行节点使用独立凭据领取任务。</p>
         </section>
@@ -241,25 +250,27 @@ export default function TaskCenterPage() {
 
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={14} /></button></div>}
 
-      <div className="stat-grid task-center-stats">
-        <div className="stat-card"><div className="stat-icon tone-violet"><ClipboardCheck size={18} /></div><div className="stat-copy"><span>全部任务</span><strong>{counts.all}</strong><small>所有可访问项目</small></div></div>
-        <div className="stat-card"><div className="stat-icon tone-amber"><ShieldCheck size={18} /></div><div className="stat-copy"><span>等待授权</span><strong>{counts.approval}</strong><small>需要所有者审批</small></div></div>
-        <div className="stat-card"><div className="stat-icon tone-blue"><CheckCircle2 size={18} /></div><div className="stat-copy"><span>等待验收</span><strong>{counts.review}</strong><small>等待所有者验收</small></div></div>
-        <div className="stat-card"><div className="stat-icon tone-green"><AlertCircle size={18} /></div><div className="stat-copy"><span>阻塞任务</span><strong>{counts.blocked}</strong><small>需要排查原因</small></div></div>
-      </div>
-
-      <section className="panel task-center-panel">
-        <div className="panel-heading"><div className="panel-title"><Filter size={17} /><h3>筛选任务</h3></div><span className="muted-inline">{rows.length} 条结果</span></div>
+      <section className="panel task-center-panel task-workspace">
+        <div className="task-status-switch" role="group" aria-label="快速筛选任务状态">
+          {[
+            { key: "all", label: "全部任务", value: counts.all, icon: ClipboardCheck },
+            { key: "waiting_approval", label: "等待授权", value: counts.approval, icon: ShieldCheck },
+            { key: "submitted", label: "等待验收", value: counts.review, icon: CheckCircle2 },
+            { key: "blocked", label: "阻塞任务", value: counts.blocked, icon: AlertCircle }
+          ].map(({key, label, value, icon: Icon}) => (
+            <button key={key} type="button" aria-pressed={status === key} className={"task-status-filter" + (status === key ? " selected" : "")} onClick={() => setStatus(key)}>
+              <Icon size={16}/><span>{label}</span><strong>{value}</strong>
+            </button>
+          ))}
+        </div>
+        <div className="panel-heading task-filter-heading"><div className="panel-title"><Filter size={16}/><h3>筛选</h3></div><button type="button" className="text-button" onClick={() => { setProject("all"); setStatus("all"); setRisk("all"); setQuery(""); }}>清除筛选</button></div>
         <div className="task-filters">
           <label>项目<select value={project} onChange={(e) => setProject(e.target.value)}><option value="all">全部项目</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
           <label>状态<select value={status} onChange={(e) => setStatus(e.target.value)}><option value="all">全部状态</option>{Object.entries(labels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
           <label>风险等级<select value={risk} onChange={(e) => setRisk(e.target.value)}><option value="all">全部等级</option>{Object.entries(risks).map(([k, v]) => <option key={k} value={k}>{k} · {v}</option>)}</select></label>
           <label>关键词<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="任务名称、项目或 ID" /></label>
         </div>
-      </section>
-
-      <section className="panel task-center-panel">
-        <div className="panel-heading"><div className="panel-title"><ClipboardCheck size={17} /><h3>任务列表</h3></div><span className="muted-inline">待授权、待验收和阻塞任务优先</span></div>
+        <div className="panel-heading task-results-heading"><div className="panel-title"><ClipboardCheck size={17}/><h3>任务列表</h3></div><span className="muted-inline">{rows.length} 条结果</span></div>
         {loading ? (
           <div className="panel-loading"><span className="spinner" />正在汇总项目任务…</div>
         ) : rows.length ? (

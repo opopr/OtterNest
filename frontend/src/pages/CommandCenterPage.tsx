@@ -196,7 +196,7 @@ export default function CommandCenterPage() {
         <div>
           
           <h1>智能指挥中心</h1>
-          <p>通过规则模板或服务器端模型提出任务操作建议；任何授权、指派、验收和取消都必须经过你的确认。</p>
+          
         </div>
         <button className="secondary-button" onClick={() => void loadProjects()} disabled={loading}>
           <RefreshCw size={15} className={loading ? "spin" : ""} />刷新项目
@@ -214,26 +214,26 @@ export default function CommandCenterPage() {
           </select>
         </label>
         <div>
-          <span className="status-tag tag-neutral">{tasks.length} 项任务上下文</span>
-          <span className="muted-inline">模型模式最多读取 50 项最新任务</span>
+          <span className="status-tag tag-neutral">{tasks.length} 项任务</span>
         </div>
       </section>
 
       {selectedId ? (
-        <CommandChatPanel projectId={selectedId} tasks={tasks} onPlan={handlePlanGenerated} />
+        <CommandChatPanel key={selectedId} projectId={selectedId} tasks={tasks} onPlan={handlePlanGenerated} />
       ) : (
         <div className="panel empty-state">
           <MessageSquare size={28} />
           <strong>先创建一个项目</strong>
-          <p>指挥中心需要项目任务上下文，才能生成有约束的操作预览。</p>
+          
         </div>
       )}
 
+      <details className="panel command-advanced"><summary>高级工具 <span>计划查询 · 事件与组件校验</span></summary>
       <div className="command-tools-grid">
         <section className="panel">
           <div className="panel-heading">
-            <div className="panel-title"><Search size={16} /><h3>命令计划追溯</h3></div>
-            <span className="muted-inline">GET /command/plans/&#123;id&#125;</span>
+            <div className="panel-title"><Search size={16} /><h3>操作计划查询</h3></div>
+            
           </div>
           <form className="form-panel form-panel-flat" onSubmit={(e) => void lookupPlan(e)}>
             <div className="flex-row-gap">
@@ -274,7 +274,7 @@ export default function CommandCenterPage() {
 
         <section className="panel">
           <div className="panel-heading">
-            <div className="panel-title"><Activity size={16} /><h3>AG-UI 事件投影与 A2UI 校验</h3></div>
+            <div className="panel-title"><Activity size={16} /><h3>事件与组件校验</h3></div>
             <button type="button" className="secondary-button compact" disabled={!selectedId || toolsBusy} onClick={() => void refreshAgUi()}>
               <RefreshCw size={13} />刷新投影
             </button>
@@ -283,7 +283,7 @@ export default function CommandCenterPage() {
             <div className="tag-wrap-list">
               <span className="status-tag tag-blue">{agUiData.protocol}</span>
               {Object.entries(agUiData.state_snapshot.task_counts).map(([st, count]) => (
-                <span className="status-tag tag-neutral" key={st}>{st}: {count}</span>
+                <span className="status-tag tag-neutral" key={st}>{getUiLabel(st)}：{count}</span>
               ))}
             </div>
           )}
@@ -304,7 +304,7 @@ export default function CommandCenterPage() {
           )}
 
           <form className="form-panel form-panel-flat section-spacer-top" onSubmit={(e) => void validateA2uiPayload(e)}>
-            <label>A2UI 组件白名单验证 (POST /a2ui/validate)
+            <label>A2UI 组件白名单验证
               <textarea rows={4} value={a2uiInput} onChange={(e) => setA2uiInput(e.target.value)} />
             </label>
             <div className="form-actions">
@@ -326,6 +326,7 @@ export default function CommandCenterPage() {
           )}
         </section>
       </div>
+      </details>
 
       {plan && (
         <div className="modal-backdrop">
@@ -338,9 +339,9 @@ export default function CommandCenterPage() {
             <div className="command-summary">
               <strong>{plan.task_title || plan.task_id}</strong>
               <span>操作：{actionLabels[plan.action] || plan.action}</span>
-              <span>任务状态：{plan.task_status || "—"} · 风险：{plan.task_risk || "—"}</span>
+              <span>任务状态：{getUiLabel(plan.task_status)} · 风险：{plan.task_risk || "—"}</span>
               <span>预览版本：v{plan.expected_version}</span>
-              {targetAgent && <span>目标 Agent：{targetAgent}</span>}
+              {targetAgent && <span>目标智能体：{targetAgent}</span>}
               <span><Clock3 size={13} />有效期至：{formatTime(plan.expires_at)}</span>
               <span>计划状态：{getUiLabel(plan.status)}</span>
             </div>

@@ -298,7 +298,7 @@ export default function AgentsPage() {
 
       {showForm && (
         <form className="panel form-panel" onSubmit={createAgent}>
-          <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>登记新的 智能体</h3></div><button type="button" className="icon-button" onClick={() => setShowForm(false)}><X size={17} /></button></div>
+          <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>登记智能体</h3></div><button type="button" className="icon-button" onClick={() => setShowForm(false)}><X size={17} /></button></div>
           <div className="form-grid three">
             <label>智能体 名称<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={120} /></label>
             <label>平台 / 环境<input value={platform} onChange={(event) => setPlatform(event.target.value)} required maxLength={80} /></label>
@@ -340,7 +340,7 @@ export default function AgentsPage() {
           <div className="panel empty-state">
             {tab === "active" ? <Bot size={30} /> : <Trash2 size={30} />}
             <strong>{tab === "active" ? "尚未登记智能体" : "回收站为空"}</strong>
-            <p>{tab === "active" ? "创建一个身份后，再配置项目成员关系与执行环境。" : "已删除的智能体 会暂存在这里，支持随时恢复或彻底删除。"}</p>
+            <p>{tab === "active" ? "" : "可恢复或彻底删除。"}</p>
           </div>
         ) : visibleAgents.map((agent) => (
           <article className={"panel agent-card " + (selectedAgentId === agent.id ? "agent-card-selected" : "")} key={agent.id}>
@@ -350,7 +350,7 @@ export default function AgentsPage() {
                 {agent.deleted_at ? "已删除" : agent.enabled ? "已启用" : "已停用"}
               </span>
             </div>
-            <h3>{agent.name}</h3><p>{agent.platform} · {agent.execution_mode}</p>
+            <h3>{agent.name}</h3><p>{agent.platform} · {getUiLabel(agent.execution_mode)}</p>
             <div className="agent-capabilities"><span>声明能力 {(agent.declared_capabilities || []).length}</span><span>已核验 {(agent.verified_capabilities || []).length}</span></div>
             <div className="capability-list">
               {(agent.verified_capabilities || []).length > 0
@@ -361,7 +361,7 @@ export default function AgentsPage() {
             {tab === "active" ? (
               <div className="card-action-row">
                 <button className="secondary-button compact agent-detail-button flex-1" onClick={() => setSelectedAgentId((current) => current === agent.id ? "" : agent.id)}>
-                  <Cpu size={14} />{selectedAgentId === agent.id ? "收起" : "环境与能力"}
+                  <Cpu size={14} />{selectedAgentId === agent.id ? "收起" : "运行与能力"}
                 </button>
                 <button className="secondary-button compact" disabled={saving} onClick={() => startEditAgent(agent)} title="编辑基本信息">
                   <Edit3 size={14} />编辑
@@ -405,7 +405,7 @@ export default function AgentsPage() {
             <button className="secondary-button compact" disabled={saving} onClick={() => void saveVerifiedCapabilities()}>保存核验</button>
           </div>
           <div className="panel-heading runtime-heading"><div className="panel-title"><Cpu size={16} /><h3>独立运行实例</h3><span className="count-chip">{runtimes.length}</span></div><button className="primary-button compact" onClick={() => setShowRuntimeForm((value) => !value)} disabled={!selectedAgent.enabled}><Plus size={14} />注册运行实例</button></div>
-          {showRuntimeForm && <form className="form-panel embedded-form" onSubmit={createRuntime}><div className="form-grid"><label>实例标签<input value={runtimeLabel} onChange={(event) => setRuntimeLabel(event.target.value)} required maxLength={120} placeholder="oracle-arm-runner-01" /></label><label>运行环境<input value={runtimeEnvironment} onChange={(event) => setRuntimeEnvironment(event.target.value)} required maxLength={160} placeholder="Oracle ARM / WSL2 / local" /></label></div><div className="form-actions"><button className="primary-button compact" disabled={saving}>创建 运行实例</button></div></form>}
+          {showRuntimeForm && <form className="form-panel embedded-form" onSubmit={createRuntime}><div className="form-grid"><label>实例标签<input value={runtimeLabel} onChange={(event) => setRuntimeLabel(event.target.value)} required maxLength={120} placeholder="oracle-arm-runner-01" /></label><label>运行环境<input value={runtimeEnvironment} onChange={(event) => setRuntimeEnvironment(event.target.value)} required maxLength={160} placeholder="Oracle ARM / WSL2 / local" /></label></div><div className="form-actions"><button className="primary-button compact" disabled={saving}>创建运行实例</button></div></form>}
           <div className="runtime-list">{runtimes.map((runtime) => <article className="runtime-card" key={runtime.id}>
             <div className="runtime-card-head"><div><strong>{runtime.label}</strong><small>{runtime.environment} · {runtime.id.slice(0, 12)}</small></div><span className={"status-tag " + (runtime.online ? "tag-green" : runtime.enabled ? "tag-amber" : "tag-neutral")}>{!runtime.enabled ? "已禁用" : runtime.online ? "在线" : "离线"}</span></div>
             <div className="runtime-meta"><span>状态：{getUiLabel(runtime.status)}</span><span>最近心跳：{runtime.last_seen ? new Date(runtime.last_seen).toLocaleString("zh-CN", { hour12: false }) : "从未上报"}</span><span>独立凭据：{runtime.has_token ? "已签发" : "未签发"}</span></div>

@@ -33,25 +33,26 @@ function StatusTag({ value }: { value: string }) {
   return <span className={"status-tag " + tone}>{map[value] || value}</span>;
 }
 
-function PendingList({ title, items, kind }: {
-  title: string; items: BriefingTask[]; kind: "approval" | "review" | "blocked";
+function PendingList({ title, items, kind, projectNames }: {
+  title: string; items: BriefingTask[]; kind: "approval" | "review" | "blocked"; projectNames: Map<string, string>;
 }) {
   const Icon = kind === "approval" ? ShieldAlert : kind === "review" ? Clock3 : AlertCircle;
-  if (items.length === 0) return null;
+  const status = kind === "approval" ? "waiting_approval" : kind === "review" ? "submitted" : "blocked";
   return (
-    <section className="panel pending-panel">
+    <section className={"pending-panel pending-" + kind}>
       <div className="panel-heading">
         <div className="panel-title"><Icon size={17} /><h3>{title}</h3></div>
-        <span className="count-chip">{items.length}</span>
+        <Link className="pending-count-link" to={"/tasks?status=" + status} aria-label={"查看" + title}><span className="count-chip">{items.length}</span><ArrowRight size={14} /></Link>
       </div>
       <div className="pending-list">
+        {!items.length && <span className="pending-empty">暂无待办</span>}
         {items.slice(0, 5).map((item) => (
           <div className="pending-row" key={item.task_id}>
             <div className="pending-copy">
               <strong>{item.title}</strong>
-              <small>{item.project_id.slice(0, 8)} · {item.task_id.slice(0, 8)}</small>
+              <small>{projectNames.get(item.project_id) || "项目 " + item.project_id.slice(0, 8)}</small>
             </div>
-            <Link to={"/projects?project=" + encodeURIComponent(item.project_id)} className="icon-link" aria-label="查看项目">
+            <Link to={"/tasks?status=" + status + "&project=" + encodeURIComponent(item.project_id) + "&q=" + encodeURIComponent(item.task_id)} className="icon-link" aria-label={"查看任务：" + item.title}>
               <ArrowRight size={16} />
             </Link>
           </div>
@@ -186,6 +187,8 @@ export default function OverviewPage() {
 
   const briefing = data?.briefing;
   const metrics = data?.metrics;
+  const projectNames = new Map((data?.projects || []).map(project => [project.id, project.name]));
+  const pendingCount = (briefing?.pending_r3_tasks?.length ?? 0) + (briefing?.pending_review_tasks?.length ?? 0) + (briefing?.blocked_tasks?.length ?? 0);
 
   return (
     <div className="page-stack">
@@ -212,11 +215,23 @@ export default function OverviewPage() {
         <StatCard label="已启用智能体" value={briefing?.enabled_agents ?? 0} hint="" icon={Bot} tone="violet" />
       </div>
 
+      <section className="panel overview-attention" aria-label="待处理事项">
+        <div className="section-heading">
+          <div><h2>待处理事项 <span className="count-chip">{pendingCount}</span></h2></div>
+          <Link to="/portfolio" className="subtle-link">{briefing?.unread_notifications ?? 0} 条未读通知 <ArrowRight size={15}/></Link>
+        </div>
+        <div className="pending-grid">
+          <PendingList title="高风险任务待审批" items={briefing?.pending_r3_tasks || []} kind="approval" projectNames={projectNames} />
+          <PendingList title="任务待验收" items={briefing?.pending_review_tasks || []} kind="review" projectNames={projectNames} />
+          <PendingList title="执行阻塞" items={briefing?.blocked_tasks || []} kind="blocked" projectNames={projectNames} />
+        </div>
+      </section>
+      <section className="overview-projects">
       <div className="section-heading">
         <div><h2>项目运行情况</h2></div>
         <Link to="/projects" className="subtle-link">全部项目 <ArrowRight size={15} /></Link>
       </div>
-      <div className="project-grid">
+      <div className="project-grid overview-project-grid">
         {projectRows.length === 0 ? (
           <div className="empty-state">
             <FolderKanban size={28} /><strong>还没有项目</strong>
@@ -240,22 +255,7 @@ export default function OverviewPage() {
         })}
       </div>
 
-      <div className="section-heading">
-        <div><h2>需要你处理</h2></div>
-        <span className="muted-inline">{briefing?.unread_notifications ?? 0} 条未读通知</span>
-      </div>
-      <div className="pending-grid">
-        <PendingList title="高风险任务待审批" items={briefing?.pending_r3_tasks || []} kind="approval" />
-        <PendingList title="任务待验收" items={briefing?.pending_review_tasks || []} kind="review" />
-        <PendingList title="执行阻塞" items={briefing?.blocked_tasks || []} kind="blocked" />
-        {(!briefing || (
-          (briefing.pending_r3_tasks?.length ?? 0) === 0 &&
-          (briefing.pending_review_tasks?.length ?? 0) === 0 &&
-          (briefing.blocked_tasks?.length ?? 0) === 0
-        )) && (
-          <div className="all-clear"><CheckCircle2 size={22} /><strong>暂无待处理事项</strong></div>
-        )}
-      </div>
+      </section>
       <div className="data-footnote">
         <span>系统模式：{getSystemModeLabel(data?.system?.mode)}</span>
         <span>简报生成：{briefing?.generated_at ? new Date(briefing.generated_at).toLocaleString("zh-CN") : "—"}</span>
