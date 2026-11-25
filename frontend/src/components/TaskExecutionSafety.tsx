@@ -229,14 +229,14 @@ export default function TaskExecutionSafety({ taskId, projectId, taskStatus, tas
     <section className="task-detail-section task-detail-wide safety-ops-section">
       <div className="task-detail-section-head">
         <div><h3><ShieldCheck size={16} />外部副作用台账</h3>
-          <p>由执行 智能体 在任务租约内登记和报告；所有者仅核对真实外部结果。</p></div>
+          <p>执行者登记，所有者核实真实结果。</p></div>
         <span className={"status-tag " + (unresolvedEffects.length ? "tag-amber" : "tag-green")}>{effects.length} 条记录 · {unresolvedEffects.length} 条待核实</span>
       </div>
       {error && <div className="inline-error"><AlertTriangle size={14} />{error}</div>}
       {notice && <div className="success-notice"><CheckCircle2 size={14} />{notice}<button onClick={() => setNotice("")}>关闭</button></div>}
       {unresolvedEffects.length > 0 && <p className="safety-warning"><AlertTriangle size={15} />外部结果尚未核实。不可仅凭超时或请求失败判定未执行，更不可直接重发可能产生副作用的操作。</p>}
       <div className="safety-items">
-        {effects.map((effect) => {
+        {effects.slice().sort((a,b) => Number(["verified_executed","verified_not_executed"].includes(a.status)) - Number(["verified_executed","verified_not_executed"].includes(b.status))).map((effect) => {
           const reviewed = ["verified_executed", "verified_not_executed"].includes(effect.status);
           return <article className="safety-item" key={effect.id}>
             <div className="safety-item-head">
@@ -244,9 +244,8 @@ export default function TaskExecutionSafety({ taskId, projectId, taskStatus, tas
               <span className={"status-tag " + (reviewed ? "tag-green" : effect.status === "unknown" ? "tag-red" : "tag-amber")}>{sideEffectLabels[effect.status] || effect.status}</span>
             </div>
             <p>{effect.description}</p>
-            <small>Agent {effect.agent_id.slice(0, 8)} · 租约 #{effect.lease_epoch} · {when(effect.updated_at)}</small>
-            {effect.evidence_summary && <p><b>执行者证据：</b>{effect.evidence_summary}</p>}
-            {effect.owner_note && <p><b>所有者对账：</b>{effect.owner_note}</p>}
+            <small>智能体 {effect.agent_id.slice(0, 8)} · 租约 #{effect.lease_epoch} · {when(effect.updated_at)}</small>
+            {(effect.evidence_summary || effect.owner_note) && <details className="library-disclosure safety-evidence" open={!reviewed || undefined}><summary>核实证据与备注</summary>{effect.evidence_summary && <p><b>执行者证据：</b>{effect.evidence_summary}</p>}{effect.owner_note && <p><b>所有者对账：</b>{effect.owner_note}</p>}</details>}
             {isOwner && !reviewed && <button className="secondary-button compact" disabled={saving} onClick={() => openReconciliation(effect.id)}>
               {effectId === effect.id ? "收起核实表单" : "人工核实外部结果"}</button>}
           </article>;
@@ -270,14 +269,14 @@ export default function TaskExecutionSafety({ taskId, projectId, taskStatus, tas
 
     {isOwner && <section className="task-detail-section task-detail-wide safety-ops-section">
       <div className="task-detail-section-head">
-        <div><h3><Link2 size={16} />A2A 任务委托</h3><p>只允许 R0/R1 的就绪任务向项目内已登记、具备核验能力的远端 智能体 委托。</p></div>
+        <div><h3><Link2 size={16} />A2A 任务委托</h3><p>只允许 R0/R1 的就绪任务向项目内已登记、具备核验能力的远端智能体委托。</p></div>
         <button className="secondary-button compact" disabled={saving || loading} onClick={() => void load()}><RefreshCw size={13} />刷新状态</button>
       </div>
       {delegation ? <div className="safety-item">
         <div className="safety-item-head">
           <div><strong>{delegationLabels[delegation.status] || delegation.status}</strong>
             <small>委托 ID：{delegation.id}</small></div>
-          <span className={"status-tag " + (delegation.status === "unknown" ? "tag-red" : ["released", "submitted", "canceled"].includes(delegation.status) ? "tag-green" : "tag-amber")}>{delegation.status}</span>
+          <span className={"status-tag " + (delegation.status === "unknown" ? "tag-red" : ["released", "submitted", "canceled"].includes(delegation.status) ? "tag-green" : "tag-amber")}>{delegationLabels[delegation.status] || delegation.status}</span>
         </div>
         <div className="safety-delegation-meta">
           <span>远端任务 ID：<code>{delegation.remote_task_id || "未知 / 尚未确认"}</code></span>
@@ -294,7 +293,7 @@ export default function TaskExecutionSafety({ taskId, projectId, taskStatus, tas
         {canReconcileRemote && <form className="safety-form" onSubmit={(e) => void reconcileDelegation(e)}>
           <label>已在远端核实的任务 ID<input value={remoteTaskId} maxLength={128} required
             onChange={(event) => setRemoteTaskId(event.target.value)} placeholder="输入经过核实的远端任务 ID" /></label>
-          <button className="primary-button compact" disabled={saving || !remoteTaskId.trim()}>记录映射并交由 Worker 核对</button>
+          <button className="primary-button compact" disabled={saving || !remoteTaskId.trim()}>记录映射并交由执行节点核对</button>
         </form>}
         {delegation.status === "cancel_requested" && <p className="form-hint">仅已提出取消请求，不能将此任务视为已取消或可安全重发。</p>}
         {delegation.status === "submitted" && <p className="form-hint">远端成果已提交。请在任务中心走所有者验收流程，不允许自动批准。</p>}
@@ -306,9 +305,9 @@ export default function TaskExecutionSafety({ taskId, projectId, taskStatus, tas
         </select></label>
         <button className="primary-button compact" disabled={!canDelegate || !endpointId || saving} onClick={() => void queueDelegation()}>明确授权并加入委托队列</button>
         {!canDelegate && <p className="form-hint">仅当前状态为「待执行」且风险 R0/R1 的任务可发起新委托；已有委托不会被覆盖。</p>}
-        {!endpoints.some((endpoint) => endpoint.enabled) && <Link to="/interfaces" className="secondary-button compact safety-link-button">前往登记远端 智能体<ArrowUpRight size={13} /></Link>}
+        {!endpoints.some((endpoint) => endpoint.enabled) && <Link to="/interfaces" className="secondary-button compact safety-link-button">前往登记远端智能体<ArrowUpRight size={13} /></Link>}
       </div>}
-      <p className="form-hint safety-footer-note">登记或排队 ≠ 远端已执行；只有独立的 A2A Worker 能与远端通信，且所有状态需以服务端台账和实际远端确认结果为准。</p>
+      <p className="form-hint safety-footer-note">登记或排队 ≠ 远端已执行；只有独立的 A2A 执行节点 能与远端通信，且所有状态需以服务端台账和实际远端确认结果为准。</p>
     </section>}
   </>;
 }

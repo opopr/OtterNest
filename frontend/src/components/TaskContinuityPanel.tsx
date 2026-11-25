@@ -140,22 +140,20 @@ export default function TaskContinuityPanel({ taskId, taskStatus, isOwner, onCha
   const selected = checkpoints.find((cp) => cp.id === selectedId);
   return <section className="task-detail-section task-detail-wide continuity-section">
     <div className="task-detail-section-head">
-      <div><h3><ClipboardCheck size={16} />检查点与故障交接</h3><p>仅由持有效租约的 智能体 创建检查点；所有者负责核验、撤销旧租约及审查交接内容。</p></div>
-      <button className="secondary-button compact" disabled={loading || saving} onClick={() => void load()}><RefreshCw size={13} />刷新</button>
+      <div><h3><ClipboardCheck size={16} />检查点与故障交接</h3><p>执行者提交检查点，所有者核验并管理交接。</p></div>
+      <div className="heading-actions"><span className="status-tag tag-green">已核验 {checkpoints.filter(cp => cp.verification_status === "owner_verified").length}</span><span className="status-tag tag-amber">待核验 {checkpoints.filter(cp => cp.verification_status === "self_reported").length}</span><button className="secondary-button compact" disabled={loading || saving} onClick={() => void load()}><RefreshCw size={13} />刷新</button></div>
     </div>
     {error && <div className="inline-error"><AlertTriangle size={14} />{error}</div>}
     {notice && <div className="success-notice"><CheckCircle2 size={14} />{notice}<button onClick={() => setNotice("")}>关闭</button></div>}
     <div className="continuity-checkpoint-list">
-      {checkpoints.map((cp) => <article className="continuity-checkpoint" key={cp.id}>
+      {checkpoints.slice().sort((a,b) => Number(b.verification_status === "self_reported") - Number(a.verification_status === "self_reported")).map((cp) => <article className="continuity-checkpoint" key={cp.id}>
         <div className="continuity-checkpoint-title">
           <strong>租约 #{cp.lease_epoch} · 步骤 {cp.step_number}</strong>
           <span className={"status-tag " + (cp.verification_status === "owner_verified" ? "tag-green" : cp.verification_status === "rejected" ? "tag-red" : "tag-amber")}>{labels[cp.verification_status] || cp.verification_status}</span>
         </div>
         <p>{cp.summary}</p>
-        {cp.next_steps && <p><b>后续步骤：</b>{cp.next_steps}</p>}
-        {cp.artifact_ids.length > 0 && <p><b>关联成果：</b>{cp.artifact_ids.length} 个</p>}
-        {cp.owner_note && <p><b>审核备注：</b>{cp.owner_note}</p>}
-        <small>提交 Agent {cp.agent_id.slice(0, 8)} · {time(cp.created_at)}</small>
+        {(cp.next_steps || cp.artifact_ids.length > 0 || cp.owner_note) && <details className="library-disclosure checkpoint-extra" open={cp.verification_status === "self_reported" || undefined}><summary>交接信息</summary>{cp.next_steps && <p><b>后续步骤：</b>{cp.next_steps}</p>}{cp.artifact_ids.length > 0 && <p><b>关联成果：</b>{cp.artifact_ids.length} 个</p>}{cp.owner_note && <p><b>审核备注：</b>{cp.owner_note}</p>}</details>}
+        <small>提交智能体 {cp.agent_id.slice(0, 8)} · {time(cp.created_at)}</small>
         {isOwner && cp.verification_status === "self_reported" && <button className="secondary-button compact" disabled={saving}
           onClick={() => { setSelectedId(cp.id); setReviewStatus("owner_verified"); setReviewNote(""); }}>审核检查点</button>}
       </article>)}

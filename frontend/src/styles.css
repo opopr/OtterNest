@@ -1338,3 +1338,44 @@ input, textarea, select { accent-color: var(--accent); }
  .import-steps>div{font-size:11px;gap:4px}
  .import-steps>div span{width:20px;height:20px}
 }
+
+/* Shared feedback, modal and responsive operational layout. */
+.runtime-workspace{grid-template-columns:minmax(0,1fr);min-width:0}
+.runtime-workspace>*{min-width:0;max-width:100%}
+.runtime-search input{min-width:0;flex:1}
+.runtime-search svg{flex-shrink:0}
+.runtime-monitor-filters select{max-width:100%}
+.runtime-status-switch .task-status-filter{min-width:0}
+.runtime-status-switch .task-status-filter span{overflow-wrap:anywhere;white-space:normal}
+.runtime-monitor-list,.runtime-monitor-card,.runtime-monitor-meta,.runtime-health-row{min-width:0;max-width:100%}
+.runtime-monitor-card code,.runtime-health-chip{overflow-wrap:anywhere;white-space:normal}
+.empty-state{min-width:0;padding:24px 16px;gap:8px;text-align:center}
+.empty-state svg{color:var(--brand-deep-teal);stroke-width:1.6;flex-shrink:0}
+.empty-state strong{font-size:14px;color:var(--text);font-weight:600;overflow-wrap:anywhere}
+.empty-state p{font-size:13px;line-height:1.6;color:var(--muted);max-width:36em;margin:0}
+.panel-loading{min-width:0;padding:24px 12px;color:var(--muted);font-size:13px;gap:8px}
+.inline-error,.error-panel,.success-notice{align-items:flex-start;overflow-wrap:anywhere;min-width:0;border-radius:8px;line-height:1.6}
+.inline-error>svg,.error-panel>svg,.success-notice>svg{flex-shrink:0;margin-top:2px}
+.inline-error button,.success-notice button{flex-shrink:0;min-height:28px}
+.app-dialog-card{min-width:0;max-width:100%;padding:20px;gap:16px;border-radius:12px;grid-template-columns:minmax(0,1fr)}
+.app-dialog-card .panel-title{min-width:0}
+.app-dialog-card h3{font-size:16px;overflow-wrap:anywhere}
+.app-dialog-message{color:var(--text-soft);font-size:14px;overflow-wrap:anywhere;white-space:pre-wrap}
+.app-dialog-card .form-actions{padding-top:12px;border-top:1px solid var(--border)}
+.app-dialog-card .form-actions button{min-height:40px}
+.app-dialog-field input,.app-dialog-field select,.app-dialog-field textarea{min-width:0;max-width:100%;font-size:14px}
+.app-dialog-field [aria-invalid="true"]{border-color:var(--red)}
+.app-dialog-danger-btn{box-shadow:none}
+@media(max-width:820px){
+ .runtime-monitor-filters{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+ .runtime-monitor-filters .runtime-search,.runtime-monitor-filters select{width:100%;min-width:0;max-width:100%;flex:none;box-sizing:border-box}
+ .runtime-monitor-filters .text-button{justify-self:start}
+}
+@media(max-width:580px){
+ .runtime-monitor-panel{padding:12px}
+ .runtime-status-switch{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .runtime-status-switch .task-status-filter{padding:8px;gap:5px}
+ .runtime-status-switch .task-status-filter strong{font-size:16px}
+ .app-dialog-card{padding:16px}
+ .app-dialog-card .form-actions button{flex:1 1 0;min-width:0;white-space:normal}
+}

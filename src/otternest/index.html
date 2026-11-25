@@ -402,7 +402,7 @@ nav{
 }
 .search-box:focus-within{
   border-color:var(--accent);
-  box-shadow:0 0 0 3px rgba(89,85,233,.14);
+  box-shadow:0 0 0 3px rgba(15,107,106,.14);
 }
 .search-box input{
   border:none;
@@ -1035,7 +1035,7 @@ input,textarea,select{
 input:focus,textarea:focus,select:focus{
   outline:none;
   border-color:var(--accent);
-  box-shadow:0 0 0 3px rgba(89,85,233,.14);
+  box-shadow:0 0 0 3px rgba(15,107,106,.14);
 }
 textarea{min-height:84px;resize:vertical}
 .input-row{display:flex;gap:10px;align-items:center}
@@ -1045,7 +1045,7 @@ button,.btn{
   align-items:center;
   justify-content:center;
   gap:7px;
-  background:linear-gradient(135deg,#6E68F5,#5955E9);
+  background:var(--accent);
   color:#FFFFFF;
   border:1px solid transparent;
   border-radius:12px;
@@ -1056,7 +1056,7 @@ button,.btn{
   cursor:pointer;
   transition:transform .08s ease,box-shadow .15s ease,filter .15s ease;
 }
-button:hover{box-shadow:0 6px 18px rgba(89,85,233,.24)}
+button:hover{box-shadow:0 6px 18px rgba(15,107,106,.12)}
 button:active{transform:translateY(1px)}
 button.secondary,.btn.secondary{
   background:var(--card);
@@ -1260,7 +1260,7 @@ button.sm,.btn.sm{padding:6px 11px;font-size:13.5px;border-radius:10px}
   box-shadow:var(--shadow-sm);
 }
 .chat-msg.user .chat-bubble{
-  background:linear-gradient(135deg,#6E68F5,#5955E9);
+  background:var(--accent);
   color:#FFFFFF;
   border-color:transparent;
 }
@@ -1412,6 +1412,28 @@ pre{max-width:100%;overflow:auto}
 @media(max-width:860px){.main-area{padding:16px 12px 24px}.topbar-right{flex-wrap:wrap;min-width:0;max-width:100%}.topbar-title-row{flex-wrap:wrap}.login-shell{padding:16px 12px}.panel,.card{padding:16px}.nav-btn{font-size:13px}.modal-backdrop{padding:12px}}
 [data-theme="dark"] .nav-icon-img,[data-theme="dark"] .page-title-icon{filter:brightness(0) saturate(100%) invert(86%) sepia(14%) saturate(649%) hue-rotate(101deg) brightness(101%) contrast(86%)}
 @media(max-width:580px){.search-box,.project-pill-wrap,.topbar-right,.topbar-left{min-width:0;max-width:100%}.search-box input{min-width:0}.main-area{overflow-wrap:anywhere}.topbar-right{gap:8px}.topbar-title-row>h1{font-size:21px}}
+
+/* Legacy console: quiet functional surfaces, no decorative empty-state illustrations. */
+button,.btn{background:var(--accent);border-radius:8px}
+button:hover,.btn:hover{box-shadow:none}
+button.secondary,.btn.secondary{background:var(--card);color:var(--text-soft)}
+button.ghost,.btn.ghost{background:var(--bg-subtle);color:var(--text-soft)}
+button.danger,.btn.danger{background:var(--danger-soft);color:var(--danger-text)}
+input,textarea,select,.search-box,.project-pill-wrap{border-radius:8px;min-width:0}
+.page-hero{padding:10px 0;background:transparent;border:0;box-shadow:none}
+.page-hero-title{font-size:17px}
+.page-hero-title img{width:22px;height:22px}
+.page-hero-sub{font-size:13px;line-height:1.5}
+.page-hero-pills{margin-top:8px}
+.empty-state{padding:24px 14px;gap:6px}
+.empty-state img{display:none}
+.empty-state p{margin:0;font-size:13px;color:var(--muted)}
+.panel,.card{min-width:0;overflow-wrap:anywhere}
+.modal-card{max-width:100%;overflow-wrap:anywhere}
+.nav-btn{background:transparent;color:var(--text-soft);box-shadow:none}
+.nav-btn.active{background:var(--accent-soft);color:var(--accent-deep)}
+[data-theme="dark"] button:not(.secondary):not(.ghost):not(.danger):not(.nav-btn):not(.search-clear){color:#172321}
+@media(max-width:580px){.topbar{gap:10px;margin-bottom:12px}.topbar-right{width:100%;min-width:0}.search-box{width:100%;min-width:0}.project-pill-wrap{max-width:100%}.project-pill-wrap select{min-width:0;max-width:100%}.input-row{flex-wrap:wrap}.page-hero-title{font-size:16px}}
 </style>
 </head>
 <body>
@@ -2237,8 +2259,7 @@ function pageHero(iconSrc,title,subtitle,mascotSrc,pillsHtml=''){
       ${subtitle?`<p class="page-hero-sub">${esc(subtitle)}</p>`:''}
       ${pillsHtml?`<div class="page-hero-pills">${pillsHtml}</div>`:''}
     </div>
-    <img class="page-hero-mascot" src="${mascotSrc}" alt="">
-    <img class="page-hero-wave" src="/assets/icons/SVG/装饰/水波装饰.svg" alt="" aria-hidden="true">
+
   </section>`;
 }
 
@@ -2267,10 +2288,10 @@ async function render(){
     const totalAgentsCount=agents.length;
 
     const segments=[
-      {label:'进行中',value:inProg,color:'#287EF4'},
-      {label:'已完成',value:completed,color:'#13B96A'},
-      {label:'待处理',value:pending,color:'#D8DCEB'},
-      {label:'已阻塞',value:blocked,color:'#8B5CF6'}
+      {label:'进行中',value:inProg,color:'#0F6B6A'},
+      {label:'已完成',value:completed,color:'#176B4F'},
+      {label:'待处理',value:pending,color:'#E9D8C5'},
+      {label:'已阻塞',value:blocked,color:'#AD303E'}
     ];
     const pctOf=v=>totalTasks>0?Math.round((v/totalTasks)*100):0;
     const taskNameMap=Object.fromEntries((cachedTasks||[]).map(t=>[t.id,t.title]));
@@ -2342,7 +2363,7 @@ async function render(){
               </div>
               <div class="cap-pills">${caps.length?caps.map(c=>`<span class="cap-pill">${esc(capLabel(c))}</span>`).join(''):'<span class="cap-pill">通用</span>'}</div>
             </div>`;
-          }).join('')||`<div class="empty-state"><img src="/assets/mascots/otter-sleep.png" alt="等待注册"><p class="muted">暂无已注册 Agent</p></div>`}
+          }).join('')||`<div class="empty-state"><img src="/assets/mascots/otter-sleep.png" alt="等待注册"><p class="muted">暂无已登记智能体</p></div>`}
         </div>
       </div>
     </section>
@@ -2720,7 +2741,7 @@ async function render(){
           </div>
           <div id="runtime-${esc(a.id)}"></div>
         </div>`);
-      }).join('')}</div>`:`<div class="empty-state"><img src="/assets/mascots/otter-sleep.png" alt=""><p class="muted">暂无已注册 Agent</p></div>`}
+      }).join('')}</div>`:`<div class="empty-state"><img src="/assets/mascots/otter-sleep.png" alt=""><p class="muted">暂无已登记智能体</p></div>`}
     </div>
     <div class="grid-2">
       ${project?`
@@ -2945,7 +2966,7 @@ async function render(){
                 </div>
                 <div class="cap-pills">${caps.map(c=>`<span class="cap-pill">${esc(capLabel(c))}</span>`).join('')||'<span class="cap-pill">通用</span>'}</div>
               </div>`;
-            }).join('')||'<p class="muted">暂无已注册 Agent</p>'}
+            }).join('')||'<p class="muted">暂无已登记智能体</p>'}
           </div>
         </div>
       </div>
