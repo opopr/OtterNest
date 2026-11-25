@@ -36,6 +36,12 @@ export default function SkillsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [skills, setSkills] = useState<Skill[]>([]);
+  const [skillQuery, setSkillQuery] = useState("");
+  const [skillFilter, setSkillFilter] = useState("all");
+  const visibleSkills = useMemo(() => {
+    const q = skillQuery.trim().toLocaleLowerCase();
+    return skills.filter(skill => (skillFilter === "all" || skill.status === skillFilter) && (!q || [skill.name, skill.version, skill.content, skill.source].some(v => (v || "").toLocaleLowerCase().includes(q))));
+  }, [skills, skillQuery, skillFilter]);
   const [evaluations, setEvaluations] = useState<Record<string, SkillEvaluation[]>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -171,28 +177,29 @@ export default function SkillsPage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><h1>技能管理</h1><p>技能提案须经所有者审批发布。</p></div>
+        <div><h1>技能管理</h1></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadSkills(selectedId)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
       <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={setSelectedId} /><span className="muted-inline">{skills.length} 个技能版本</span></section>
       <section className="panel">
-        <div className="panel-heading"><div className="panel-title"><BookMarked size={17} /><h3>项目技能</h3></div><button className="primary-button compact" onClick={() => setShowForm((value) => !value)} disabled={!selectedId}><Plus size={15} />提交技能提案</button></div>
+        <div className="panel-heading"><div className="panel-title"><BookMarked size={17} /><h3>项目技能</h3><span className="count-chip">{visibleSkills.length}</span></div><button className="primary-button compact" onClick={() => setShowForm((value) => !value)} disabled={!selectedId}><Plus size={15} />提交技能提案</button></div>
+        <div className="library-filter-bar"><label>关键词<input aria-label="搜索技能" value={skillQuery} onChange={event => setSkillQuery(event.target.value)} placeholder="搜索名称、版本或内容" /></label><label>状态<select aria-label="技能状态" value={skillFilter} onChange={event => setSkillFilter(event.target.value)}><option value="all">全部状态</option><option value="proposed">待发布</option><option value="published">已发布</option><option value="archived">已归档</option></select></label><button className="text-button" type="button" onClick={() => { setSkillQuery(""); setSkillFilter("all"); }}>清除筛选</button></div>
         {showForm && <form className="form-panel embedded-form" onSubmit={createSkill}>
           <div className="form-grid"><label>技能名称<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={120} /></label><label>版本号<input value={version} onChange={(event) => setVersion(event.target.value)} required maxLength={40} /></label></div>
           <label>技能内容<textarea rows={7} value={content} onChange={(event) => setContent(event.target.value)} required maxLength={20000} placeholder="填写智能体可执行的操作步骤、约束和验收要求。提案在发布前不会对项目智能体开放。" /></label>
           <label>来源与依据<input value={source} onChange={(event) => setSource(event.target.value)} required maxLength={3000} /></label>
-          <p className="form-hint">同一项目内 技能名称与版本组合必须唯一。发布是单独的所有者审批动作。</p>
+          <p className="form-hint">同一项目内技能名称与版本组合必须唯一。发布是单独的所有者审批动作。</p>
           <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "提交中…" : "提交提案"}</button></div>
         </form>}
         <div className="skill-grid">
-          {loading ? <div className="panel-loading"><div className="spinner" /></div> : skills.map((skill) => <article className="skill-card" key={skill.id}>
+          {loading ? <div className="panel-loading"><div className="spinner" /></div> : visibleSkills.map((skill) => <article className="skill-card" key={skill.id}>
             <div className="skill-card-head"><div><strong>{skill.name}</strong><small>版本 {skill.version} · {skill.id.slice(0, 8)}</small></div><span className={"status-tag " + (skill.status === "published" ? "tag-green" : skill.status === "proposed" ? "tag-amber" : "tag-neutral")}>{statusLabel[skill.status] || skill.status}</span></div>
-            <pre className="skill-content">{skill.content}</pre><small className="memory-source">来源：{skill.source}</small>
-            <div className="skill-evaluations"><div><strong><ClipboardList size={13} />评价记录</strong><span>{(evaluations[skill.id] || []).length} 条</span></div>{(evaluations[skill.id] || []).map((item) => <div className="skill-evaluation" key={item.id}><span className={"status-tag " + (item.verdict === "pass" ? "tag-green" : item.verdict === "fail" ? "tag-red" : "tag-amber")}>{verdictLabel[item.verdict]}</span><p>{item.notes}</p></div>)}</div>
+            <details className="library-disclosure"><summary>技能内容</summary><pre className="skill-content">{skill.content}</pre><small className="memory-source">来源：{skill.source}</small></details>
+            <details className="library-disclosure skill-evaluations"><summary><span><ClipboardList size={13}/> 评价记录</span><span>{(evaluations[skill.id] || []).length} 条</span></summary>{(evaluations[skill.id] || []).map((item) => <div className="skill-evaluation" key={item.id}><span className={"status-tag " + (item.verdict === "pass" ? "tag-green" : item.verdict === "fail" ? "tag-red" : "tag-amber")}>{verdictLabel[item.verdict]}</span><p>{item.notes}</p></div>)}</details>
             <div className="skill-actions">{skill.status === "proposed" && <button className="secondary-button compact" disabled={saving} onClick={() => void publishSkill(skill)}><ShieldCheck size={13} />所有者发布</button>}{skill.status !== "archived" && <button className="text-button" disabled={saving} onClick={() => void evaluateSkill(skill)}><Check size={13} />记录评价</button>}{skill.status !== "archived" && <button className="icon-button" title="归档" disabled={saving} onClick={() => void archiveSkill(skill)}><Archive size={14} /></button>}</div>
           </article>)}
-          {!loading && !skills.length && <div className="empty-state"><BookMarked size={25} /><strong>暂无技能</strong><p>技能发布后对智能体可见。</p></div>}
+          {!loading && !visibleSkills.length && <div className="empty-state"><BookMarked size={25} /><strong>{skills.length ? "没有符合条件的技能" : "暂无技能"}</strong></div>}
         </div>
       </section>
     </div>

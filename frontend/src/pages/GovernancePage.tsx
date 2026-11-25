@@ -110,6 +110,7 @@ export default function GovernancePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"tasks" | "decisions" | "command" | "chat">("tasks");
+  const [approvalFilter, setApprovalFilter] = useState("all");
   const [commandText, setCommandText] = useState("");
 
   const selectedProject = useMemo(() => projects.find((item) => item.id === selectedId) || null, [projects, selectedId]);
@@ -375,7 +376,7 @@ export default function GovernancePage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><h1>指挥中心与审批</h1></div>
+        <div><h1>审批与治理</h1></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadProjectData(selectedId)} disabled={loading || detailLoading}><RefreshCw size={15} className={loading || detailLoading ? "spin" : ""} />刷新</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
@@ -395,8 +396,9 @@ export default function GovernancePage() {
       {tab === "tasks" ? (
         <section className="panel">
           <div className="panel-heading"><div className="panel-title"><ClipboardCheck size={17} /><h3>待授权与待验收任务</h3></div><span className="muted-inline">所有写操作先预览，再由所有者确认</span></div>
+          <div className="approval-switch" role="group" aria-label="审批状态">{[{key:"all",label:"全部待办"},{key:"waiting_approval",label:"待授权"},{key:"submitted",label:"待验收"}].map(item => <button type="button" key={item.key} aria-pressed={approvalFilter === item.key} className={approvalFilter === item.key ? "selected" : ""} onClick={() => setApprovalFilter(item.key)}>{item.label}<span>{item.key === "all" ? pendingTasks.length : pendingTasks.filter(task => task.status === item.key).length}</span></button>)}</div>
           <div className="governance-task-list">
-            {pendingTasks.map((task) => <article className="governance-task" key={task.id}>
+            {pendingTasks.filter(task => approvalFilter === "all" || task.status === approvalFilter).map((task) => <article className="governance-task" key={task.id}>
               <div className="governance-task-main"><div><strong>{task.title}</strong><span className={"status-tag " + (task.status === "waiting_approval" ? "tag-red" : "tag-blue")}>{taskStatus[task.status]}</span></div><p>{task.id} · {task.risk} · 优先级 {task.priority}</p><small>{task.instruction}</small></div>
               <div className="governance-task-actions">
                 {task.status === "waiting_approval" ? <button className="primary-button compact" disabled={saving} onClick={() => void createTaskPlan(task, "authorize_task")}><ShieldCheck size={14} />生成授权预览</button> : <>
@@ -405,7 +407,7 @@ export default function GovernancePage() {
                 </>}
               </div>
             </article>)}
-            {!pendingTasks.length && <div className="empty-state"><CheckCircle2 size={26} /><strong>没有待处理任务</strong><p>该项目当前没有等待授权或验收的任务。</p></div>}
+            {!pendingTasks.some(task => approvalFilter === "all" || task.status === approvalFilter) && <div className="empty-state"><CheckCircle2 size={26} /><strong>暂无此类待办</strong></div>}
           </div>
         </section>
       ) : tab === "decisions" ? (
@@ -535,7 +537,7 @@ export default function GovernancePage() {
         </div>
       ) : tab === "command" ? (
         <section className="panel command-input-panel">
-          <div className="panel-heading"><div className="panel-title"><MessageSquare size={17} /><h3>受限自然语言命令</h3></div><span className="status-tag tag-blue">模板解析 · 非 LLM</span></div>
+          <div className="panel-heading"><div className="panel-title"><MessageSquare size={17} /><h3>受限自然语言命令</h3></div><span className="status-tag tag-blue">本地规则解析</span></div>
           <p className="form-hint">该入口只支持后端白名单中的中文命令模板，不会调用外部模型，也不会直接执行操作。解析成功后会创建与任务审批相同的版本化命令预览。</p>
           <form className="form-panel" onSubmit={interpretCommand}>
             <label>输入命令<textarea rows={3} value={commandText} onChange={(event) => setCommandText(event.target.value)} required minLength={4} maxLength={3500} placeholder="例如：验收通过任务「完成首页 React 改造」" /></label>
@@ -557,7 +559,7 @@ export default function GovernancePage() {
       {plan && <div className="modal-backdrop"><section className="panel command-preview">
         <div className="panel-heading"><div className="panel-title"><ShieldCheck size={17} /><h3>命令执行预览</h3></div><button className="icon-button" onClick={() => setPlan(null)}><X size={17} /></button></div>
         <div className="command-preview-warning"><AlertCircle size={18} /><span>此操作必须由所有者明确确认。预览有效期至 {timeText(plan.expires_at)}，任务版本为 {plan.expected_version}。</span></div>
-        <div className="command-preview-grid"><div><small>任务</small><strong>{plan.task_title || plan.task_id}</strong></div><div><small>操作</small><strong>{plan.action}</strong></div><div><small>当前状态</small><strong>{plan.task_status}</strong></div><div><small>风险等级</small><strong>{plan.task_risk}</strong></div></div>
+        <div className="command-preview-grid"><div><small>任务</small><strong>{plan.task_title || plan.task_id}</strong></div><div><small>操作</small><strong>{getUiLabel(plan.action)}</strong></div><div><small>当前状态</small><strong>{getUiLabel(plan.task_status)}</strong></div><div><small>风险等级</small><strong>{plan.task_risk}</strong></div></div>
         <pre className="json-preview">{JSON.stringify(plan.parameters, null, 2)}</pre>
         <div className="form-actions"><button className="secondary-button" onClick={() => setPlan(null)}>取消</button><button className="primary-button" disabled={saving} onClick={() => void confirmPlan()}>{saving ? "执行中…" : "确认执行命令"}</button></div>
       </section></div>}

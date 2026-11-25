@@ -317,7 +317,7 @@ export default function GoalsWorkflowPage() {
       </div>
       {loading && !board ? <div className="panel-loading"><div className="spinner" />正在读取目标和工作流…</div> : tab === "goals" ? (
         <div className="page-stack">
-        <GoalPlanComposer projectId={selectedId} onConfirmed={()=>void loadProjectData(selectedId)} />
+        <details className="panel maintenance-disclosure"><summary>智能目标规划</summary><GoalPlanComposer key={selectedId} projectId={selectedId} onConfirmed={()=>void loadProjectData(selectedId)} /></details>
         <section className="panel">
           <div className="panel-heading"><div className="panel-title"><GitBranch size={17} /><h3>目标与前置条件</h3></div><button className="primary-button compact" onClick={() => setShowGoalForm((value) => !value)} disabled={!selectedId}><Plus size={15} />新建目标</button></div>
           {showGoalForm && <form className="form-panel embedded-form" onSubmit={createGoal}>

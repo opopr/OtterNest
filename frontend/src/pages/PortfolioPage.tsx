@@ -52,6 +52,8 @@ export default function PortfolioPage() {
   const [metrics, setMetrics] = useState<PortfolioMetrics | null>(null);
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notificationFilter, setNotificationFilter] = useState("all");
+  const visibleNotifications = notifications.filter(item => notificationFilter === "all" || (notificationFilter === "unread" ? !item.read : item.level === "urgent"));
   const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -192,20 +194,20 @@ export default function PortfolioPage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><h1>运营分析</h1><p>跨项目运行指标、每日简报、通知收件箱与受控实验。</p></div>
+        <div><h1>运营分析</h1></div>
         <div className="heading-actions">
           <button className="secondary-button" onClick={() => void loadOverview()} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button>
           <button className="primary-button compact" onClick={() => void runSchedule()} disabled={saving}><Play size={15} />执行公平调度</button>
         </div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
-      {loading && !metrics ? <div className="panel-loading"><div className="spinner" />正在汇总 运营分析 数据…</div> : (
+      {loading && !metrics ? <div className="panel-loading"><div className="spinner" />正在汇总运营数据…</div> : (
         <>
           <div className="stat-grid portfolio-stat-grid">
-            <div className="stat-card"><div className="stat-icon tone-violet"><FolderKanbanIcon /></div><div className="stat-copy"><span>项目总数</span><strong>{metrics?.project_count ?? 0}</strong><small>全部项目空间</small></div></div>
-            <div className="stat-card"><div className="stat-icon tone-blue"><Activity size={18} /></div><div className="stat-copy"><span>任务总量</span><strong>{metrics?.total_tasks ?? 0}</strong><small>跨项目累计</small></div></div>
+            <div className="stat-card"><div className="stat-icon tone-violet"><FolderKanbanIcon /></div><div className="stat-copy"><span>项目总数</span><strong>{metrics?.project_count ?? 0}</strong></div></div>
+            <div className="stat-card"><div className="stat-icon tone-blue"><Activity size={18} /></div><div className="stat-copy"><span>任务总量</span><strong>{metrics?.total_tasks ?? 0}</strong></div></div>
             <div className="stat-card"><div className="stat-icon tone-green"><Check size={18} /></div><div className="stat-copy"><span>已完成任务</span><strong>{metrics?.completed_count ?? 0}</strong><small>{metrics?.total_tasks ? percent((metrics.completed_count || 0) / metrics.total_tasks) : "暂无数据"}</small></div></div>
-            <div className="stat-card"><div className="stat-icon tone-amber"><ShieldAlert size={18} /></div><div className="stat-copy"><span>阻塞任务</span><strong>{metrics?.blocked_count ?? 0}</strong><small>需要排查原因</small></div></div>
+            <div className="stat-card"><div className="stat-icon tone-amber"><ShieldAlert size={18} /></div><div className="stat-copy"><span>阻塞任务</span><strong>{metrics?.blocked_count ?? 0}</strong></div></div>
             <div className="stat-card"><div className="stat-icon tone-violet"><Bell size={18} /></div><div className="stat-copy"><span>未读通知</span><strong>{unread}</strong><small>其中紧急 {briefing?.unread_urgent_notifications ?? 0} 条</small></div></div>
           </div>
 
@@ -229,7 +231,7 @@ export default function PortfolioPage() {
             <section className="panel">
               <div className="panel-heading"><div className="panel-title"><Clock3 size={17} /><h3>每日简报</h3></div><span className="muted-inline">{dateText(briefing?.generated_at)}</span></div>
               <div className="briefing-mini-grid">
-                <div><strong>{briefing?.enabled_agents ?? 0}</strong><small>已启用 智能体</small></div>
+                <div><strong>{briefing?.enabled_agents ?? 0}</strong><small>已启用智能体</small></div>
                 <div><strong>{briefing?.pending_r3_tasks.length ?? 0}</strong><small>高风险待授权</small></div>
                 <div><strong>{briefing?.pending_review_tasks.length ?? 0}</strong><small>待验收</small></div>
                 <div><strong>{briefing?.blocked_tasks.length ?? 0}</strong><small>阻塞任务</small></div>
@@ -245,13 +247,14 @@ export default function PortfolioPage() {
 
           <section className="panel">
             <div className="panel-heading"><div className="panel-title"><Bell size={17} /><h3>通知收件箱</h3><span className="count-chip">{unread}</span></div><button className="text-button" onClick={() => void markAllRead()} disabled={saving || unread === 0}>全部标为已读</button></div>
+            <div className="approval-switch" role="group" aria-label="通知筛选">{[{key:"all",label:"全部"},{key:"unread",label:"未读"},{key:"urgent",label:"紧急"}].map(item => <button type="button" key={item.key} aria-pressed={notificationFilter === item.key} className={notificationFilter === item.key ? "selected" : ""} onClick={() => setNotificationFilter(item.key)}>{item.label}<span>{item.key === "all" ? notifications.length : item.key === "unread" ? unread : notifications.filter(n => n.level === "urgent").length}</span></button>)}</div>
             <div className="notification-list">
-              {notifications.map((item) => <div className={"notification-row " + (item.read ? "is-read" : "")} key={item.id}>
+              {visibleNotifications.map((item) => <div className={"notification-row " + (item.read ? "is-read" : "")} key={item.id}>
                 <span className={"notification-dot level-" + item.level} />
                 <div className="notification-copy"><div><strong>{item.title}</strong><span className={"status-tag " + (item.level === "urgent" ? "tag-red" : item.level === "important" ? "tag-blue" : "tag-neutral")}>{levelLabel[item.level] || getUiLabel(item.level)}</span></div><p>{item.body}</p><small>{dateText(item.created_at)} · {item.source_kind}</small></div>
                 {!item.read && <button className="icon-button" title="标记已读" onClick={() => void markRead(item.id)}><Check size={16} /></button>}
               </div>)}
-              {!notifications.length && <div className="empty-state"><Bell size={24} /><strong>收件箱为空</strong><p>系统产生的审批、任务和运行通知会出现在这里。</p></div>}
+              {!visibleNotifications.length && <div className="empty-state"><Bell size={24} /><strong>暂无此类通知</strong></div>}
             </div>
           </section>
 
@@ -271,7 +274,7 @@ export default function PortfolioPage() {
                 const draft = runDrafts[experiment.id] || { baseline: "", candidate: "", samples: "3", notes: "" };
                 const setDraft = (key: keyof typeof draft, value: string) => setRunDrafts((current) => ({ ...current, [experiment.id]: { ...draft, [key]: value } }));
                 return <article className="experiment-card" key={experiment.id}>
-                  <div className="experiment-card-head"><div><strong>{experiment.hypothesis}</strong><small>{experiment.target_kind} · {experiment.target_id}</small></div><span className={"status-tag " + (experiment.status === "promoted" ? "tag-green" : experiment.status === "rolled_back" ? "tag-neutral" : experiment.status === "evaluated" ? "tag-blue" : "tag-amber")}>{statusLabel[experiment.status] || getUiLabel(experiment.status)}</span></div>
+                  <div className="experiment-card-head"><div><strong>{experiment.hypothesis}</strong><small>{({workflow_rule:"工作流规则",skill:"技能",context_policy:"上下文策略"} as Record<string,string>)[experiment.target_kind] || experiment.target_kind} · {experiment.target_id}</small></div><span className={"status-tag " + (experiment.status === "promoted" ? "tag-green" : experiment.status === "rolled_back" ? "tag-neutral" : experiment.status === "evaluated" ? "tag-blue" : "tag-amber")}>{statusLabel[experiment.status] || getUiLabel(experiment.status)}</span></div>
                   {experiment.status === "proposed" && <div className="experiment-run-form">
                     <label>基线分数<input type="number" min="0" max="100" value={draft.baseline} onChange={(event) => setDraft("baseline", event.target.value)} /></label>
                     <label>候选分数<input type="number" min="0" max="100" value={draft.candidate} onChange={(event) => setDraft("candidate", event.target.value)} /></label>
@@ -287,7 +290,7 @@ export default function PortfolioPage() {
               {!experiments.length && <div className="empty-state"><FlaskConical size={24} /><strong>该项目还没有实验</strong><p>创建实验后记录基线、候选分数和样本数，再由所有者决定是否采纳。</p></div>}
             </div>
           </section>
-          {scheduleResult && <section className="panel"><div className="panel-heading"><div className="panel-title"><TrendingUp size={17} /><h3>最近一次公平调度结果</h3></div><span className="status-tag tag-green">已执行</span></div><div className="briefing-mini-grid"><div><strong>{scheduleResult.projects_evaluated}</strong><small>评估项目</small></div><div><strong>{scheduleResult.total_routes}</strong><small>路由任务数</small></div></div>{scheduleResult.per_project.map((item) => <div className="schedule-row" key={item.project_id}><strong>{item.project_name}</strong><span>优先级 {item.priority}</span><span>{item.routes.length} 条路由</span></div>)}</section>}
+          {scheduleResult && <section className="panel"><div className="panel-heading"><div className="panel-title"><TrendingUp size={17} /><h3>最近一次公平调度结果</h3></div><span className="status-tag tag-green">已执行</span></div><div className="briefing-mini-grid"><div><strong>{scheduleResult.projects_evaluated}</strong><small>评估项目</small></div><div><strong>{scheduleResult.total_routes}</strong><small>分配任务数</small></div></div>{scheduleResult.per_project.map((item) => <div className="schedule-row" key={item.project_id}><strong>{item.project_name}</strong><span>优先级 {item.priority}</span><span>{item.routes.length} 项分配</span></div>)}</section>}
         </>
       )}
     </div>

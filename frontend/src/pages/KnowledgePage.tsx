@@ -78,13 +78,14 @@ export default function KnowledgePage() {
   const [shareRationale, setShareRationale] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [sensitivityFilter, setSensitivityFilter] = useState<string>("all");
+  const [memoryStatus, setMemoryStatus] = useState("all");
   const [tab, setTab] = useState<"memories" | "charter" | "sharing">("memories");
 
   const selectedProject = useMemo(() => projects.find((item) => item.id === selectedId) || null, [projects, selectedId]);
   const publishedMemories = memories.filter((item) => item.status === "published");
   const visibleMemories = useMemo(
-    () => sensitivityFilter === "all" ? memories : memories.filter((m) => m.sensitivity === sensitivityFilter),
-    [memories, sensitivityFilter]
+    () => memories.filter(m => (sensitivityFilter === "all" || m.sensitivity === sensitivityFilter) && (memoryStatus === "all" || m.status === memoryStatus)),
+    [memories, sensitivityFilter, memoryStatus]
   );
 
   const loadProjects = useCallback(async () => {
@@ -269,13 +270,13 @@ export default function KnowledgePage() {
       {loading && !selectedProject ? <div className="panel-loading"><div className="spinner" />正在读取项目知识…</div> : tab === "memories" ? (
         <section className="panel">
           <div className="panel-heading">
-            <div className="panel-title"><Database size={17} /><h3>知识生命周期</h3></div>
+            <div className="panel-title"><Database size={17} /><h3>项目知识</h3><span className="count-chip">{visibleMemories.length}</span></div>
             <div className="heading-actions flex-row-gap">
               <form onSubmit={(e) => { e.preventDefault(); if (selectedId) void loadProjectData(selectedId, searchQuery); }} className="flex-row-gap-sm">
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="混合向量语义检索…"
+                  aria-label="知识检索" placeholder="输入检索关键词"
                   className="search-input-compact"
                 />
                 <select
@@ -285,13 +286,14 @@ export default function KnowledgePage() {
                   className="compact-select"
                 >
                   <option value="all">全部敏感级</option>
-                  <option value="public">公开 (public)</option>
-                  <option value="internal">内部 (internal)</option>
-                  <option value="confidential">机密 (confidential)</option>
-                  <option value="restricted">受限 (restricted)</option>
+                  <option value="public">公开</option>
+                  <option value="internal">内部</option>
+                  <option value="confidential">机密</option>
+                  <option value="restricted">受限</option>
                 </select>
+                <select className="compact-select" aria-label="知识状态" value={memoryStatus} onChange={e => setMemoryStatus(e.target.value)}><option value="all">全部状态</option><option value="proposed">待发布</option><option value="published">已发布</option><option value="archived">已归档</option></select>
                 <button type="submit" className="secondary-button compact" disabled={!selectedId || loading}><Search size={14} />检索</button>
-                {searchQuery && <button type="button" className="text-button" onClick={() => { setSearchQuery(""); if (selectedId) void loadProjectData(selectedId, ""); }}>清除</button>}
+                {(searchQuery || sensitivityFilter !== "all" || memoryStatus !== "all") && <button type="button" className="text-button" onClick={() => { setSearchQuery(""); setSensitivityFilter("all"); setMemoryStatus("all"); if (selectedId) void loadProjectData(selectedId, ""); }}>清除</button>}
               </form>
               <button className="primary-button compact" onClick={() => { cancelMemoryForm(); setShowMemoryForm(true); }} disabled={!selectedId}><Plus size={15} />新增记忆</button>
             </div>
@@ -306,7 +308,7 @@ export default function KnowledgePage() {
             <label>内容<textarea rows={4} value={memoryDraft.content} onChange={(event) => setDraftField("content", event.target.value)} required maxLength={20000} /></label>
             <label>来源与依据<input value={memoryDraft.source} onChange={(event) => setDraftField("source", event.target.value)} required maxLength={3000} /></label>
             {editingId && <label>修订原因（至少 5 个字符）<textarea rows={2} value={revisionReason} onChange={(event) => setRevisionReason(event.target.value)} required minLength={5} /></label>}
-            <p className="form-hint">新记忆默认进入待审核状态。只有所有者发布后，智能体 才能把它作为正式项目知识使用。</p>
+            <p className="form-hint">新记忆默认进入待审核状态。只有所有者发布后，智能体才能把它作为正式项目知识使用。</p>
             <div className="form-actions"><button className="primary-button compact" disabled={saving || (Boolean(editingId) && revisionReason.trim().length < 5)}>{saving ? "保存中…" : editingId ? "保存修订" : "提交记忆"}</button></div>
           </form>}
           <div className="memory-grid">
@@ -314,9 +316,9 @@ export default function KnowledgePage() {
               const displayScore = typeof memory.relevance_score === "number" ? memory.relevance_score : memory.score;
               return <article className="memory-card" key={memory.id}>
                 <div className="memory-card-head"><span className="capability-tag">{kindLabel[memory.kind] || memory.kind}</span><span className={"status-tag " + (memory.status === "published" ? "tag-green" : memory.status === "proposed" ? "tag-amber" : "tag-neutral")}>{statusLabel[memory.status] || memory.status}</span></div>
-                <h3>{memory.title}</h3><p>{memory.content}</p>
+                <h3>{memory.title}</h3><details className="library-disclosure"><summary>查看知识内容</summary><p className="memory-expanded-content">{memory.content}</p><small className="memory-source">来源：{memory.source}</small></details>
                 <div className="memory-meta"><span><LockKeyhole size={12} />{sensitivityLabel[memory.sensitivity] || memory.sensitivity}</span><span>版本 {memory.version}</span>{typeof displayScore === "number" && <span className="status-tag tag-green">相关度 {displayScore.toFixed(2)}</span>}</div>
-                <small className="memory-source">来源：{memory.source}</small>
+
                 <div className="memory-actions">{memory.status !== "archived" && <button className="text-button" onClick={() => editMemory(memory)}><Pencil size={13} />修订</button>}{memory.status === "proposed" && <button className="secondary-button compact" disabled={saving} onClick={() => void publishMemory(memory)}><Check size={13} />发布</button>}{memory.status !== "archived" && <button className="icon-button" title="归档" disabled={saving} onClick={() => void archiveMemory(memory)}><Archive size={15} /></button>}</div>
               </article>;
             })}

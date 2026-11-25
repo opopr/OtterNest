@@ -287,109 +287,15 @@ export default function SystemPage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><h1>系统设置与运行事件</h1><p>全局保护模式、项目运行状态，以及由服务端持久化的项目事件流。</p></div>
+        <div><h1>系统设置与运行事件</h1></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => void loadSystem()} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新状态</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
 
-      <section className="panel connection-diagnostics-panel">
-        <div className="panel-heading">
-          <div className="panel-title"><Activity size={17} /><h3>API 与数据库连接诊断</h3></div>
-          <div className="heading-actions">
-            <span className="muted-inline">{connectionCheckedAt ? "检测于 " + new Date(connectionCheckedAt).toLocaleString("zh-CN", { hour12: false }) : "尚未检测"}</span>
-            <button className="secondary-button compact" onClick={() => void checkConnection()} disabled={checkingConnection}>
-              <RefreshCw size={14} className={checkingConnection ? "spin" : ""} />重新检测
-            </button>
-          </div>
-        </div>
-        <div className="connection-origin-list">
-          <div><span>前端 来源地址</span><code>{window.location.origin}</code></div>
-          <div><span>后端 API 来源地址</span><code>{getApiOrigin()}</code></div>
-        </div>
-        <div className="stat-grid connection-check-grid">
-          <div className="stat-card">
-            <div className={"stat-icon " + (connectionChecks?.api.state === "ok" ? "tone-green" : connectionChecks?.api.state === "error" ? "tone-amber" : "tone-blue")}><Activity size={18} /></div>
-            <div className="stat-copy"><span>API 服务</span><strong>{connectionChecks?.api.state === "ok" ? "可访问" : connectionChecks?.api.state === "error" ? "连接失败" : checkingConnection ? "检测中" : "待检测"}</strong><small>{connectionChecks?.api.detail || "GET /health/live"}</small><small>{connectionChecks?.api.latencyMs ?? "—"} ms</small></div>
-          </div>
-          <div className="stat-card">
-            <div className={"stat-icon " + (connectionChecks?.database.state === "ok" ? "tone-green" : connectionChecks?.database.state === "error" ? "tone-amber" : "tone-blue")}><CheckCircle2 size={18} /></div>
-            <div className="stat-copy"><span>数据库连接</span><strong>{connectionChecks?.database.state === "ok" ? "正常" : connectionChecks?.database.state === "error" ? "未就绪" : checkingConnection ? "检测中" : "待检测"}</strong><small>{connectionChecks?.database.detail || "GET /health/ready · 服务端执行 SELECT 1"}</small><small>{connectionChecks?.database.latencyMs ?? "—"} ms</small></div>
-          </div>
-          <div className="stat-card">
-            <div className={"stat-icon " + (connectionChecks?.identity.state === "ok" ? "tone-green" : connectionChecks?.identity.state === "error" ? "tone-amber" : "tone-blue")}><Shield size={18} /></div>
-            <div className="stat-copy"><span>身份认证</span><strong>{connectionChecks?.identity.state === "ok" ? "有效" : connectionChecks?.identity.state === "error" ? "失败" : checkingConnection ? "检测中" : "待检测"}</strong><small>{connectionChecks?.identity.detail || "GET /api/v1/me"}</small><small>{connectionChecks?.identity.latencyMs ?? "—"} ms</small></div>
-          </div>
-        </div>
-        {(connectionChecks?.api.state === "error" || connectionChecks?.database.state === "error" || connectionChecks?.identity.state === "error") && (
-          <div className="connection-help">
-            如果当前从 Google AI Studio 预览访问，请确认 <code>VITE_API_BASE_URL</code> 指向后端 HTTPS 来源地址，并让服务端 <code>OTTERNEST_CORS_ORIGINS</code> 精确包含上方的前端 Origin。不要把数据库地址或令牌写入 VITE_ 变量。
-          </div>
-        )}
-        <div className="form-actions">
-          <a className="secondary-button compact" href={getApiOrigin() + "/api/docs"} target="_blank" rel="noreferrer">打开 FastAPI 文档</a>
-        </div>
-      </section>
-
-      <section className="panel">
-        <div className="panel-heading">
-          <div className="panel-title"><DownloadCloud size={17} /><h3>系统版本与一键更新</h3></div>
-          <div className="heading-actions flex-row-gap">
-            {updateCheck && updateCheck.git_available !== false && (
-              <span className={"status-tag " + (updateCheck.update_available ? "tag-amber" : "tag-green")}>
-                {updateCheck.update_available ? `发现 ${updateCheck.behind_count} 个新提交` : "已是最新版本"}
-              </span>
-            )}
-            <button className="secondary-button compact" onClick={() => void checkForUpdates(true)} disabled={checkingUpdate || updateStatus?.state === "running"}>
-              <RefreshCw size={14} className={checkingUpdate ? "spin" : ""} />检查更新
-            </button>
-            <button
-              className="primary-button compact"
-              onClick={() => void applySelfUpdate(false)}
-              disabled={applyingUpdate || updateStatus?.state === "running" || !updateCheck?.enabled || updateCheck?.git_available === false}
-              title={!updateCheck?.enabled ? "需在服务端配置 OTTERNEST_ENABLE_WEB_UPDATE=true" : ""}
-            >
-              <DownloadCloud size={14} />{updateStatus?.state === "running" ? "更新执行中…" : "一键更新并重启"}
-            </button>
-          </div>
-        </div>
-        {updateError && <div className="connection-help mb-10">当前环境未启用 Git 在线更新检测：{updateError}</div>}
-        {updateCheck && updateCheck.git_available === false && (
-          <div className="connection-help mb-10">当前后端运行在无 <code>.git</code> 目录的打包/容器环境中，在线代码更新不可用。</div>
-        )}
-        {updateCheck && updateCheck.git_available !== false && (
-          <div className="update-meta-row">
-            <span>分支：<code>{updateCheck.branch}</code></span>
-            <span>当前版本：<code>{updateCheck.current_commit}</code></span>
-            <span>远端版本：<code>{updateCheck.remote_commit}</code></span>
-            <span>工作区：{updateCheck.working_tree_clean ? "干净" : "有未提交修改"}</span>
-            <span>自动重启：{updateCheck.restart_command_configured ? "已配置" : "未配置（仅拉取/迁移/构建）"}</span>
-          </div>
-        )}
-        {updateCheck && updateCheck.git_available !== false && !updateCheck.enabled && (
-          <div className="connection-help mb-10">
-            网页一键更新当前处于关闭状态。如需在页面直接更新，请在服务端环境变量中配置 <code>OTTERNEST_ENABLE_WEB_UPDATE=true</code>（以及可选的 <code>OTTERNEST_RESTART_COMMAND</code>）。
-          </div>
-        )}
-        {updateCheck && Array.isArray(updateCheck.recent_commits) && updateCheck.recent_commits.length > 0 && (
-          <pre className="json-preview mb-10">{updateCheck.recent_commits.join("\n")}</pre>
-        )}
-        {updateStatus && updateStatus.state !== "idle" && (
-          <div className="update-status-box">
-            <div className="update-status-head">
-              <span className={"status-tag " + (updateStatus.state === "succeeded" ? "tag-green" : updateStatus.state === "running" ? "tag-amber" : "tag-neutral")}>
-                {updateStatus.state === "running" ? `执行中：${updateStatus.step}` : updateStatus.state === "succeeded" ? "更新成功" : "更新失败"}
-              </span>
-              {updateStatus.error && <span className="update-error-text">{updateStatus.error}</span>}
-            </div>
-            {Array.isArray(updateStatus.logs) && updateStatus.logs.length > 0 && <pre className="json-preview">{updateStatus.logs.join("\n")}</pre>}
-          </div>
-        )}
-      </section>
-
       {loading && !systemMode ? <div className="panel-loading"><div className="spinner" />正在读取系统状态…</div> : <>
         <section className={"system-mode-banner " + (isProtective ? "protective" : "normal")}>
           <div className="system-mode-icon">{isProtective ? <ShieldAlert size={23} /> : <CheckCircle2 size={23} />}</div>
-          <div><div className="eyebrow">系统</div><h2>{modeLabel[systemMode?.mode || "normal"]}</h2><p>{systemMode?.reason || "当前未启用全局保护限制。"}</p></div>
+          <div><h2>{modeLabel[systemMode?.mode || "normal"]}</h2><p>{systemMode?.reason || "当前未启用全局保护限制。"}</p></div>
           <span className={"status-tag " + (isProtective ? "tag-amber" : "tag-green")}>{isProtective ? "保护策略生效" : "运行正常"}</span>
         </section>
 
@@ -422,12 +328,108 @@ export default function SystemPage() {
           <div className="event-timeline">
             {events.map((event) => <article className="event-timeline-row" key={event.id}>
               <span className="event-timeline-marker" />
-              <div className="event-timeline-content"><div><strong>{eventLabel[event.kind] || event.kind}</strong><code>{event.kind}</code></div><p>对象：{event.subject_id}</p>{Object.keys(event.payload || {}).length > 0 && <pre>{JSON.stringify(event.payload, null, 2)}</pre>}<small>{new Date(event.created_at).toLocaleString("zh-CN", { hour12: false })} · 事件 #{event.id}</small></div>
+              <div className="event-timeline-content"><div><strong>{eventLabel[event.kind] || event.kind}</strong><code>{event.kind}</code></div><p>对象：{event.subject_id}</p>{Object.keys(event.payload || {}).length > 0 && <details className="library-disclosure event-payload"><summary>事件详情</summary><pre>{JSON.stringify(event.payload, null, 2)}</pre></details>}<small>{new Date(event.created_at).toLocaleString("zh-CN", { hour12: false })} · 事件 #{event.id}</small></div>
             </article>)}
             {!events.length && <div className="empty-state"><Activity size={24} /><strong>暂无项目事件</strong><p>项目中的任务、目标、记忆和治理变更会在这里形成可追踪记录。</p></div>}
           </div>
         </section>
       </>}
+      <details className="panel maintenance-disclosure"><summary>服务诊断与版本维护</summary><div className="system-maintenance-stack">
+      <section className="panel connection-diagnostics-panel">
+        <div className="panel-heading">
+          <div className="panel-title"><Activity size={17} /><h3>连接诊断</h3></div>
+          <div className="heading-actions">
+            <span className="muted-inline">{connectionCheckedAt ? "检测于 " + new Date(connectionCheckedAt).toLocaleString("zh-CN", { hour12: false }) : "尚未检测"}</span>
+            <button className="secondary-button compact" onClick={() => void checkConnection()} disabled={checkingConnection}>
+              <RefreshCw size={14} className={checkingConnection ? "spin" : ""} />重新检测
+            </button>
+          </div>
+        </div>
+        <div className="connection-origin-list">
+          <div><span>前端地址</span><code>{window.location.origin}</code></div>
+          <div><span>后端接口地址</span><code>{getApiOrigin()}</code></div>
+        </div>
+        <div className="stat-grid connection-check-grid">
+          <div className="stat-card">
+            <div className={"stat-icon " + (connectionChecks?.api.state === "ok" ? "tone-green" : connectionChecks?.api.state === "error" ? "tone-amber" : "tone-blue")}><Activity size={18} /></div>
+            <div className="stat-copy"><span>API 服务</span><strong>{connectionChecks?.api.state === "ok" ? "可访问" : connectionChecks?.api.state === "error" ? "连接失败" : checkingConnection ? "检测中" : "待检测"}</strong><small>{connectionChecks?.api.detail || "GET /health/live"}</small><small>{connectionChecks?.api.latencyMs ?? "—"} ms</small></div>
+          </div>
+          <div className="stat-card">
+            <div className={"stat-icon " + (connectionChecks?.database.state === "ok" ? "tone-green" : connectionChecks?.database.state === "error" ? "tone-amber" : "tone-blue")}><CheckCircle2 size={18} /></div>
+            <div className="stat-copy"><span>数据库连接</span><strong>{connectionChecks?.database.state === "ok" ? "正常" : connectionChecks?.database.state === "error" ? "未就绪" : checkingConnection ? "检测中" : "待检测"}</strong><small>{connectionChecks?.database.detail || "GET /health/ready · 服务端执行 SELECT 1"}</small><small>{connectionChecks?.database.latencyMs ?? "—"} ms</small></div>
+          </div>
+          <div className="stat-card">
+            <div className={"stat-icon " + (connectionChecks?.identity.state === "ok" ? "tone-green" : connectionChecks?.identity.state === "error" ? "tone-amber" : "tone-blue")}><Shield size={18} /></div>
+            <div className="stat-copy"><span>身份认证</span><strong>{connectionChecks?.identity.state === "ok" ? "有效" : connectionChecks?.identity.state === "error" ? "失败" : checkingConnection ? "检测中" : "待检测"}</strong><small>{connectionChecks?.identity.detail || "GET /api/v1/me"}</small><small>{connectionChecks?.identity.latencyMs ?? "—"} ms</small></div>
+          </div>
+        </div>
+        {(connectionChecks?.api.state === "error" || connectionChecks?.database.state === "error" || connectionChecks?.identity.state === "error") && (
+          <div className="connection-help">
+            如果当前从 Google AI Studio 预览访问，请确认 <code>VITE_API_BASE_URL</code> 指向后端 HTTPS 来源地址，并让服务端 <code>OTTERNEST_CORS_ORIGINS</code> 精确包含上方的前端 Origin。不要把数据库地址或令牌写入 VITE_ 变量。
+          </div>
+        )}
+        <div className="form-actions">
+          <a className="secondary-button compact" href={getApiOrigin() + "/api/docs"} target="_blank" rel="noreferrer">接口文档</a>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-heading">
+          <div className="panel-title"><DownloadCloud size={17} /><h3>版本与更新</h3></div>
+          <div className="heading-actions flex-row-gap">
+            {updateCheck && updateCheck.git_available !== false && (
+              <span className={"status-tag " + (updateCheck.update_available ? "tag-amber" : "tag-green")}>
+                {updateCheck.update_available ? `发现 ${updateCheck.behind_count} 个新提交` : "已是最新版本"}
+              </span>
+            )}
+            <button className="secondary-button compact" onClick={() => void checkForUpdates(true)} disabled={checkingUpdate || updateStatus?.state === "running"}>
+              <RefreshCw size={14} className={checkingUpdate ? "spin" : ""} />检查更新
+            </button>
+            <button
+              className="primary-button compact"
+              onClick={() => void applySelfUpdate(false)}
+              disabled={applyingUpdate || updateStatus?.state === "running" || !updateCheck?.enabled || updateCheck?.git_available === false}
+              title={!updateCheck?.enabled ? "需在服务端配置 OTTERNEST_ENABLE_WEB_UPDATE=true" : ""}
+            >
+              <DownloadCloud size={14} />{updateStatus?.state === "running" ? "更新执行中…" : "一键更新并重启"}
+            </button>
+          </div>
+        </div>
+        {updateError && <div className="connection-help mb-10">当前环境未启用 Git 在线更新检测：{updateError}</div>}
+        {updateCheck && updateCheck.git_available === false && (
+          <div className="connection-help mb-10">当前后端运行在无 <code>.git</code> 目录的打包/容器环境中，在线代码更新不可用。</div>
+        )}
+        {updateCheck && updateCheck.git_available !== false && (
+          <div className="update-meta-row">
+            <span>分支：<code>{updateCheck.branch}</code></span>
+            <span>当前版本：<code>{updateCheck.current_commit}</code></span>
+            <span>远端版本：<code>{updateCheck.remote_commit}</code></span>
+            <span>工作区：{updateCheck.working_tree_clean ? "无未提交修改" : "有未提交修改"}</span>
+            <span>自动重启：{updateCheck.restart_command_configured ? "已配置" : "未配置（仅拉取/迁移/构建）"}</span>
+          </div>
+        )}
+        {updateCheck && updateCheck.git_available !== false && !updateCheck.enabled && (
+          <div className="connection-help mb-10">
+            网页一键更新当前处于关闭状态。如需在页面直接更新，请在服务端环境变量中配置 <code>OTTERNEST_ENABLE_WEB_UPDATE=true</code>（以及可选的 <code>OTTERNEST_RESTART_COMMAND</code>）。
+          </div>
+        )}
+        {updateCheck && Array.isArray(updateCheck.recent_commits) && updateCheck.recent_commits.length > 0 && (
+          <pre className="json-preview mb-10">{updateCheck.recent_commits.join("\n")}</pre>
+        )}
+        {updateStatus && updateStatus.state !== "idle" && (
+          <div className="update-status-box">
+            <div className="update-status-head">
+              <span className={"status-tag " + (updateStatus.state === "succeeded" ? "tag-green" : updateStatus.state === "running" ? "tag-amber" : "tag-neutral")}>
+                {updateStatus.state === "running" ? `执行中：${updateStatus.step}` : updateStatus.state === "succeeded" ? "更新成功" : "更新失败"}
+              </span>
+              {updateStatus.error && <span className="update-error-text">{updateStatus.error}</span>}
+            </div>
+            {Array.isArray(updateStatus.logs) && updateStatus.logs.length > 0 && <pre className="json-preview">{updateStatus.logs.join("\n")}</pre>}
+          </div>
+        )}
+      </section>
+
+      </div></details>
     </div>
   );
 }

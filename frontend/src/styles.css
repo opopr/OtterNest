@@ -1263,3 +1263,40 @@ input, textarea, select { accent-color: var(--accent); }
   .command-advanced>summary span{display:block;margin-left:0}
   .project-tab-content{gap:10px}
 }
+
+/* Library and administration workspaces: readable lists and progressive disclosure. */
+.library-filter-bar{display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px;padding:12px 0;margin-bottom:12px;border-bottom:1px solid var(--border)}
+.library-filter-bar label{display:grid;gap:5px;color:var(--text-soft);font-size:13px;min-width:0;flex:1 1 160px}
+.library-filter-bar label:first-child{flex:2 1 220px}
+.library-filter-bar input,.library-filter-bar select{width:100%;min-width:0;min-height:36px;padding:8px 10px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);border-radius:8px;font-size:13px}
+.library-filter-bar .text-button{min-height:36px}
+.library-disclosure{min-width:0;border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:8px 10px}
+.library-disclosure summary,.maintenance-disclosure>summary{cursor:pointer;color:var(--text-soft);font-weight:600;font-size:13px;line-height:1.6}
+.library-disclosure[open]>summary{margin-bottom:8px}
+.library-disclosure summary span{display:inline-flex;gap:5px;align-items:center}
+.library-disclosure.skill-evaluations{display:block}
+.library-disclosure.skill-evaluations summary span:last-child{margin-left:10px;color:var(--muted);font-size:12px}
+.memory-expanded-content{white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0;font-size:14px;line-height:1.6;color:var(--text)}
+.memory-card,.skill-card{min-width:0;align-content:start}
+.skill-content{white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto}
+.artifact-upload-disclosure{margin-bottom:10px}
+.artifact-upload-disclosure summary{color:var(--accent-deep)}
+.artifact-upload-disclosure[open] .artifact-upload{margin-top:10px}
+.maintenance-disclosure>summary{font-size:14px;color:var(--text)}
+.maintenance-disclosure[open]>summary{margin-bottom:16px}
+.maintenance-disclosure .operations-grid>.panel,.system-maintenance-stack>.panel{box-shadow:none}
+.system-maintenance-stack{display:grid;gap:16px;min-width:0}
+.event-payload{margin:8px 0}
+.event-payload pre{max-width:100%;overflow:auto}
+.approval-switch{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px;border-bottom:1px solid var(--border)}
+.approval-switch button{display:flex;align-items:center;gap:8px;padding:10px 12px;min-height:40px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--text-soft);font-size:13px}
+.approval-switch button.selected{border-bottom-color:var(--accent);color:var(--accent-deep);font-weight:650}
+.approval-switch button span{font-size:12px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.governance-tabs button{min-height:40px;box-shadow:none}
+.governance-tabs button.selected{color:var(--accent-deep);background:var(--accent-soft);border-color:var(--brand-coral)}
+@media(max-width:580px){
+ .library-filter-bar{gap:8px}.library-filter-bar label,.library-filter-bar label:first-child{flex:1 1 100%}
+ .library-disclosure{padding:8px}.approval-switch button{padding:8px;font-size:12px}
+ .maintenance-disclosure .operations-grid{grid-template-columns:minmax(0,1fr)}
+ .system-maintenance-stack{gap:10px}
+}

@@ -50,6 +50,9 @@ export default function ArtifactsPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [fileQuery, setFileQuery] = useState("");
+  const [reviewFilter, setReviewFilter] = useState("all");
+  const visibleArtifacts = useMemo(() => artifacts.filter(a => (reviewFilter === "all" || a.review_status === reviewFilter) && a.name.toLocaleLowerCase().includes(fileQuery.trim().toLocaleLowerCase())), [artifacts, fileQuery, reviewFilter]);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [sensitivity, setSensitivity] = useState("internal");
@@ -198,7 +201,7 @@ export default function ArtifactsPage() {
   const restoreArchive = async () => {
     if (!selectedProjectId || !restoreFile) return;
     const confirmed = await dialog.confirm({
-      title: "恢复成果二进制归档",
+      title: "恢复成果归档",
       message: "确认将归档包恢复到当前项目？系统会先完整校验清单、路径、大小和 SHA-256。",
       confirmText: "确认校验并恢复",
       tone: "warning",
@@ -221,9 +224,9 @@ export default function ArtifactsPage() {
     if (!selectedProjectId) return;
     if (!dryRun) {
       const confirmed = await dialog.confirm({
-        title: "确认执行成果垃圾回收（GC）",
+        title: "确认执行文件回收",
         message: "这将物理删除符合条件的未验收/旧版本成果文件，并保留数据库审计元数据。是否继续？",
-        confirmText: "确认执行 GC",
+        confirmText: "确认回收",
         tone: "danger",
       });
       if (!confirmed) return;
@@ -253,24 +256,24 @@ export default function ArtifactsPage() {
       <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedProjectId} onChange={setSelectedProjectId} /><label className="task-select"><span>选择任务</span><select value={selectedTaskId} onChange={(event) => setSelectedTaskId(event.target.value)}><option value="">选择任务…</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label></section>
       <section className="panel">
         <div className="panel-heading"><div className="panel-title"><FileCheck2 size={17} /><h3>成果版本</h3><span className="count-chip">{artifacts.length}</span></div></div>
-        <p className="form-hint">当前任务：{selectedTask?.title || "未选择任务"}</p>
-        <div className="artifact-upload">
+        <p className="form-hint">任务：{selectedTask?.title || "未选择任务"}</p>
+        <details className="library-disclosure artifact-upload-disclosure"><summary>上传新版本</summary><div className="artifact-upload">
           <label>上传文件<input type="file" onChange={(event) => setUploadFile(event.target.files?.[0] || null)} /></label>
           <label>敏感级<select value={sensitivity} onChange={(event) => setSensitivity(event.target.value)}><option value="public">公开</option><option value="internal">内部</option><option value="confidential">机密</option><option value="restricted">受限</option></select></label>
           <button className="primary-button compact" disabled={saving || !selectedTaskId || !uploadFile} onClick={() => void uploadArtifact()}>
             <FileUp size={14} />{uploadProgress !== null ? `上传中 ${uploadProgress}%` : "上传为新版本"}
           </button>
         </div>
-        <p className="form-hint">常规单次上传上限 5 MiB；超过 4 MiB 自动启用分块上传。相同任务和文件名会创建新版本，不覆盖旧文件。</p>
-        <div className="artifact-list">{artifacts.map((artifact) => <article className="artifact-card" key={artifact.id}>
+        <p className="form-hint">常规单次上传上限 5 MiB；超过 4 MiB 自动启用分块上传。相同任务和文件名会创建新版本，不覆盖旧文件。</p></details>
+        <div className="library-filter-bar"><label>文件名<input aria-label="搜索成果文件" value={fileQuery} onChange={event => setFileQuery(event.target.value)} placeholder="搜索文件名" /></label><label>验收状态<select aria-label="成果验收状态" value={reviewFilter} onChange={event => setReviewFilter(event.target.value)}><option value="all">全部状态</option><option value="pending">待验收</option><option value="accepted">已通过</option><option value="rejected">已驳回</option></select></label><button type="button" className="text-button" onClick={() => { setFileQuery(""); setReviewFilter("all"); }}>清除筛选</button></div><div className="artifact-list">{visibleArtifacts.map((artifact) => <article className="artifact-card" key={artifact.id}>
           <div className="artifact-card-main"><div className="artifact-file-icon"><Archive size={18} /></div><div><strong>{artifact.name}</strong><small>v{artifact.version} · {sizeText(artifact.size_bytes)} · {artifact.checksum.slice(0, 16)}…</small><small>敏感级 {getUiLabel(artifact.sensitivity)} · {new Date(artifact.created_at).toLocaleString("zh-CN", { hour12: false })}</small></div></div>
           <div className="artifact-card-actions"><span className={"status-tag " + (artifact.review_status === "accepted" ? "tag-green" : artifact.review_status === "rejected" ? "tag-red" : "tag-amber")}>{reviewLabel[artifact.review_status] || artifact.review_status}</span><button className="icon-button" title="下载并校验" disabled={saving || Boolean(artifact.deleted_at)} onClick={() => void downloadArtifact(artifact)}><Download size={15} /></button>{artifact.review_status === "pending" && <><button className="icon-button" title="验收通过" disabled={saving} onClick={() => void reviewArtifact(artifact, true)}><Check size={15} /></button><button className="icon-button" title="驳回" disabled={saving} onClick={() => void reviewArtifact(artifact, false)}><X size={15} /></button></>}</div>
           {artifact.review_note && <p className="artifact-review-note">验收说明：{artifact.review_note}</p>}
-          {artifact.deleted_at && <small className="muted-inline">文件已由 GC 回收，元数据仍保留。</small>}
-        </article>)}{!artifacts.length && <div className="empty-state"><FileArchive size={25} /><strong>该任务尚无成果文件</strong><p>智能体 或所有者上传的文件会形成不可变版本，并在验收后保留记录。</p></div>}</div>
+          {artifact.deleted_at && <small className="muted-inline">文件已回收，元数据仍保留。</small>}
+        </article>)}{!visibleArtifacts.length && <div className="empty-state"><FileArchive size={25} /><strong>{artifacts.length ? "没有符合条件的文件" : "暂无成果文件"}</strong></div>}</div>
       </section>
 
-      <div className="operations-grid">
+      <details className="panel maintenance-disclosure"><summary>归档与回收</summary><div className="operations-grid">
         <section className="panel">
           <div className="panel-heading"><div className="panel-title"><FileArchive size={17} /><h3>成果二进制归档</h3></div></div>
           <p className="form-hint">导出当前项目内可读取且 SHA-256 校验通过的文件。恢复前会先完整验证归档包，再写入目标文件。</p>
@@ -281,12 +284,12 @@ export default function ArtifactsPage() {
         </section>
         <section className="panel">
           <div className="panel-heading"><div className="panel-title"><Trash2 size={17} /><h3>成果垃圾回收（GC）</h3></div></div>
-          <p className="form-hint">先执行 dry-run 预览候选文件；已验收成果不会被 GC 删除。驳回版本可按选项纳入回收。</p>
+          <p className="form-hint">先预览回收范围。已验收成果不会被回收，驳回版本可按选项纳入。</p>
           <div className="form-grid"><label>每个版本族保留版本数<input type="number" min="1" max="50" value={keepVersions} onChange={(event) => setKeepVersions(event.target.value)} /></label><label className="checkbox-field"><input type="checkbox" checked={includeRejected} onChange={(event) => setIncludeRejected(event.target.checked)} />包含已驳回版本</label></div>
           <div className="artifact-archive-actions"><button className="secondary-button compact" disabled={saving || !selectedProjectId} onClick={() => void runGC(true)}>预览回收范围</button><button className="primary-button compact" disabled={saving || !gcResult || gcResult.candidate_count === 0 || gcResult.dry_run === false} onClick={() => void runGC(false)}>确认执行 GC</button></div>
           {gcResult && <div className="gc-result"><strong>{gcResult.dry_run ? "预览结果" : "执行结果"}</strong><span>{gcResult.candidate_count} 个候选文件</span><span>预计释放 {sizeText(gcResult.reclaimed_bytes)}</span><small>{gcResult.candidate_ids.length ? gcResult.candidate_ids.slice(0, 5).join(" · ") : "没有符合条件的文件"}{gcResult.candidate_ids.length > 5 ? " …" : ""}</small></div>}
         </section>
-      </div>
+      </div></details>
     </div>
   );
 }
