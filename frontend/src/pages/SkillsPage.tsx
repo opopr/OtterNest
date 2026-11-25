@@ -74,7 +74,7 @@ export default function SkillsPage() {
         }
       }));
       setEvaluations(Object.fromEntries(pairs));
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Skill 列表读取失败"); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "技能列表读取失败"); }
     finally { setLoading(false); }
   }, []);
 
@@ -93,14 +93,14 @@ export default function SkillsPage() {
       });
       setName(""); setVersion("1.0.0"); setContent(""); setSource(""); setShowForm(false);
       await loadSkills(selectedId);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "提交 Skill 提案失败"); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "提交技能提案失败"); }
     finally { setSaving(false); }
   };
 
   const publishSkill = async (skill: Skill) => {
     const confirmed = await dialog.confirm({
-      title: "发布 Skill",
-      message: `确认发布 Skill「${skill.name}」？发布后该项目的 Agent 才能读取它。`,
+      title: "发布技能",
+      message: `确认发布技能「${skill.name}」？发布后该项目的智能体 才能读取它。`,
       confirmText: "确认发布",
     });
     if (!confirmed) return;
@@ -108,14 +108,14 @@ export default function SkillsPage() {
     try {
       await request("/skills/" + encodeURIComponent(skill.id) + "/publish", { method: "POST" });
       await loadSkills(selectedId);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "发布 Skill 失败"); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "发布技能 失败"); }
     finally { setSaving(false); }
   };
 
   const evaluateSkill = async (skill: Skill) => {
     const verdict = await dialog.prompt({
-      title: `评价 Skill「${skill.name}」`,
-      message: "请选择该 Skill 的评估结论，下一步将填写详细说明。",
+      title: `评价技能「${skill.name}」`,
+      message: "请选择该技能的评估结论，下一步将填写详细说明。",
       label: "评价结论",
       defaultValue: "pass",
       choices: [
@@ -142,13 +142,13 @@ export default function SkillsPage() {
         method: "POST", body: JSON.stringify({ verdict, notes, task_id: null })
       });
       await loadSkills(selectedId);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Skill 评价失败"); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "技能评价失败"); }
     finally { setSaving(false); }
   };
 
   const archiveSkill = async (skill: Skill) => {
     const reason = await dialog.prompt({
-      title: `归档 Skill「${skill.name}」`,
+      title: `归档技能「${skill.name}」`,
       message: "归档后该技能不再提供给智能体，但会保留历史评价记录。",
       label: "归档原因（至少 5 个字符）",
       placeholder: "说明归档或替代原因…",
@@ -164,25 +164,25 @@ export default function SkillsPage() {
         method: "POST", body: JSON.stringify({ reason })
       });
       await loadSkills(selectedId);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "归档 Skill 失败"); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "归档技能 失败"); }
     finally { setSaving(false); }
   };
 
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><h1>技能 管理</h1><p>Skill 先作为不可信提案进入项目，再经所有者发布；评价与归档保留生命周期记录。</p></div>
+        <div><h1>技能管理</h1><p>技能提案须经所有者审批发布。</p></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadSkills(selectedId)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
-      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={setSelectedId} /><span className="muted-inline">{skills.length} 个 Skill 版本</span></section>
+      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={setSelectedId} /><span className="muted-inline">{skills.length} 个技能版本</span></section>
       <section className="panel">
-        <div className="panel-heading"><div className="panel-title"><BookMarked size={17} /><h3>项目 Skill 注册表</h3></div><button className="primary-button compact" onClick={() => setShowForm((value) => !value)} disabled={!selectedId}><Plus size={15} />提出 Skill</button></div>
+        <div className="panel-heading"><div className="panel-title"><BookMarked size={17} /><h3>项目技能</h3></div><button className="primary-button compact" onClick={() => setShowForm((value) => !value)} disabled={!selectedId}><Plus size={15} />提交技能提案</button></div>
         {showForm && <form className="form-panel embedded-form" onSubmit={createSkill}>
-          <div className="form-grid"><label>Skill 名称<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={120} /></label><label>版本号<input value={version} onChange={(event) => setVersion(event.target.value)} required maxLength={40} /></label></div>
-          <label>Skill 内容<textarea rows={7} value={content} onChange={(event) => setContent(event.target.value)} required maxLength={20000} placeholder="写入 智能体 可执行的操作步骤、约束和验收要求。提案在发布前不会对项目 智能体 开放。" /></label>
+          <div className="form-grid"><label>技能名称<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={120} /></label><label>版本号<input value={version} onChange={(event) => setVersion(event.target.value)} required maxLength={40} /></label></div>
+          <label>技能内容<textarea rows={7} value={content} onChange={(event) => setContent(event.target.value)} required maxLength={20000} placeholder="填写智能体可执行的操作步骤、约束和验收要求。提案在发布前不会对项目智能体开放。" /></label>
           <label>来源与依据<input value={source} onChange={(event) => setSource(event.target.value)} required maxLength={3000} /></label>
-          <p className="form-hint">同一项目内 Skill 名称与版本组合必须唯一。发布是单独的所有者审批动作。</p>
+          <p className="form-hint">同一项目内 技能名称与版本组合必须唯一。发布是单独的所有者审批动作。</p>
           <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "提交中…" : "提交提案"}</button></div>
         </form>}
         <div className="skill-grid">
@@ -192,7 +192,7 @@ export default function SkillsPage() {
             <div className="skill-evaluations"><div><strong><ClipboardList size={13} />评价记录</strong><span>{(evaluations[skill.id] || []).length} 条</span></div>{(evaluations[skill.id] || []).map((item) => <div className="skill-evaluation" key={item.id}><span className={"status-tag " + (item.verdict === "pass" ? "tag-green" : item.verdict === "fail" ? "tag-red" : "tag-amber")}>{verdictLabel[item.verdict]}</span><p>{item.notes}</p></div>)}</div>
             <div className="skill-actions">{skill.status === "proposed" && <button className="secondary-button compact" disabled={saving} onClick={() => void publishSkill(skill)}><ShieldCheck size={13} />所有者发布</button>}{skill.status !== "archived" && <button className="text-button" disabled={saving} onClick={() => void evaluateSkill(skill)}><Check size={13} />记录评价</button>}{skill.status !== "archived" && <button className="icon-button" title="归档" disabled={saving} onClick={() => void archiveSkill(skill)}><Archive size={14} /></button>}</div>
           </article>)}
-          {!loading && !skills.length && <div className="empty-state"><BookMarked size={25} /><strong>暂无 Skill</strong><p>提交一个 Skill 提案，经过所有者发布后才会对 智能体 可见。</p></div>}
+          {!loading && !skills.length && <div className="empty-state"><BookMarked size={25} /><strong>暂无技能</strong><p>技能发布后对智能体可见。</p></div>}
         </div>
       </section>
     </div>

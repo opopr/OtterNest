@@ -52,7 +52,8 @@ jobs:
       - run: pytest -q tests/test_postgres_concurrency.py
 
   frontend:
-    runs-on: ubuntu-latest
+    # Playwright 1.51 supports Ubuntu 24.04; keep the browser runner stable.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

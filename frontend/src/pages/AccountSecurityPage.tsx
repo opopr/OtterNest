@@ -234,7 +234,7 @@ export default function AccountSecurityPage() {
         <div><span>双重验证</span><strong>{account?.user?.totp_enabled ? "已启用" : "未启用"}</strong></div>
         <div><span>活跃会话</span><strong>{account?.active_sessions ?? "—"}</strong></div>
         <div><span>剩余恢复码</span><strong>{account?.user?.recovery_codes_remaining ?? "—"}</strong></div>
-        <div><span>当前身份方式</span><strong>{account?.auth_method === "owner_token" ? "服务器 Owner Token" : account?.auth_method || "—"}</strong></div>
+        <div><span>当前身份方式</span><strong>{account?.auth_method === "owner_token" ? "服务器所有者令牌" : account?.auth_method || "—"}</strong></div>
       </div>}
     </section>
 
@@ -244,7 +244,7 @@ export default function AccountSecurityPage() {
         <form className="form-panel admin-stack-form" onSubmit={(event) => void updatePassword(event)}>
           {!account?.account_configured && <label>首次创建用户名<input value={newUsername} onChange={(event) => setNewUsername(event.target.value)} minLength={3} maxLength={64} required autoComplete="username" /></label>}
           <label>显示名称（选填）<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={120} /></label>
-          <label>当前密码{account?.auth_method === "owner_token" ? "（使用服务器 Token 时可不填）" : ""}
+          <label>当前密码{account?.auth_method === "owner_token" ? "（使用服务器令牌时可不填）" : ""}
             <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)}
               required={Boolean(account?.account_configured && account?.auth_method !== "owner_token")} autoComplete="current-password" /></label>
           <label>新密码<input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} maxLength={128} required autoComplete="new-password" /></label>
@@ -289,7 +289,7 @@ export default function AccountSecurityPage() {
 
     <section className="panel">
       <div className="panel-heading"><div className="panel-title"><LogOut size={17} /><h3>会话控制</h3></div></div>
-      <p className="form-hint">可撤销所有密码登录会话。服务器 Owner Token 由服务器环境配置单独管理，不会因此轮换。</p>
+      <p className="form-hint">可撤销所有密码登录会话。服务器所有者令牌 由服务器环境配置单独管理，不会因此轮换。</p>
       <button className="secondary-button compact" onClick={() => void revokeSessions()} disabled={saving || !token}><LogOut size={14} />注销所有会话</button>
     </section>
 

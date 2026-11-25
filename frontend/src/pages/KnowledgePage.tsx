@@ -155,7 +155,7 @@ export default function KnowledgePage() {
   const publishMemory = async (memory: Memory) => {
     const confirmed = await dialog.confirm({
       title: "发布项目知识",
-      message: `确认发布「${memory.title}」？发布后它会成为可被项目 Agent 使用的知识。`,
+      message: `确认发布「${memory.title}」？发布后它会成为可被项目智能体使用的知识。`,
       confirmText: "确认发布"
     });
     if (!confirmed) return;

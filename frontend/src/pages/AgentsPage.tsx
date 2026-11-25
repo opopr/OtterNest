@@ -140,7 +140,7 @@ export default function AgentsPage() {
   const rotateAgentToken = async (agent: Agent) => {
     if (!(await dialog.confirm({
       title: "重新生成智能体主令牌",
-      message: `确认重新生成并轮换 Agent「${agent.name}」的主令牌？旧令牌将立即失效！`,
+      message: `确认轮换智能体「${agent.name}」的主令牌？旧令牌将立即失效！`,
       confirmText: "确认轮换",
       tone: "warning"
     }))) return;
@@ -281,7 +281,7 @@ export default function AgentsPage() {
       {createdToken && (
         <div className="panel token-panel">
           <div className="token-panel-title"><ShieldCheck size={18} /><strong>智能体 已创建：请立即保存令牌</strong></div>
-          <p>令牌只在创建时返回一次。离开本页或刷新后不会再次显示，请只交给可信 Runner 使用。</p>
+          <p>令牌只在创建时返回一次。离开本页或刷新后不会再次显示，请只交给可信执行节点 使用。</p>
           <div className="token-value"><code>{createdToken}</code><button className="secondary-button compact" onClick={() => void copyToken(createdToken)}><Copy size={15} />复制</button></div>
           <button className="text-button" onClick={() => setCreatedToken("")}>我已安全保存</button>
         </div>
@@ -302,7 +302,7 @@ export default function AgentsPage() {
           <div className="form-grid three">
             <label>智能体 名称<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={120} /></label>
             <label>平台 / 环境<input value={platform} onChange={(event) => setPlatform(event.target.value)} required maxLength={80} /></label>
-            <label>执行方式<select value={executionMode} onChange={(event) => setExecutionMode(event.target.value as Agent["execution_mode"])}><option value="manual">手动</option><option value="polling">轮询 Runner</option><option value="remote">远程接入</option></select></label>
+            <label>执行方式<select value={executionMode} onChange={(event) => setExecutionMode(event.target.value as Agent["execution_mode"])}><option value="manual">手动</option><option value="polling">执行节点轮询</option><option value="remote">远程接入</option></select></label>
           </div>
           <label>能力声明（逗号分隔）<input value={capabilities} onChange={(event) => setCapabilities(event.target.value)} placeholder="python, browser, filesystem" /></label>
           <p className="form-hint">能力声明不等于可信能力。所有者必须独立核验后，智能体 才能被分配要求该能力的任务。</p>
@@ -312,11 +312,11 @@ export default function AgentsPage() {
 
       {editingAgent && (
         <form className="panel form-panel" onSubmit={updateAgent}>
-          <div className="panel-heading"><div className="panel-title"><Edit3 size={17} /><h3>编辑 Agent：{editingAgent.name}</h3></div><button type="button" className="icon-button" onClick={() => setEditingAgent(null)}><X size={17} /></button></div>
+          <div className="panel-heading"><div className="panel-title"><Edit3 size={17} /><h3>编辑智能体：{editingAgent.name}</h3></div><button type="button" className="icon-button" onClick={() => setEditingAgent(null)}><X size={17} /></button></div>
           <div className="form-grid three">
             <label>智能体 名称<input value={editName} onChange={(event) => setEditName(event.target.value)} required maxLength={120} /></label>
             <label>平台 / 环境<input value={editPlatform} onChange={(event) => setEditPlatform(event.target.value)} required maxLength={80} /></label>
-            <label>执行方式<select value={editExecutionMode} onChange={(event) => setEditExecutionMode(event.target.value as Agent["execution_mode"])}><option value="manual">手动</option><option value="polling">轮询 Runner</option><option value="remote">远程接入</option></select></label>
+            <label>执行方式<select value={editExecutionMode} onChange={(event) => setEditExecutionMode(event.target.value as Agent["execution_mode"])}><option value="manual">手动</option><option value="polling">执行节点轮询</option><option value="remote">远程接入</option></select></label>
           </div>
           <label>能力声明（逗号分隔）<input value={editCapabilities} onChange={(event) => setEditCapabilities(event.target.value)} placeholder="python, browser, filesystem" /></label>
           <div className="form-actions flex-row-gap">
@@ -339,8 +339,8 @@ export default function AgentsPage() {
         {loading ? <div className="panel-loading"><div className="spinner" /></div> : visibleAgents.length === 0 ? (
           <div className="panel empty-state">
             {tab === "active" ? <Bot size={30} /> : <Trash2 size={30} />}
-            <strong>{tab === "active" ? "尚未登记 Agent" : "回收站为空"}</strong>
-            <p>{tab === "active" ? "创建一个身份后，再配置项目成员关系与执行环境。" : "已删除的 Agent 会暂存在这里，支持随时恢复或彻底删除。"}</p>
+            <strong>{tab === "active" ? "尚未登记智能体" : "回收站为空"}</strong>
+            <p>{tab === "active" ? "创建一个身份后，再配置项目成员关系与执行环境。" : "已删除的智能体 会暂存在这里，支持随时恢复或彻底删除。"}</p>
           </div>
         ) : visibleAgents.map((agent) => (
           <article className={"panel agent-card " + (selectedAgentId === agent.id ? "agent-card-selected" : "")} key={agent.id}>
@@ -367,7 +367,7 @@ export default function AgentsPage() {
                   <Edit3 size={14} />编辑
                 </button>
                 <button className="secondary-button compact" disabled={saving || !agent.enabled} onClick={() => void rotateAgentToken(agent)} title="重置/重新生成主令牌">
-                  <KeyRound size={14} />重置Token
+                  <KeyRound size={14} />重置令牌
                 </button>
                 {agent.enabled ? (
                   <button className="secondary-button compact" disabled={saving} onClick={() => void disableAgent(agent)} title="停用">
@@ -398,7 +398,7 @@ export default function AgentsPage() {
 
       {selectedAgent && (
         <section className="panel runtime-panel">
-          <div className="panel-heading"><div className="panel-title"><Terminal size={17} /><h3>{selectedAgent.name} · Runtime 与能力治理</h3></div><button className="icon-button" onClick={() => setSelectedAgentId("")}><X size={16} /></button></div>
+          <div className="panel-heading"><div className="panel-title"><Terminal size={17} /><h3>{selectedAgent.name} · 运行实例与能力</h3></div><button className="icon-button" onClick={() => setSelectedAgentId("")}><X size={16} /></button></div>
           <div className="runtime-capability-panel">
             <div><strong>所有者核验能力</strong><p>只可从声明能力中选择。请先在平台外完成实际能力测试。</p></div>
             <label>已核验能力（逗号分隔）<input value={verifiedCapabilities} onChange={(event) => setVerifiedCapabilities(event.target.value)} placeholder="从声明能力中选择" /></label>
@@ -411,7 +411,7 @@ export default function AgentsPage() {
             <div className="runtime-meta"><span>状态：{getUiLabel(runtime.status)}</span><span>最近心跳：{runtime.last_seen ? new Date(runtime.last_seen).toLocaleString("zh-CN", { hour12: false }) : "从未上报"}</span><span>独立凭据：{runtime.has_token ? "已签发" : "未签发"}</span></div>
             {Object.keys(runtime.last_health || {}).length > 0 && <pre className="json-preview">{JSON.stringify(runtime.last_health, null, 2)}</pre>}
             <div className="runtime-actions">{runtime.enabled && <button className="secondary-button compact" disabled={saving} onClick={() => void issueRuntimeToken(runtime)}><KeyRound size={13} />签发 / 轮换凭据</button>}{runtime.enabled && <button className="text-button" disabled={saving} onClick={() => void disableRuntime(runtime)}><XCircle size={13} />禁用 运行实例</button>}</div>
-          </article>)}{!runtimes.length && <div className="empty-mini">尚未登记 运行实例。创建 运行实例 后，Runner 使用独立凭据定期上报心跳。</div>}</div>
+          </article>)}{!runtimes.length && <div className="empty-mini">尚未登记运行实例。执行节点需使用独立凭据上报心跳。</div>}</div>
           {selectedAgent.enabled && <div className="agent-disable-row"><span className="form-hint">停用 智能体 会阻止新分配；它不会自动终止外部机器上的进程。</span><button className="text-button" disabled={saving} onClick={() => void disableAgent(selectedAgent)}><XCircle size={14} />停用整个 智能体</button></div>}
         </section>
       )}

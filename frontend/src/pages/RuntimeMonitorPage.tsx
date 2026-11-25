@@ -62,7 +62,7 @@ export default function RuntimeMonitorPage(){
  },[rows,filter,query]);
 
  const rotateToken=async(row:RuntimeRow)=>{
-  if(!(await dialog.confirm({title:"轮换运行实例凭据",message:"为「"+row.label+"」轮换独立运行实例凭据？旧凭据将立即失效，必须同步更新对应 Runner 的配置。",confirmText:"确认轮换",tone:"warning"})))return;
+  if(!(await dialog.confirm({title:"轮换运行实例凭据",message:"为「"+row.label+"」轮换独立运行实例凭据？旧凭据将立即失效，必须同步更新对应执行节点的配置。",confirmText:"确认轮换",tone:"warning"})))return;
   setSaving(true);setError("");
   try{
    const token=await request<RuntimeToken>("/agents/"+encodeURIComponent(row.agent_id)+"/runtimes/"+encodeURIComponent(row.id)+"/token",{method:"POST"});
@@ -95,7 +95,7 @@ export default function RuntimeMonitorPage(){
   {error&&<div className="inline-error"><AlertCircle size={16}/>{error}<button onClick={()=>setError("")}><X size={14}/></button></div>}
   {issuedToken&&<section className="panel token-panel runtime-token-panel">
    <div className="token-panel-title"><KeyRound size={18}/><strong>运行实例 凭据已签发：请立即保存</strong></div>
-   <p>该令牌只在本次响应中显示一次。旧令牌已立即失效，请同步更新对应 Runner 的密钥配置，不要提交到 Git。</p>
+   <p>该令牌只在本次响应中显示一次。旧令牌已立即失效，请同步更新对应执行节点的密钥配置，不要提交到 Git。</p>
    <div className="token-value"><code>{issuedToken.token}</code><button className="secondary-button compact" onClick={()=>void copyToken()}><Copy size={14}/>复制</button></div>
    <button className="text-button" onClick={()=>setIssuedToken(null)}>我已安全保存</button>
   </section>}

@@ -65,7 +65,7 @@ export default function GoalPlanComposer({projectId,onConfirmed}:Props){
   if(!draft||draft.project_id!==projectId||confirming)return;
   const ok=await dialog.confirm({
    title:"确认创建目标与任务",
-   message:`确认创建这个目标及其 ${draft.proposal.tasks.length} 个任务？确认后会写入 PostgreSQL，但不会自动授权、分配 Agent 或启动执行。`,
+   message:`确认创建这个目标及其 ${draft.proposal.tasks.length} 个任务？确认后会写入 PostgreSQL，但不会自动授权、分配智能体 或启动执行。`,
    confirmText:"确认并创建"
   });
   if(!ok)return;

@@ -156,7 +156,7 @@ export default function TaskCenterPage() {
     const scope = project === "all" ? "全部活动项目" : "当前项目";
     const confirmed = await dialog.confirm({
       title: "执行任务调度",
-      message: `确认对${scope}执行一次任务调度？\n\n只会路由到最近 180 秒内心跳且处于 idle 的 Runtime。调度只设置目标 Agent，不会远程启动进程；Runner 仍需自行轮询并领取任务。`,
+      message: `确认对${scope}执行一次任务调度？\n\n只会分配给最近 180 秒内上报心跳且处于空闲状态的运行实例。调度仅设置目标智能体，不会启动远程进程；执行节点仍需自行轮询并领取任务。`,
       confirmText: "立即调度"
     });
     if (!confirmed) return;
@@ -231,11 +231,11 @@ export default function TaskCenterPage() {
               ))}
             </div>
           ) : (
-            <div className="dispatch-empty">本轮没有任务被路由。请检查 Runner 是否在线且处于 idle、智能体 能力是否已核验，以及任务是否处于待执行状态。</div>
+            <div className="dispatch-empty">本轮未分配任务。请检查执行节点是否在线且空闲、智能体能力是否已核验，以及任务是否待执行。</div>
           )}
           {dispatchNotice.routes.length > 12 && <p className="form-hint">另有 {dispatchNotice.routes.length - 12} 个路由结果未在此处展开，可在任务列表查看。</p>}
           {dispatchNotice.errors.length > 0 && <div className="dispatch-errors">{dispatchNotice.errors.map((item, index) => <p key={index}><AlertCircle size={13} />{item}</p>)}</div>}
-          <p className="dispatch-disclaimer">调度只写入目标 智能体 和审计事件，不会启动远程进程。Runner 通过自己的 运行实例 凭据轮询队列并领取任务。</p>
+          <p className="dispatch-disclaimer">调度只记录目标智能体与审计事件，不会启动远程进程。执行节点使用独立凭据领取任务。</p>
         </section>
       )}
 
