@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
@@ -215,6 +216,11 @@ export default function PortfolioPage() {
             <div className="stat-card"><div className="stat-icon tone-violet"><Bell size={18} /></div><div className="stat-copy"><span>未读通知</span><strong>{unread}</strong><small>其中紧急 {briefing?.unread_urgent_notifications ?? 0} 条</small></div></div>
           </div>
 
+          {metrics && <section className="panel portfolio-distribution"><div className="panel-heading"><div className="panel-title"><Activity size={17}/><h3>任务分布</h3></div><span className="muted-inline">共 {metrics.total_tasks} 项</span></div>
+          {metrics.total_tasks > 0 ? <><div className="portfolio-distribution-bar" role="img" aria-label={`已完成 ${metrics.completed_count}，已阻塞 ${metrics.blocked_count}，其他 ${Math.max(0,metrics.total_tasks-metrics.completed_count-metrics.blocked_count)}`}>
+            <span className="distribution-completed" style={{flexGrow: Math.max(0,metrics.completed_count)}}/><span className="distribution-blocked" style={{flexGrow: Math.max(0,metrics.blocked_count)}}/><span className="distribution-other" style={{flexGrow: Math.max(0,metrics.total_tasks-metrics.completed_count-metrics.blocked_count)}}/>
+          </div><div className="distribution-legend"><Link to="/tasks?status=completed"><i className="distribution-completed"/>已完成 <strong>{metrics.completed_count}</strong></Link><Link to="/tasks?status=blocked"><i className="distribution-blocked"/>已阻塞 <strong>{metrics.blocked_count}</strong></Link><span><i className="distribution-other"/>其他状态 <strong>{Math.max(0,metrics.total_tasks-metrics.completed_count-metrics.blocked_count)}</strong></span></div></> : <div className="empty-mini">暂无任务数据</div>}
+          </section>}
           <div className="portfolio-grid">
             <section className="panel">
               <div className="panel-heading"><div className="panel-title"><Gauge size={17} /><h3>项目运行表现</h3></div><span className="muted-inline">按优先级排序</span></div>
@@ -223,7 +229,7 @@ export default function PortfolioPage() {
                   const project = projects.find((row) => row.id === item.project_id);
                   const rate = item.total_tasks ? item.completed_count / item.total_tasks : 0;
                   return <div className="portfolio-project-row" key={item.project_id}>
-                    <div className="portfolio-project-main"><strong>{project?.name || item.project_id.slice(0, 8)}</strong><small>{item.completed_count}/{item.total_tasks} 项完成 · {item.blocked_count} 项阻塞</small></div>
+                    <div className="portfolio-project-main"><Link className="portfolio-project-link" to={"/projects?project="+encodeURIComponent(item.project_id)}>{project?.name || item.project_id.slice(0, 8)}</Link><small>{item.completed_count}/{item.total_tasks} 项完成 · {item.blocked_count} 项阻塞</small></div>
                     <div className="portfolio-progress"><span style={{ width: Math.round(rate * 100) + "%" }} /></div>
                     <strong className="portfolio-rate">{Math.round(rate * 100)}%</strong>
                   </div>;

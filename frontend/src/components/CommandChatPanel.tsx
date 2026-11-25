@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Bot, CheckCircle2, MessageSquare, RefreshCw, Send, Sparkles, UserRound } from "lucide-react";
 import { request } from "../api/client";
 import type { Task } from "../api/types";
@@ -50,10 +50,18 @@ interface PlannerStatus { enabled: boolean; model: string | null; }
 
 export default function CommandChatPanel({ projectId, tasks, onPlan }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const transcriptRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const activeRequest = useRef(0);
+  const [nearBottom, setNearBottom] = useState(true);
+  const scrollLatest = () => { const el = transcriptRef.current; if (el) el.scrollTop = el.scrollHeight; setNearBottom(true); };
+
   const [history, setHistory] = useState<ChatTurn[]>([]);
   const [text, setText] = useState("");
   const [focusTaskId, setFocusTaskId] = useState("");
   const [sending, setSending] = useState(false);
+  useEffect(() => { if (nearBottom) { const el = transcriptRef.current; if (el) el.scrollTop = el.scrollHeight; } }, [messages,sending,nearBottom]);
+  useEffect(() => () => { activeRequest.current += 1; }, [projectId]);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"template" | "model">("template");
   const [plannerStatus, setPlannerStatus] = useState<PlannerStatus>({ enabled: false, model: null });
@@ -72,12 +80,16 @@ export default function CommandChatPanel({ projectId, tasks, onPlan }: Props) {
     setFocusTaskId("");
     setText("");
     setError("");
+    setSending(false);
+    setNearBottom(true);
   }, [projectId]);
 
   const send = async (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
     const utterance = text.trim();
     if (!utterance || !projectId || sending) return;
+    const requestId = ++activeRequest.current;
+    setNearBottom(true);
     const userTurn: ChatTurn = { role: "user", text: utterance, ...(focusTaskId ? { task_id: focusTaskId } : {}) };
     const nextHistory = [...history, userTurn].slice(-20);
     const userMessage: ChatMessage = { ...userTurn, id: "user-" + Date.now() };
@@ -97,6 +109,7 @@ export default function CommandChatPanel({ projectId, tasks, onPlan }: Props) {
           mode
         })
       });
+      if (activeRequest.current !== requestId) return;
       const assistantTurn: ChatTurn = {
         role: "assistant",
         text: response.reply,
@@ -114,12 +127,13 @@ export default function CommandChatPanel({ projectId, tasks, onPlan }: Props) {
       if (response.focus_task_id) setFocusTaskId(response.focus_task_id);
       if (response.plan) onPlan(response.plan);
     } catch (reason) {
+      if (activeRequest.current !== requestId) return;
       const message = reason instanceof Error ? reason.message : "指挥中心请求失败";
       setError(message);
       const assistantTurn: ChatTurn = { role: "assistant", text: "请求未完成：" + message };
       setMessages((current) => [...current, { ...assistantTurn, id: "error-" + Date.now(), status: "error" }]);
       setHistory([...nextHistory, assistantTurn].slice(-20));
-    } finally { setSending(false); }
+    } finally { if (activeRequest.current === requestId) setSending(false); }
   };
 
   const clear = () => {
@@ -130,9 +144,13 @@ export default function CommandChatPanel({ projectId, tasks, onPlan }: Props) {
     setError("");
   };
 
-  const chooseCandidate = (candidate: NonNullable<ChatMessage["candidates"]>[number]) => {
+  const chooseCandidate = (candidate: NonNullable<ChatMessage["candidates"]>[number], messageId: string) => {
+    if (sending) return;
     setFocusTaskId(candidate.id);
-    setText("为什么任务被阻塞？");
+    const position = messages.findIndex(message => message.id === messageId);
+    const original = messages.slice(0,position).reverse().find(message=>message.role==="user");
+    setText(current=>current.trim() ? current : original?.text || "");
+    composerRef.current?.focus();
   };
 
   return (
@@ -143,22 +161,23 @@ export default function CommandChatPanel({ projectId, tasks, onPlan }: Props) {
         <label>关联任务<select value={focusTaskId} onChange={(event) => setFocusTaskId(event.target.value)}><option value="">自动识别</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title} · {statusLabel[task.status] || task.status}</option>)}</select></label>
         <span className="muted-inline">{mode === "model" ? "模型将接收当前项目任务摘要、智能体名称及最近 20 轮对话" : "本地解析，不发送项目内容至外部模型"}</span>
       </div>
-      <div className="command-chat-transcript">
+      <div className="command-chat-transcript" ref={transcriptRef} role="log" aria-label="项目对话记录" onScroll={event=>{const el=event.currentTarget;setNearBottom(el.scrollHeight-el.scrollTop-el.clientHeight<64);}}>
         {!messages.length && <div className="chat-welcome"><div className="chat-welcome-icon"><Sparkles size={21} /></div><strong>输入指令或选择任务</strong><div className="chat-suggestions"><button onClick={() => setText("查看项目状态和指标")}>查看项目状态</button><button onClick={() => setText("为什么任务被阻塞？")}>查看阻塞原因</button><button onClick={() => setText("请批准它")}>批准当前任务</button></div></div>}
         {messages.map((message) => <article className={"chat-message " + (message.role === "user" ? "from-user" : "from-assistant")} key={message.id}>
           <div className="chat-message-avatar">{message.role === "user" ? <UserRound size={15} /> : <Bot size={15} />}</div>
           <div className="chat-message-body"><div className="chat-message-meta"><strong>{message.role === "user" ? "你" : "智能助手"}</strong>{message.status === "plan_ready" && <span className="status-tag tag-green">已生成预览</span>}{message.status === "needs_clarification" && <span className="status-tag tag-amber">需要澄清</span>}</div>
             <p>{message.text}</p>
-            {message.candidates && message.candidates.length > 0 && <div className="chat-candidates"><small>请选择任务：</small>{message.candidates.map((candidate) => <button key={candidate.id} onClick={() => chooseCandidate(candidate)}><span><strong>{candidate.title}</strong><small>{statusLabel[candidate.status] || getUiLabel(candidate.status)} · {candidate.risk}</small></span><CheckCircle2 size={15} /></button>)}</div>}
+            {message.candidates && message.candidates.length > 0 && <div className="chat-candidates"><small>请选择任务：</small>{message.candidates.map((candidate) => <button key={candidate.id} disabled={sending} onClick={() => chooseCandidate(candidate,message.id)}><span><strong>{candidate.title}</strong><small>{statusLabel[candidate.status] || getUiLabel(candidate.status)} · {candidate.risk}</small></span><CheckCircle2 size={15} /></button>)}</div>}
             <A2UIRenderer value={message.a2ui} />
           </div>
         </article>)}
         {sending && <div className="chat-typing"><span className="spinner" />正在分析…</div>}
       </div>
+      {!nearBottom && <button type="button" className="secondary-button compact chat-scroll-latest" onClick={scrollLatest}>跳到最新消息</button>}
       {error && <div className="inline-error"><span>{error}</span></div>}
       <form className="command-chat-composer" onSubmit={(event) => void send(event)}>
-        <textarea rows={2} value={text} onChange={(event) => setText(event.target.value)} maxLength={3500} aria-label="输入指令" placeholder="输入项目问题或任务指令…" />
-        <div className="command-chat-composer-foot"><span>{mode === "model" ? "模型建议 · 操作须确认" : "本地解析 · 操作须确认"}</span><button className="primary-button compact" disabled={sending || !text.trim()}><Send size={14} />发送</button></div>
+        <textarea ref={composerRef} rows={3} value={text} onChange={(event) => setText(event.target.value)} maxLength={3500} onKeyDown={event=>{if ((event.ctrlKey || event.metaKey) && event.key==="Enter" && !event.nativeEvent.isComposing) {event.preventDefault();void send();}}} aria-label="输入指令" placeholder="输入项目问题或任务指令…" />
+        <div className="command-chat-composer-foot"><span>操作须确认 · <span className="chat-send-shortcut">Ctrl + Enter 发送</span></span><button className="primary-button compact" disabled={sending || !text.trim()}><Send size={14} />发送</button></div>
       </form>
     </section>
   );

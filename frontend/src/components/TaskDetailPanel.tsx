@@ -44,7 +44,7 @@ const statusTones: Record<string,string> = {
 };
 const eventLabels: Record<string,string> = {
   "task.created":"任务创建", "task.routed":"分配目标智能体",
-  "task.authorized":"任务已授权", "task.claimed":"智能体 已领取",
+  "task.authorized":"任务已授权", "task.claimed":"智能体已领取",
   "task.submitted":"提交执行结果", "task.accepted":"验收通过",
   "task.changes_requested":"验收要求修改", "task.blocked":"任务阻塞",
   "task.unblocked":"解除阻塞", "task.cancelled":"任务取消",
@@ -227,6 +227,8 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
     }
   };
 
+  const [dependencyView, setDependencyView] = useState<"all"|"waiting">("all");
+  const visibleUpstream = dependencyView === "waiting" ? upstream.filter(row=>row.status!=="completed") : upstream;
   const taskNode = (row:Task,role:"upstream"|"downstream") => (
     <div className="dag-task" key={row.id}>
       <div className="dag-task-title"><strong>{row.title}</strong><span className={"status-tag "+(statusTones[row.status]||"tag-neutral")}>{statusLabels[row.status]||row.status}</span></div>
@@ -283,8 +285,8 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
 
         <details className="task-detail-disclosure" open><summary>任务依赖关系</summary><section className="task-detail-section task-detail-wide">
           <div className="task-detail-section-head"><div><h3><GitBranch size={16}/>依赖图</h3><p>箭头方向表示执行顺序：上游依赖 → 当前任务 → 下游任务。</p></div><span className={"status-tag "+(dependencyInfo?.satisfied?"tag-green":"tag-amber")}>{dependencyInfo?.satisfied?"上游依赖已满足":"仍有依赖未满足"}</span></div>
-          <div className="dag-layout">
-            <div className="dag-column"><span className="dag-column-label">上游依赖 · {upstream.length}</span>{upstream.length?upstream.map(row=>taskNode(row,"upstream")):<div className="dag-empty">无上游依赖</div>}</div>
+          <div className="approval-switch dependency-switch" role="group" aria-label="上游依赖筛选"><button type="button" aria-pressed={dependencyView==="all"} className={dependencyView==="all"?"selected":""} onClick={()=>setDependencyView("all")}>全部依赖 <span>{upstream.length}</span></button><button type="button" aria-pressed={dependencyView==="waiting"} className={dependencyView==="waiting"?"selected":""} onClick={()=>setDependencyView("waiting")}>未完成 <span>{upstream.filter(row=>row.status!=="completed").length}</span></button></div><div className="dag-layout">
+            <div className="dag-column"><span className="dag-column-label">上游依赖 · {upstream.length}</span>{visibleUpstream.length?visibleUpstream.map(row=>taskNode(row,"upstream")):<div className="dag-empty">{dependencyView==="waiting"?"无未完成上游任务":"无上游依赖"}</div>}</div>
             <div className="dag-arrow"><ArrowRight size={19}/></div>
             <div className="dag-current"><span className="dag-column-label">当前任务</span><div className="dag-task dag-task-current"><div className="dag-task-title"><strong>{task.title}</strong><span className={"status-tag "+(statusTones[task.status]||"tag-neutral")}>{statusLabels[task.status]||task.status}</span></div><small>{task.risk} · 版本 {task.version}</small><code>{shortId(task.id)}</code></div></div>
             <div className="dag-arrow"><ArrowRight size={19}/></div>

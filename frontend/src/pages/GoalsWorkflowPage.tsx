@@ -1,3 +1,5 @@
+import { dependencyLayers } from "../utils/dependencyLayers";
+import ListPagination, { useListPage } from "../components/ListPagination";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertCircle, ArrowUp, GitBranch, ListChecks, Pencil, Plus, RefreshCw,
@@ -66,6 +68,9 @@ export default function GoalsWorkflowPage() {
   const [board, setBoard] = useState<GoalBoard | null>(null);
   const [rules, setRules] = useState<WorkflowRule[]>([]);
   const [runs, setRuns] = useState<WorkflowRun[]>([]);
+  const [runFilter, setRunFilter] = useState("all");
+  const runPage = useListPage(runs.filter(run => runFilter === "all" || run.status === runFilter), JSON.stringify([selectedId,runFilter]));
+  const goalGraph = useMemo(() => dependencyLayers(board?.goals || []), [board]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -335,13 +340,18 @@ export default function GoalsWorkflowPage() {
             <label>成功标准<textarea rows={3} value={editGoalCriteria} onChange={(e) => setEditGoalCriteria(e.target.value)} required maxLength={5000} /></label>
             <div className="form-actions"><button type="button" className="secondary-button compact" onClick={() => setEditingGoal(null)}>取消</button><button className="primary-button compact" disabled={saving}>保存修改</button></div>
           </form>}
+          {Boolean(board?.goals.length) && <section className="goal-layer-board" aria-label="目标依赖概览">
+            <div className="goal-layer-heading"><strong>目标依赖顺序</strong><span className="muted-inline">按前置依赖分层，不代表执行状态</span></div>
+            <div className="goal-layer-grid">{goalGraph.layers.map((layer,index) => <div className="goal-layer" key={index}><span className="goal-layer-label">第 {index+1} 层</span>{layer.map(goal => <button type="button" key={goal.id} className="goal-layer-node" onClick={() => document.getElementById("goal-card-" + goal.id)?.scrollIntoView({block:"nearest"})}><strong>{goal.title}</strong><span className={"status-tag " + (goal.status === "completed" ? "tag-green" : !goal.dependencies_satisfied ? "tag-amber" : "tag-neutral")}>{goal.status === "completed" ? "已完成" : !goal.dependencies_satisfied ? "等待前置目标" : goalStatus[goal.status] || goal.status}</span></button>)}</div>)}</div>
+            {goalGraph.unresolved.length > 0 && <div className="inline-error">无法确定依赖顺序：{goalGraph.unresolved.map(goal=>goal.title).join("、")}</div>}
+          </section>}
           <div className="goal-board">
             {(board?.goals || []).map((goal, index) => {
               const predecessorOptions = (board?.goals || []).filter((item) => item.id !== goal.id && !goal.depends_on.some((edge) => edge.id === item.id));
               const progress = goal.task_count ? Math.round(goal.completed_task_count / goal.task_count * 100) : 0;
-              return <article className="goal-card" key={goal.id}>
+              return <article className="goal-card" id={"goal-card-" + goal.id} key={goal.id}>
                 <div className="goal-card-top"><span className="goal-number">{String(index + 1).padStart(2, "0")}</span><span className={"status-tag " + (goal.status === "completed" ? "tag-green" : goal.status === "paused" ? "tag-neutral" : "tag-blue")}>{goalStatus[goal.status] || goal.status}</span></div>
-                <h3>{goal.title}</h3><p>{goal.success_criteria}</p>
+                <h3>{goal.title}</h3><details className="library-disclosure"><summary>成功标准</summary><p>{goal.success_criteria}</p></details>
                 <div className="goal-progress-label"><span>关联任务 {goal.completed_task_count}/{goal.task_count}</span><strong>{progress}%</strong></div><div className="progress-track"><span style={{ width: progress + "%" }} /></div>
                 <div className="goal-dependencies"><strong>前置目标</strong>{goal.depends_on.map((dependency) => <div className="goal-dependency" key={dependency.id}><ArrowUp size={13} /><span>{dependency.title}</span><span className={"status-tag " + (dependency.status === "completed" ? "tag-green" : "tag-neutral")}>{goalStatus[dependency.status] || dependency.status}</span><button className="icon-button" title="移除依赖" onClick={() => void removeDependency(goal, dependency.id)}><X size={14} /></button></div>)}{!goal.depends_on.length && <small>无前置目标</small>}
                   {goal.status !== "completed" && predecessorOptions.length > 0 && <div className="dependency-add"><select value={dependencySelections[goal.id] || ""} onChange={(event) => setDependencySelections((current) => ({ ...current, [goal.id]: event.target.value }))}><option value="">选择前置目标…</option>{predecessorOptions.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><button className="secondary-button compact" disabled={!dependencySelections[goal.id] || saving} onClick={() => void addDependency(goal)}>添加</button></div>}
@@ -379,7 +389,7 @@ export default function GoalsWorkflowPage() {
           </section>
           <section className="panel">
             <div className="panel-heading"><div className="panel-title"><ListChecks size={17} /><h3>工作流运行记录</h3></div><span className="muted-inline">最近 50 条</span></div>
-            <div className="workflow-run-list">{runs.map((run) => <div className="workflow-run-row" key={run.id}><span className={"status-tag " + (run.status === "executed" ? "tag-green" : run.status === "failed" ? "tag-red" : "tag-neutral")}>{runStatus[run.status] || run.status}</span><div><strong>{run.detail || "事件规则执行"}</strong><small>事件 #{run.event_id} · 链深度 {run.chain_depth} · {new Date(run.created_at).toLocaleString("zh-CN", { hour12: false })}</small></div><span className="muted-inline">{run.created_task_id ? "任务已创建" : ""}</span></div>)}{!runs.length && <div className="empty-mini">暂无工作流运行记录</div>}</div>
+            <div className="approval-switch" role="group" aria-label="工作流运行状态">{[{key:"all",label:"全部"},{key:"executed",label:"已执行"},{key:"skipped",label:"已跳过"},{key:"failed",label:"失败"}].map(item=><button type="button" key={item.key} aria-pressed={runFilter===item.key} className={runFilter===item.key?"selected":""} onClick={()=>setRunFilter(item.key)}>{item.label}</button>)}</div><div className="workflow-run-list">{runPage.rows.map((run) => <div className="workflow-run-row" key={run.id}><span className={"status-tag " + (run.status === "executed" ? "tag-green" : run.status === "failed" ? "tag-red" : "tag-neutral")}>{runStatus[run.status] || run.status}</span><div><strong>{run.detail || "事件规则执行"}</strong><small>事件 #{run.event_id} · 链深度 {run.chain_depth} · {new Date(run.created_at).toLocaleString("zh-CN", { hour12: false })}</small></div><span className="muted-inline">{run.created_task_id ? "任务已创建" : ""}</span></div>)}{!runPage.total && <div className="empty-mini">暂无符合条件的运行记录</div>}</div><ListPagination {...runPage} label="工作流分页"/>
           </section>
         </div>
       )}

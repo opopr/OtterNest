@@ -553,7 +553,7 @@ export default function GovernancePage() {
           <div className="command-safety-note"><ShieldCheck size={16} /><span>命令只会生成预览。你仍需在预览弹窗中检查任务、操作、版本和风险，再点击确认执行。</span></div>
         </section>
       ) : (
-        <CommandChatPanel projectId={selectedId} tasks={tasks} onPlan={setPlan} />
+        <CommandChatPanel key={selectedId} projectId={selectedId} tasks={tasks} onPlan={setPlan} />
       )}
 
       {plan && <div className="modal-backdrop"><section className="panel command-preview">

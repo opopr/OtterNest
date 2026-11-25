@@ -56,6 +56,9 @@ def seed():
             "password": PASSWORD, "display_name": "测试管理员",
         })
         project = post("/projects", {"name": "界面验收项目"})
+        goal1 = post(f"/projects/{project['id']}/goals", {"title": "前置验收目标", "success_criteria": "确认基础界面", "priority": 50})
+        goal2 = post(f"/projects/{project['id']}/goals", {"title": "后续验收目标", "success_criteria": "确认后续流程", "priority": 50})
+        post(f"/goals/{goal2['id']}/dependencies", {"predecessor_id": goal1["id"]})
         agent = post("/agents", {
             "name": "测试智能体", "platform": "local",
             "execution_mode": "manual", "capabilities": ["python"],
@@ -264,6 +267,26 @@ def react_checks(browser, name, width, height, problems):
         expect(page.get_by_label("搜索通知", exact=True)).to_have_value("")
         expect(page.get_by_label("通知所属项目", exact=True)).to_have_value("all")
         check_width(page, f"{name}-notification-filter", problems)
+
+        visit(page, "/goals-workflows", "项目与任务", "目标与工作流", mobile)
+        goal_graph = page.get_by_role("region", name="目标依赖概览")
+        expect(goal_graph.locator(".goal-layer").nth(0)).to_contain_text("前置验收目标")
+        expect(goal_graph.locator(".goal-layer").nth(1)).to_contain_text("后续验收目标")
+        expect(goal_graph.locator(".goal-layer").nth(1)).to_contain_text("等待前置目标")
+        check_width(page, f"{name}-goal-layers", problems)
+        screenshot(page, f"{name}-goal-layers")
+        page.get_by_role("button", name="工作流规则", exact=False).click()
+        page.get_by_role("group", name="工作流运行状态").get_by_role("button", name="失败", exact=True).click()
+        expect(page.get_by_text("暂无符合条件的运行记录", exact=True)).to_be_visible()
+        visit(page, "/portfolio", None, "运营分析", mobile)
+        expect(page.locator(".portfolio-distribution-bar")).to_be_visible()
+        page.locator(".distribution-legend").get_by_role("link", name="已阻塞", exact=False).click()
+        expect(page.get_by_label("状态", exact=True)).to_have_value("blocked")
+        visit(page, "/command", None, "智能指挥中心", mobile)
+        page.get_by_label("输入指令", exact=True).fill("查看项目状态")
+        expect(page.get_by_role("log", name="项目对话记录")).to_be_visible()
+        expect(page.get_by_role("button", name="发送", exact=True)).to_be_enabled()
+        check_width(page, f"{name}-command-composer", problems)
 
         bell = page.get_by_role("button", name="通知收件箱")
         bell.click()
