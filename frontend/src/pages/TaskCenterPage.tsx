@@ -51,6 +51,10 @@ export default function TaskCenterPage() {
   const [status, setStatus] = useState(() => Object.prototype.hasOwnProperty.call(labels, searchParams.get("status") || "") ? searchParams.get("status")! : "all");
   const [risk, setRisk] = useState("all");
   const [query, setQuery] = useState(searchParams.get("q") || "");
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
+  const [compactRows, setCompactRows] = useState(false);
+  useEffect(() => { setPageIndex(0); }, [project, status, risk, query, pageSize]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dispatching, setDispatching] = useState(false);
@@ -100,6 +104,9 @@ export default function TaskCenterPage() {
       });
   }, [tasks, project, status, risk, query]);
 
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const currentPage = Math.min(pageIndex, totalPages - 1);
+  const pageRows = rows.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
   const counts = {
     all: tasks.length,
     approval: tasks.filter((t) => t.status === "waiting_approval").length,
@@ -270,12 +277,12 @@ export default function TaskCenterPage() {
           <label>风险等级<select aria-label="风险等级" value={risk} onChange={(e) => setRisk(e.target.value)}><option value="all">全部等级</option>{Object.entries(risks).map(([k, v]) => <option key={k} value={k}>{k} · {v}</option>)}</select></label>
           <label>关键词<input aria-label="关键词" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="任务名称、项目或 ID" /></label>
         </div>
-        <div className="panel-heading task-results-heading"><div className="panel-title"><ClipboardCheck size={17}/><h3>任务列表</h3></div><span className="muted-inline">{rows.length} 条结果</span></div>
+        <div className="panel-heading task-results-heading"><div className="panel-title"><ClipboardCheck size={17}/><h3>任务列表</h3></div><div className="heading-actions"><span className="muted-inline">{rows.length} 条结果</span><button type="button" className="secondary-button compact" aria-pressed={compactRows} onClick={() => setCompactRows(v => !v)}>{compactRows ? "展开摘要" : "紧凑显示"}</button></div></div>
         {loading ? (
           <div className="panel-loading"><span className="spinner" />正在汇总项目任务…</div>
         ) : rows.length ? (
           <div className="task-center-list">
-            {rows.map((t) => (
+            {pageRows.map((t) => (
               <article className="task-center-row" key={t.id}>
                 <div className="task-center-main">
                   <div className="task-center-title">
@@ -284,8 +291,8 @@ export default function TaskCenterPage() {
                     <span className="status-tag tag-neutral">{t.risk}</span>
                   </div>
                   <p>{t.project_name} · 优先级 {t.priority} · {getUiLabel(t.sensitivity)}</p>
-                  <small>{t.result_summary || t.failure_reason || t.instruction}</small>
-                  <small>任务 ID：{t.id}</small>
+                  {!compactRows && <small className="task-result-excerpt">{t.failure_reason || t.result_summary || t.instruction}</small>}
+                  <details className="task-row-identifier"><summary>任务编号</summary><code>{t.id}</code></details>
                 </div>
                 <div className="task-center-actions">
                   <button className="secondary-button compact" onClick={() => setDetailSelection({ id: t.id, projectId: t.project_id, projectName: t.project_name })}><Eye size={14} />详情</button>
@@ -301,8 +308,9 @@ export default function TaskCenterPage() {
             ))}
           </div>
         ) : (
-          <div className="empty-state"><ClipboardCheck size={24} /><strong>没有符合条件的任务</strong><p>调整筛选条件，或先在项目中创建任务。</p></div>
+          <div className="empty-state"><ClipboardCheck size={24} /><strong>没有符合条件的任务</strong></div>
         )}
+        {!loading && rows.length > 0 && <div className="task-pagination" aria-label="任务分页"><span>第 {currentPage * pageSize + 1}–{Math.min((currentPage + 1) * pageSize, rows.length)} 条，共 {rows.length} 条</span><div><label>每页 <select aria-label="每页任务数" value={pageSize} onChange={e => setPageSize(Number(e.target.value))}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option></select></label><button type="button" className="secondary-button compact" disabled={currentPage === 0} onClick={() => setPageIndex(currentPage - 1)}>上一页</button><span>{currentPage + 1}/{totalPages}</span><button type="button" className="secondary-button compact" disabled={currentPage + 1 >= totalPages} onClick={() => setPageIndex(currentPage + 1)}>下一页</button></div></div>}
       </section>
 
       {detailSelection && <TaskDetailPanel selection={detailSelection} isOwner={user?.kind === "owner"} onClose={() => setDetailSelection(null)} onChanged={() => void load()} />}

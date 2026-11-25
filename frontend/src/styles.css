@@ -1422,3 +1422,18 @@ input, textarea, select { accent-color: var(--accent); }
 @media(max-width:1100px){.page-search-trigger kbd{display:none}}
 @media(max-width:820px){.page-search-trigger span{display:none}.page-search-trigger{min-width:36px;justify-content:center;padding:6px}.page-search-dialog{max-height:calc(100dvh - 32px)}}
 @media(max-width:580px){.agent-filter-bar{gap:8px}.agent-search-field{flex:1 1 100%}.agent-filter-bar select{flex:1}.agent-card-head>.status-tag{flex-shrink:0}.agent-card-identity{flex-basis:160px}.page-search-dialog{padding:14px}}
+
+/* Searchable project workspaces and compact task result lists. */
+.project-status-filter{width:100%;min-width:0;max-width:100%;margin-bottom:10px}
+.project-content-filter{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);min-width:0}
+.project-content-filter input,.project-content-filter select,.task-pagination select{min-width:0;max-width:100%;min-height:36px;border:1px solid var(--border-strong);border-radius:8px;padding:7px 9px;background:var(--surface);color:var(--text);font-size:13px}
+.project-content-filter input{flex:1 1 150px}
+.project-content-filter select{flex:0 1 136px}
+.task-result-excerpt{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
+.task-row-identifier{font-size:12px;color:var(--muted);min-width:0}
+.task-row-identifier summary{cursor:pointer;width:max-content;max-width:100%}
+.task-row-identifier code{overflow-wrap:anywhere;white-space:normal}
+.task-pagination{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--border);padding-top:12px;font-size:12px;color:var(--muted)}
+.task-pagination>div,.task-pagination label{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.task-pagination button{min-height:34px}
+@media(max-width:580px){.project-content-filter input{flex:1 1 100%}.project-content-filter select{flex:1 1 120px}.task-pagination>div{gap:6px}.task-pagination button{padding:6px 8px}}
