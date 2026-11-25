@@ -41,9 +41,9 @@ export const NAVIGATION_GROUPS: NavGroup[] = [
   },
   {
     id: "command",
-    label: "AI 指挥中心",
+    label: "智能指挥中心",
     icon: "command",
-    items: [{ to: "/command", label: "AI 指挥中心", icon: "command" }]
+    items: [{ to: "/command", label: "智能指挥中心", icon: "command" }]
   },
   {
     id: "projects",
@@ -58,11 +58,11 @@ export const NAVIGATION_GROUPS: NavGroup[] = [
   },
   {
     id: "agents",
-    label: "Agent 与接入",
+    label: "智能体与接入",
     icon: "agents",
     items: [
-      { to: "/agents", label: "Agent 管理", icon: "agents" },
-      { to: "/runtimes", label: "Runtime 监控", icon: "runtimes" },
+      { to: "/agents", label: "智能体管理", icon: "agents" },
+      { to: "/runtimes", label: "运行监控", icon: "runtimes" },
       { to: "/interfaces", label: "外部接口", icon: "interfaces" }
     ]
   },
@@ -72,7 +72,7 @@ export const NAVIGATION_GROUPS: NavGroup[] = [
     icon: "knowledge",
     items: [
       { to: "/knowledge", label: "知识库", icon: "knowledge" },
-      { to: "/skills", label: "Skills 管理", icon: "skills" },
+      { to: "/skills", label: "技能管理", icon: "skills" },
       { to: "/artifacts", label: "成果中心", icon: "artifacts" }
     ]
   },
@@ -90,7 +90,7 @@ export const NAVIGATION_GROUPS: NavGroup[] = [
     id: "portfolio",
     label: "运营分析",
     icon: "portfolio",
-    items: [{ to: "/portfolio", label: "Portfolio", icon: "portfolio" }]
+    items: [{ to: "/portfolio", label: "运营分析", icon: "portfolio" }]
   },
   {
     id: "system",

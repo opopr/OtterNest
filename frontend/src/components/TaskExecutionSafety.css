@@ -2,30 +2,30 @@
 .safety-ops-section { display: grid; gap: 10px; }
 .safety-ops-section .task-detail-section-head { margin-bottom: 0; }
 .safety-ops-section .task-detail-section-head h3 { margin: 0 0 5px; }
-.safety-ops-section .success-notice { font-size: 10px; }
-.safety-warning { display: flex; align-items: flex-start; gap: 7px; margin: 0; padding: 10px; border: 1px solid #f1e0be; border-radius: 9px; background: #fffbef; color: #946c2d; font-size: 10px; line-height: 1.65; overflow-wrap: anywhere; }
+.safety-ops-section .success-notice { font-size: 12px; }
+.safety-warning { display: flex; align-items: flex-start; gap: 7px; margin: 0; padding: 10px; border: 1px solid #f1e0be; border-radius: 9px; background: #fffbef; color: #946c2d; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
 .safety-warning svg { flex: 0 0 auto; }
 .safety-items { display: grid; gap: 10px; }
-.safety-item { display: grid; gap: 10px; padding: 12px; border: 1px solid #eceef5; border-radius: 10px; background: #fbfcff; }
+.safety-item { display: grid; gap: 10px; padding: 12px; border: 1px solid #f8f1e7; border-radius: 10px; background: #fffaf5; }
 .safety-item-head { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
 .safety-item-head > div:first-child { display: grid; gap: 5px; min-width: 0; }
-.safety-item-head strong { color: #4b526f; font-size: 11px; }
-.safety-item-head code, .safety-item-head small { color: #969cb0; font-size: 9px; overflow-wrap: anywhere; }
+.safety-item-head strong { color: #294e4c; font-size: 13px; }
+.safety-item-head code, .safety-item-head small { color: #6e827d; font-size: 11px; overflow-wrap: anywhere; }
 .safety-item .status-tag { flex: 0 0 auto; }
-.safety-item > p { margin: 0; color: #737b92; font-size: 10px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
-.safety-item > small { color: #9a9faf; font-size: 9px; }
+.safety-item > p { margin: 0; color: #57706e; font-size: 12px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.safety-item > small { color: #6e827d; font-size: 11px; }
 .safety-item .secondary-button { justify-self: start; }
-.safety-form { display: grid; gap: 12px; padding: 13px; border: 1px solid #e8e6fb; border-radius: 10px; background: #fafaff; }
-.safety-form > strong { color: #565c78; font-size: 11px; }
-.safety-form p { margin: 0; color: #7c819c; font-size: 10px; line-height: 1.6; }
-.safety-form label { display: grid; gap: 6px; color: #69718a; font-size: 10px; font-weight: 650; }
-.safety-form input, .safety-form textarea, .safety-form select { display: block; width: 100%; padding: 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: #fff; color: #474e68; font-size: 11px; }
+.safety-form { display: grid; gap: 12px; padding: 13px; border: 1px solid #f8f1e7; border-radius: 10px; background: #fffaf5; }
+.safety-form > strong { color: #57706e; font-size: 13px; }
+.safety-form p { margin: 0; color: #57706e; font-size: 12px; line-height: 1.6; }
+.safety-form label { display: grid; gap: 6px; color: #57706e; font-size: 12px; font-weight: 650; }
+.safety-form input, .safety-form textarea, .safety-form select { display: block; width: 100%; padding: 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: #fff; color: #294e4c; font-size: 13px; }
 .safety-form textarea { resize: vertical; }
 .safety-form .primary-button, .safety-form .secondary-button { justify-self: start; }
 .safety-form .form-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .safety-delegation-meta { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; padding: 11px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
-.safety-delegation-meta span { color: #737b93; font-size: 10px; line-height: 1.5; min-width: 0; overflow-wrap: anywhere; }
-.safety-delegation-meta code { font-size: 10px; }
+.safety-delegation-meta span { color: #57706e; font-size: 12px; line-height: 1.5; min-width: 0; overflow-wrap: anywhere; }
+.safety-delegation-meta code { font-size: 12px; }
 .safety-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .safety-ops-section .form-hint { margin: 5px 0 0; }
 .safety-inline-link { color: var(--accent-deep); text-decoration: underline; }

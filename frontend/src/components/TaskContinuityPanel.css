@@ -1,34 +1,34 @@
 
 .continuity-section { display: grid; gap: 12px; }
 .continuity-section .task-detail-section-head { margin-bottom: 0; }
-.continuity-section .success-notice { font-size: 10px; }
+.continuity-section .success-notice { font-size: 12px; }
 .continuity-checkpoint-list { display: grid; gap: 10px; }
-.continuity-checkpoint { display: grid; gap: 8px; padding: 12px; border: 1px solid #eceef5; border-radius: 10px; background: #fcfcff; }
+.continuity-checkpoint { display: grid; gap: 8px; padding: 12px; border: 1px solid #f8f1e7; border-radius: 10px; background: #fffaf5; }
 .continuity-checkpoint-title { display: flex; align-items: start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.continuity-checkpoint-title strong { font-size: 11px; color: #4b536e; }
-.continuity-checkpoint p { margin: 0; font-size: 10px; line-height: 1.7; color: #747c96; white-space: pre-wrap; overflow-wrap: anywhere; }
-.continuity-checkpoint small { font-size: 9px; color: #959cb0; }
+.continuity-checkpoint-title strong { font-size: 13px; color: #294e4c; }
+.continuity-checkpoint p { margin: 0; font-size: 12px; line-height: 1.7; color: #57706e; white-space: pre-wrap; overflow-wrap: anywhere; }
+.continuity-checkpoint small { font-size: 11px; color: #6e827d; }
 .continuity-checkpoint > button { justify-self: start; }
-.continuity-form { display: grid; gap: 11px; padding: 14px; border: 1px solid #e8e5fa; border-radius: 10px; background: #fafaff; }
-.continuity-form strong { font-size: 11px; color: #4f5574; }
-.continuity-form > label:not(.continuity-checkbox) { display: grid; gap: 6px; color: #69718a; font-size: 10px; font-weight: 650; }
-.continuity-form textarea, .continuity-form select { display: block; width: 100%; padding: 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: #fff; color: #515a74; font-size: 11px; }
+.continuity-form { display: grid; gap: 11px; padding: 14px; border: 1px solid #f8f1e7; border-radius: 10px; background: #fffaf5; }
+.continuity-form strong { font-size: 13px; color: #57706e; }
+.continuity-form > label:not(.continuity-checkbox) { display: grid; gap: 6px; color: #57706e; font-size: 12px; font-weight: 650; }
+.continuity-form textarea, .continuity-form select { display: block; width: 100%; padding: 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: #fff; color: #57706e; font-size: 13px; }
 .continuity-form textarea { resize: vertical; }
 .continuity-form .form-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .continuity-form > button { justify-self: start; }
-.continuity-operations { display: grid; gap: 10px; padding: 13px; border: 1px solid var(--border); border-radius: 10px; background: #fcfcff; }
-.continuity-ops-heading { display: flex; align-items: center; gap: 8px; color: #6f68d0; }
-.continuity-ops-heading strong { color: #515977; font-size: 11px; }
-.continuity-operations > p { margin: 0; color: #7d849a; font-size: 10px; line-height: 1.7; }
+.continuity-operations { display: grid; gap: 10px; padding: 13px; border: 1px solid var(--border); border-radius: 10px; background: #fffaf5; }
+.continuity-ops-heading { display: flex; align-items: center; gap: 8px; color: #b64d28; }
+.continuity-ops-heading strong { color: #57706e; font-size: 13px; }
+.continuity-operations > p { margin: 0; color: #57706e; font-size: 12px; line-height: 1.7; }
 .continuity-operations > button, .continuity-handoff > button { justify-self: start; }
-.continuity-handoff { display: grid; gap: 11px; padding: 12px; border: 1px solid #e8e9f5; border-radius: 10px; background: white; }
+.continuity-handoff { display: grid; gap: 11px; padding: 12px; border: 1px solid #f8f1e7; border-radius: 10px; background: white; }
 .continuity-handoff-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 9px; }
 .continuity-handoff-summary > div { display: grid; gap: 7px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; }
-.continuity-handoff-summary span { color: #8f95a9; font-size: 9px; }
-.continuity-handoff-summary strong { color: #535a74; font-size: 11px; overflow-wrap: anywhere; }
-.continuity-boundary { display: flex; align-items: start; gap: 8px; margin: 0; padding: 11px; border: 1px solid #f1ddba; border-radius: 9px; background: #fffbf0; color: #8e6e37; font-size: 10px; line-height: 1.65; }
+.continuity-handoff-summary span { color: #57706e; font-size: 11px; }
+.continuity-handoff-summary strong { color: #57706e; font-size: 13px; overflow-wrap: anywhere; }
+.continuity-boundary { display: flex; align-items: start; gap: 8px; margin: 0; padding: 11px; border: 1px solid #f1ddba; border-radius: 9px; background: #fffbf0; color: #8e6e37; font-size: 12px; line-height: 1.65; }
 .continuity-boundary svg { flex: 0 0 auto; }
 .continuity-revoke { border-color: #f0dfc0; background: #fffcf7; }
-.continuity-checkbox { display: flex; align-items: flex-start; gap: 8px; color: #775f3c; font-size: 10px; line-height: 1.6; }
+.continuity-checkbox { display: flex; align-items: flex-start; gap: 8px; color: #775f3c; font-size: 12px; line-height: 1.6; }
 .continuity-checkbox input { flex: 0 0 auto; width: 14px; height: 14px; margin: 2px 0 0; }
 @media (max-width: 600px) { .continuity-handoff-summary { grid-template-columns: repeat(2,minmax(0,1fr)); } }

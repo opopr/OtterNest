@@ -150,7 +150,7 @@ export default function ProjectPortabilityPage() {
   if (!isOwner) return <div className="page-stack"><div className="page-heading"><h1>项目导入导出</h1></div><div className="panel empty-state"><ShieldCheck size={26} /><strong>仅所有者可以导入或导出项目包。</strong></div></div>;
 
   return <div className="page-stack admin-gap-page">
-    <div className="page-heading"><div><div className="eyebrow">PROJECT PORTABILITY</div><h1>项目导入导出</h1>
+    <div className="page-heading"><div><h1>项目导入导出</h1>
       <p>备份项目的可携带 JSON 记录，预检后恢复成全新、默认暂停的项目。</p></div>
       <button className="secondary-button compact" onClick={() => void refresh()} disabled={loading || busy}><RefreshCw size={14} />刷新</button></div>
     {error && <div className="inline-error"><AlertCircle size={15} />{error}<button onClick={() => setError("")}><X size={14} /></button></div>}
@@ -186,7 +186,7 @@ export default function ProjectPortabilityPage() {
       <div className="admin-import-warnings"><ShieldAlert size={18} />
         <div><strong>恢复是保守操作，不会自动续跑或恢复连接</strong>
           <ul><li>新项目默认暂停；未完成任务通常保持阻塞或等待重新审批。</li>
-            <li>Agent 身份恢复为禁用状态，密钥与外部连接不会恢复。</li>
+            <li>智能体 身份恢复为禁用状态，密钥与外部连接不会恢复。</li>
             <li>成果仅恢复元数据，需要重新校验并恢复二进制文件。</li></ul>
         </div></div>
       <form className="form-panel admin-stack-form" onSubmit={(event) => void restore(event)}>

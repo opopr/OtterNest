@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { SystemModeProvider } from "./auth/SystemModeProvider";
 import { DialogProvider } from "./components/AppDialog";
 import AppShell from "./components/AppShell";
+import BrandMark from "./components/BrandMark";
 import LoginPage from "./pages/LoginPage";
 
 const OverviewPage = lazy(() => import("./pages/OverviewPage"));
@@ -29,9 +30,9 @@ function AuthGate() {
   if (checking) {
     return (
       <div className="boot-screen">
-        <div className="boot-mascot">🦦</div>
+        <div className="boot-mascot"><BrandMark /></div>
         <div className="spinner" />
-        <p>正在连接 OtterNest 控制平面…</p>
+        <p>正在连接服务…</p>
       </div>
     );
   }

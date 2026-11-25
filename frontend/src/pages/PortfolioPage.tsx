@@ -191,14 +191,14 @@ export default function PortfolioPage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><div className="eyebrow">PORTFOLIO & PERFORMANCE</div><h1>Portfolio 总览</h1><p>跨项目运行指标、每日简报、通知收件箱与受控实验。</p></div>
+        <div><h1>运营分析 总览</h1><p>跨项目运行指标、每日简报、通知收件箱与受控实验。</p></div>
         <div className="heading-actions">
           <button className="secondary-button" onClick={() => void loadOverview()} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button>
           <button className="primary-button compact" onClick={() => void runSchedule()} disabled={saving}><Play size={15} />执行公平调度</button>
         </div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
-      {loading && !metrics ? <div className="panel-loading"><div className="spinner" />正在汇总 Portfolio 数据…</div> : (
+      {loading && !metrics ? <div className="panel-loading"><div className="spinner" />正在汇总 运营分析 数据…</div> : (
         <>
           <div className="stat-grid portfolio-stat-grid">
             <div className="stat-card"><div className="stat-icon tone-violet"><FolderKanbanIcon /></div><div className="stat-copy"><span>项目总数</span><strong>{metrics?.project_count ?? 0}</strong><small>全部项目空间</small></div></div>
@@ -228,7 +228,7 @@ export default function PortfolioPage() {
             <section className="panel">
               <div className="panel-heading"><div className="panel-title"><Clock3 size={17} /><h3>每日简报</h3></div><span className="muted-inline">{dateText(briefing?.generated_at)}</span></div>
               <div className="briefing-mini-grid">
-                <div><strong>{briefing?.enabled_agents ?? 0}</strong><small>已启用 Agent</small></div>
+                <div><strong>{briefing?.enabled_agents ?? 0}</strong><small>已启用 智能体</small></div>
                 <div><strong>{briefing?.pending_r3_tasks.length ?? 0}</strong><small>高风险待授权</small></div>
                 <div><strong>{briefing?.pending_review_tasks.length ?? 0}</strong><small>待验收</small></div>
                 <div><strong>{briefing?.blocked_tasks.length ?? 0}</strong><small>阻塞任务</small></div>
@@ -259,7 +259,7 @@ export default function PortfolioPage() {
             <div className="project-toolbar"><ProjectSelect projects={projects} value={selectedId} onChange={setSelectedId} /><span className="muted-inline">实验结果必须满足候选分数不低于基线且样本数不少于 3 才能采纳。</span></div>
             {showExperimentForm && <form className="form-panel embedded-form" onSubmit={createExperiment}>
               <div className="form-grid three">
-                <label>实验对象类型<select value={targetKind} onChange={(event) => setTargetKind(event.target.value as Experiment["target_kind"])}><option value="workflow_rule">工作流规则</option><option value="skill">Agent Skill</option><option value="context_policy">上下文策略</option></select></label>
+                <label>实验对象类型<select value={targetKind} onChange={(event) => setTargetKind(event.target.value as Experiment["target_kind"])}><option value="workflow_rule">工作流规则</option><option value="skill">智能体技能</option><option value="context_policy">上下文策略</option></select></label>
                 <label>对象 ID<input value={targetId} onChange={(event) => setTargetId(event.target.value)} required /></label>
                 <label>实验假设<input value={hypothesis} onChange={(event) => setHypothesis(event.target.value)} required minLength={5} maxLength={3000} /></label>
               </div>

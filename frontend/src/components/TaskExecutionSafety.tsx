@@ -153,7 +153,7 @@ export default function TaskExecutionSafety({ taskId, projectId, taskStatus, tas
     if (!peer) return;
     const confirmed = await dialog.confirm({
       title: "发起 A2A 远端委托",
-      message: "确认将此任务交给外部 A2A Agent？\n\n远端：" + peer.url + "\n\n后端会验证项目状态、任务风险、Agent 资格和凭据。请求提交后不能当作尚未发送而直接重试。",
+      message: "确认将此任务交给外部 A2A 智能体？\n\n远端：" + peer.url + "\n\n后端会验证项目状态、任务风险、智能体 资格和凭据。请求提交后不能当作尚未发送而直接重试。",
       confirmText: "加入委托队列",
       tone: "warning"
     });
@@ -229,7 +229,7 @@ export default function TaskExecutionSafety({ taskId, projectId, taskStatus, tas
     <section className="task-detail-section task-detail-wide safety-ops-section">
       <div className="task-detail-section-head">
         <div><h3><ShieldCheck size={16} />外部副作用台账</h3>
-          <p>由执行 Agent 在任务租约内登记和报告；所有者仅核对真实外部结果。</p></div>
+          <p>由执行 智能体 在任务租约内登记和报告；所有者仅核对真实外部结果。</p></div>
         <span className={"status-tag " + (unresolvedEffects.length ? "tag-amber" : "tag-green")}>{effects.length} 条记录 · {unresolvedEffects.length} 条待核实</span>
       </div>
       {error && <div className="inline-error"><AlertTriangle size={14} />{error}</div>}
@@ -270,7 +270,7 @@ export default function TaskExecutionSafety({ taskId, projectId, taskStatus, tas
 
     {isOwner && <section className="task-detail-section task-detail-wide safety-ops-section">
       <div className="task-detail-section-head">
-        <div><h3><Link2 size={16} />A2A 任务委托</h3><p>只允许 R0/R1 的就绪任务向项目内已登记、具备核验能力的远端 Agent 委托。</p></div>
+        <div><h3><Link2 size={16} />A2A 任务委托</h3><p>只允许 R0/R1 的就绪任务向项目内已登记、具备核验能力的远端 智能体 委托。</p></div>
         <button className="secondary-button compact" disabled={saving || loading} onClick={() => void load()}><RefreshCw size={13} />刷新状态</button>
       </div>
       {delegation ? <div className="safety-item">
@@ -306,7 +306,7 @@ export default function TaskExecutionSafety({ taskId, projectId, taskStatus, tas
         </select></label>
         <button className="primary-button compact" disabled={!canDelegate || !endpointId || saving} onClick={() => void queueDelegation()}>明确授权并加入委托队列</button>
         {!canDelegate && <p className="form-hint">仅当前状态为「待执行」且风险 R0/R1 的任务可发起新委托；已有委托不会被覆盖。</p>}
-        {!endpoints.some((endpoint) => endpoint.enabled) && <Link to="/interfaces" className="secondary-button compact safety-link-button">前往登记远端 Agent<ArrowUpRight size={13} /></Link>}
+        {!endpoints.some((endpoint) => endpoint.enabled) && <Link to="/interfaces" className="secondary-button compact safety-link-button">前往登记远端 智能体<ArrowUpRight size={13} /></Link>}
       </div>}
       <p className="form-hint safety-footer-note">登记或排队 ≠ 远端已执行；只有独立的 A2A Worker 能与远端通信，且所有状态需以服务端台账和实际远端确认结果为准。</p>
     </section>}

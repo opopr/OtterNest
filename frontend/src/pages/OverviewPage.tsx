@@ -4,12 +4,13 @@ import {
   FolderKanban, RefreshCw, ShieldAlert, Wifi, WifiOff
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { getApiOrigin, request, websocketUrl } from "../api/client";
+import { request, websocketUrl } from "../api/client";
 import type {
   Agent, BriefingTask, DailyBriefing, PortfolioMetrics, Project, SystemMode
 } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import StatCard from "../components/StatCard";
+import { getSystemModeLabel } from "../utils/labels";
 import { computeReconnectDelayMs } from "../utils/reconnect";
 
 interface OverviewData {
@@ -189,7 +190,7 @@ export default function OverviewPage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><div className="eyebrow">COMMAND CENTER</div><h1>团队总览</h1><p>项目、执行节点和待处理事项的实时概况。</p></div>
+        <div><h1>总览</h1></div>
         <div className="heading-actions">
           <div className={"live-pill " + (live === "connected" ? "live-on" : "")}>
             {live === "connected" ? <Wifi size={15} /> : <WifiOff size={15} />}
@@ -202,33 +203,23 @@ export default function OverviewPage() {
       </div>
       {error && <div className="inline-error">{error}</div>}
 
-      <div className="welcome-banner">
-        <div className="welcome-copy">
-          <span className="welcome-kicker">YOUR AI TEAM, YOUR RULES</span>
-          <h2>让每一只小水獭，都在正确的任务上协作。</h2>
-          <p>目标由你设定，权限由你掌控，成果由你验收。</p>
-          <Link to="/projects" className="banner-link">查看项目与任务 <ArrowRight size={16} /></Link>
-        </div>
-        <img src={getApiOrigin() + "/assets/mascots/otter-wave.png"} alt="OtterNest 水獭" />
-        <div className="banner-orb banner-orb-one" /><div className="banner-orb banner-orb-two" />
-      </div>
 
       <div className="stat-grid">
-        <StatCard label="项目空间" value={metrics?.project_count ?? 0} hint="已登记项目" icon={FolderKanban} tone="violet" />
-        <StatCard label="任务总数" value={metrics?.total_tasks ?? 0} hint="跨项目任务" icon={Activity} tone="blue" />
-        <StatCard label="已完成任务" value={metrics?.completed_count ?? 0} hint="已验收完成" icon={CheckCircle2} tone="green" />
-        <StatCard label="阻塞任务" value={metrics?.blocked_count ?? 0} hint="需要排查处理" icon={AlertCircle} tone="amber" />
-        <StatCard label="启用 Agent" value={briefing?.enabled_agents ?? 0} hint="已登记并启用" icon={Bot} tone="violet" />
+        <StatCard label="项目空间" value={metrics?.project_count ?? 0} hint="" icon={FolderKanban} tone="violet" />
+        <StatCard label="任务总数" value={metrics?.total_tasks ?? 0} hint="" icon={Activity} tone="blue" />
+        <StatCard label="已完成任务" value={metrics?.completed_count ?? 0} hint="" icon={CheckCircle2} tone="green" />
+        <StatCard label="阻塞任务" value={metrics?.blocked_count ?? 0} hint="" icon={AlertCircle} tone="amber" />
+        <StatCard label="启用 智能体" value={briefing?.enabled_agents ?? 0} hint="" icon={Bot} tone="violet" />
       </div>
 
       <div className="section-heading">
-        <div><h2>项目运行情况</h2><p>数据来自服务端每日简报与 Portfolio 指标。</p></div>
+        <div><h2>项目运行情况</h2></div>
         <Link to="/projects" className="subtle-link">全部项目 <ArrowRight size={15} /></Link>
       </div>
       <div className="project-grid">
         {projectRows.length === 0 ? (
           <div className="empty-state">
-            <FolderKanban size={28} /><strong>还没有项目</strong><p>创建第一个项目，开始组织你的 AI 团队。</p>
+            <FolderKanban size={28} /><strong>还没有项目</strong>
             <Link to="/projects" className="primary-button compact">创建项目</Link>
           </div>
         ) : projectRows.map((project) => {
@@ -250,7 +241,7 @@ export default function OverviewPage() {
       </div>
 
       <div className="section-heading">
-        <div><h2>需要你处理</h2><p>这些事项来自真实的任务状态，不是模拟数据。</p></div>
+        <div><h2>需要你处理</h2></div>
         <span className="muted-inline">{briefing?.unread_notifications ?? 0} 条未读通知</span>
       </div>
       <div className="pending-grid">
@@ -262,13 +253,13 @@ export default function OverviewPage() {
           (briefing.pending_review_tasks?.length ?? 0) === 0 &&
           (briefing.blocked_tasks?.length ?? 0) === 0
         )) && (
-          <div className="all-clear"><CheckCircle2 size={22} /><strong>目前没有待处理的任务异常</strong><span>系统仍会持续记录项目事件和执行状态。</span></div>
+          <div className="all-clear"><CheckCircle2 size={22} /><strong>目前没有待处理的任务异常</strong></div>
         )}
       </div>
       <div className="data-footnote">
-        <span>系统模式：{data?.system?.mode || "未知"}</span>
+        <span>系统模式：{getSystemModeLabel(data?.system?.mode)}</span>
         <span>简报生成：{briefing?.generated_at ? new Date(briefing.generated_at).toLocaleString("zh-CN") : "—"}</span>
-        <span>{lastEvent ? "最近事件：" + lastEvent : "等待项目事件"}</span>
+        <span>{lastEvent ? "已收到项目事件" : "等待项目事件"}</span>
       </div>
     </div>
   );

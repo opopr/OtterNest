@@ -43,8 +43,8 @@ const statusTones: Record<string,string> = {
   completed:"tag-green", cancelled:"tag-neutral", failed:"tag-red"
 };
 const eventLabels: Record<string,string> = {
-  "task.created":"任务创建", "task.routed":"分配目标 Agent",
-  "task.authorized":"任务已授权", "task.claimed":"Agent 已领取",
+  "task.created":"任务创建", "task.routed":"分配目标 智能体",
+  "task.authorized":"任务已授权", "task.claimed":"智能体 已领取",
   "task.submitted":"提交执行结果", "task.accepted":"验收通过",
   "task.changes_requested":"验收要求修改", "task.blocked":"任务阻塞",
   "task.unblocked":"解除阻塞", "task.cancelled":"任务取消",
@@ -248,8 +248,8 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
           <div><small>当前版本</small><strong>v{task.version}</strong></div>
           <div><small>重新执行次数</small><strong>{task.rework_count}</strong></div>
           <div><small>审批状态</small><strong>{task.approval_granted?"已授权":"未授权"}</strong></div>
-          <div><small>执行 Agent</small><code>{task.assigned_agent_id?shortId(task.assigned_agent_id):"尚未领取"}</code></div>
-          <div><small>目标 Agent</small><code>{task.target_agent_id?shortId(task.target_agent_id):"自动调度"}</code></div>
+          <div><small>执行 智能体</small><code>{task.assigned_agent_id?shortId(task.assigned_agent_id):"尚未领取"}</code></div>
+          <div><small>目标 智能体</small><code>{task.target_agent_id?shortId(task.target_agent_id):"自动调度"}</code></div>
           <div><small>租约代次</small><strong>{task.lease_epoch}</strong></div>
           <div><small>租约到期</small><strong>{formatTime(task.lease_until)}</strong></div>
           <div><small>完成时间</small><strong>{formatTime(task.completed_at)}</strong></div>

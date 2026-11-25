@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { ArrowRight, KeyRound, LockKeyhole, RefreshCw, ShieldCheck } from "lucide-react";
 import { getApiOrigin } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
+import BrandMark from "../components/BrandMark";
 
 type LoginMode = "account" | "token";
 
@@ -51,17 +52,17 @@ export default function LoginPage() {
 
   return (
     <div className="login-screen">
-      <div className="login-decoration login-decoration-one" />
-      <div className="login-decoration login-decoration-two" />
+
+
       <div className="login-card">
         <div className="login-brand">
-          <div className="login-mascot">🦦</div>
-          <div><div className="eyebrow">PERSONAL AI TEAM OS</div><h1>欢迎回到 OtterNest</h1><p>你的 AI 团队，始终由你掌控。</p></div>
+          <div className="login-mascot"><BrandMark /></div>
+          <div><h1>登录水獭窝</h1></div>
         </div>
         {challenge ? (
           <form className="login-form" onSubmit={handleMfa}>
             <div className="login-form-heading"><ShieldCheck size={19} /><strong>双重身份验证</strong></div>
-            <p className="form-hint">请输入验证器 App 的 6 位动态验证码，或 8 位一次性备用恢复码。</p>
+            <p className="form-hint">请输入验证器应用 的 6 位动态验证码，或 8 位一次性备用恢复码。</p>
             <label>验证码 / 恢复码<input autoFocus value={code} onChange={(event) => setCode(event.target.value)} autoComplete="one-time-code" required /></label>
             {error && <div className="form-error">{error}</div>}
             <button className="primary-button" disabled={busy}>{busy ? "正在验证…" : "验证并进入"}<ArrowRight size={16} /></button>
@@ -73,11 +74,11 @@ export default function LoginPage() {
               {authError || "无法连接到 OtterNest FastAPI 服务，请检查网络或跨域配置。"}
             </div>
             <div className="connection-origin-list">
-              <div><span>当前前端 Origin</span><code>{window.location.origin}</code></div>
-              <div><span>后端 API Origin</span><code>{getApiOrigin()}</code></div>
+              <div><span>当前前端来源地址</span><code>{window.location.origin}</code></div>
+              <div><span>后端接口来源地址</span><code>{getApiOrigin()}</code></div>
             </div>
             <p className="form-hint">
-              请确认后端环境变量 <code>OTTERNEST_CORS_ORIGINS</code> 已精确包含上方「当前前端 Origin」（不含路径与通配符），且 <code>VITE_API_BASE_URL</code> 指向可访问的 FastAPI HTTPS Origin。
+              请确认后端环境变量 <code>OTTERNEST_CORS_ORIGINS</code> 已精确包含上方「当前前端来源地址」（不含路径与通配符），且 <code>VITE_API_BASE_URL</code> 指向可访问的 FastAPI HTTPS 来源地址。
             </p>
             <button
               type="button"

@@ -287,7 +287,7 @@ export default function SystemPage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><div className="eyebrow">SYSTEM OPERATIONS</div><h1>系统设置与运行事件</h1><p>全局保护模式、项目运行状态，以及由服务端持久化的项目事件流。</p></div>
+        <div><h1>系统设置与运行事件</h1><p>全局保护模式、项目运行状态，以及由服务端持久化的项目事件流。</p></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => void loadSystem()} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新状态</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
@@ -303,8 +303,8 @@ export default function SystemPage() {
           </div>
         </div>
         <div className="connection-origin-list">
-          <div><span>前端 Origin</span><code>{window.location.origin}</code></div>
-          <div><span>后端 API Origin</span><code>{getApiOrigin()}</code></div>
+          <div><span>前端 来源地址</span><code>{window.location.origin}</code></div>
+          <div><span>后端 API 来源地址</span><code>{getApiOrigin()}</code></div>
         </div>
         <div className="stat-grid connection-check-grid">
           <div className="stat-card">
@@ -322,7 +322,7 @@ export default function SystemPage() {
         </div>
         {(connectionChecks?.api.state === "error" || connectionChecks?.database.state === "error" || connectionChecks?.identity.state === "error") && (
           <div className="connection-help">
-            如果当前从 Google AI Studio 预览访问，请确认 <code>VITE_API_BASE_URL</code> 指向后端 HTTPS Origin，并让服务端 <code>OTTERNEST_CORS_ORIGINS</code> 精确包含上方的前端 Origin。不要把数据库地址或令牌写入 VITE_ 变量。
+            如果当前从 Google AI Studio 预览访问，请确认 <code>VITE_API_BASE_URL</code> 指向后端 HTTPS 来源地址，并让服务端 <code>OTTERNEST_CORS_ORIGINS</code> 精确包含上方的前端 Origin。不要把数据库地址或令牌写入 VITE_ 变量。
           </div>
         )}
         <div className="form-actions">
@@ -389,7 +389,7 @@ export default function SystemPage() {
       {loading && !systemMode ? <div className="panel-loading"><div className="spinner" />正在读取系统状态…</div> : <>
         <section className={"system-mode-banner " + (isProtective ? "protective" : "normal")}>
           <div className="system-mode-icon">{isProtective ? <ShieldAlert size={23} /> : <CheckCircle2 size={23} />}</div>
-          <div><div className="eyebrow">GLOBAL CONTROL PLANE</div><h2>{modeLabel[systemMode?.mode || "normal"]}</h2><p>{systemMode?.reason || "当前未启用全局保护限制。"}</p></div>
+          <div><div className="eyebrow">系统</div><h2>{modeLabel[systemMode?.mode || "normal"]}</h2><p>{systemMode?.reason || "当前未启用全局保护限制。"}</p></div>
           <span className={"status-tag " + (isProtective ? "tag-amber" : "tag-green")}>{isProtective ? "保护策略生效" : "运行正常"}</span>
         </section>
 

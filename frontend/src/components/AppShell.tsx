@@ -1,6 +1,6 @@
 import { Component, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
 import {
-  Activity, ArchiveRestore, ArrowUpRight, Bell, BookMarked, BookOpen, Bot, CheckCheck, ChevronDown,
+  ArchiveRestore, ArrowUpRight, Bell, BookMarked, BookOpen, Bot, CheckCheck, ChevronDown,
   CircleHelp, ClipboardCheck, FileArchive, FolderKanban, Gauge, GitBranch, KeyRound,
   LayoutDashboard, LockKeyhole, LogOut, MessageSquare, Monitor, PlugZap, Settings2,
   ShieldCheck, Wifi, type LucideIcon
@@ -10,6 +10,7 @@ import { getApiOrigin, request } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { useSystemMode } from "../auth/SystemModeProvider";
 import { getSystemModeLabel } from "../utils/labels";
+import BrandMark from "./BrandMark";
 import { NAVIGATION_GROUPS, findNavLabel, findNavGroupId, type NavIconKey } from "../utils/navigation";
 
 const NAV_ICONS: Record<NavIconKey, LucideIcon> = {
@@ -132,8 +133,8 @@ export default function AppShell() {
     <div className="app-shell">
       <aside className="sidebar">
         <Link className="brand" to="/" aria-label="OtterNest 首页">
-          <span className="brand-mascot">🦦</span>
-          <span><strong>OtterNest</strong><small>水獭窝 · AI Team OS</small></span>
+          <span className="brand-mascot"><BrandMark /></span>
+          <span><strong>OtterNest</strong><small>水獭窝</small></span>
         </Link>
 
         <nav className="side-nav-grouped" aria-label="主导航">
@@ -191,17 +192,13 @@ export default function AppShell() {
         </nav>
 
         <div className="sidebar-spacer" />
-        <div className="sidebar-note">
-          <div className="sidebar-note-icon"><ShieldCheck size={17} /></div>
-          <div><strong>所有者控制</strong><p>重要操作始终经过授权与审查。</p></div>
-        </div>
         <a className="side-link" href={getApiOrigin() + "/legacy"} target="_blank" rel="noreferrer">
-          <ArrowUpRight size={16} />进入旧版完整管理台
+          <ArrowUpRight size={16} />旧版管理台
         </a>
         <a className="side-link" href={getApiOrigin() + "/api/docs"} target="_blank" rel="noreferrer">
-          <CircleHelp size={16} />API 文档
+          <CircleHelp size={16} />接口文档
         </a>
-        <div className="sidebar-footer">Personal AI Team OS · v0.1.0</div>
+        
       </aside>
 
       <div className="workspace">
@@ -215,7 +212,7 @@ export default function AppShell() {
               <span className="system-dot" />{modeLabel}
             </div>
             <div className={"connection-pill" + (systemMode ? "" : " is-offline")}>
-              <Wifi size={15} />{systemMode ? "API 已连接" : "API 状态未知"}
+              <Wifi size={15} />{systemMode ? "服务已连接" : "连接状态未知"}
             </div>
             <div className="notif-menu-wrap">
               <button
@@ -269,7 +266,7 @@ export default function AppShell() {
                     )}
                   </div>
                   <div className="notif-popover-foot">
-                    <Link to="/portfolio" onClick={() => setNotifOpen(false)}>前往 Portfolio 查看完整收件箱 →</Link>
+                    <Link to="/portfolio" onClick={() => setNotifOpen(false)}>查看全部通知</Link>
                   </div>
                 </div>
               )}
@@ -297,10 +294,6 @@ export default function AppShell() {
             </Suspense>
           </RouteErrorBoundary>
         </main>
-        <footer className="workspace-footer">
-          <span>OtterNest · 本地优先，个人掌控</span>
-          <span><Activity size={13} />控制平面状态以服务端记录为准</span>
-        </footer>
       </div>
     </div>
   );

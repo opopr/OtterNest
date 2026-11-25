@@ -23,6 +23,8 @@ test("findNavLabel preserves each original destination label", () => {
   assert.equal(findNavLabel("/"), "总览");
   assert.equal(findNavLabel("/account-security"), "账号安全");
   assert.equal(findNavLabel("/projects"), "项目管理");
+  assert.equal(findNavLabel("/agents"), "智能体管理");
+  assert.equal(findNavLabel("/portfolio"), "运营分析");
   assert.equal(findNavLabel("/unknown"), "控制中心");
   assert.equal(findNavGroupId("/tasks"), "projects");
   assert.equal(findNavGroupId("/runtimes"), "agents");

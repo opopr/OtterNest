@@ -32,7 +32,7 @@ type ReviewStatus = "owner_verified" | "rejected";
 interface Props { taskId: string; taskStatus: string; isOwner: boolean; onChanged: () => void; }
 const time = (date: string | null) => date ? new Date(date).toLocaleString("zh-CN", { hour12: false }) : "—";
 const labels: Record<string, string> = {
-  self_reported: "Agent 自报，未经核验",
+  self_reported: "智能体 自报，未经核验",
   owner_verified: "所有者已核验",
   rejected: "所有者已驳回"
 };
@@ -70,7 +70,7 @@ export default function TaskContinuityPanel({ taskId, taskStatus, isOwner, onCha
     if (!selected || selected.verification_status !== "self_reported") return;
     const confirmed = await dialog.confirm({
       title: reviewStatus === "owner_verified" ? "核验检查点" : "驳回检查点",
-      message: "确认" + (reviewStatus === "owner_verified" ? "核验通过" : "驳回") + "这条 Agent 检查点？\n\n核验只确认这一条记录，不证明模型对话状态或外部进程已经安全迁移。",
+      message: "确认" + (reviewStatus === "owner_verified" ? "核验通过" : "驳回") + "这条 智能体 检查点？\n\n核验只确认这一条记录，不证明模型对话状态或外部进程已经安全迁移。",
       confirmText: reviewStatus === "owner_verified" ? "确认通过" : "确认驳回",
       tone: reviewStatus === "rejected" ? "warning" : "default"
     });
@@ -140,7 +140,7 @@ export default function TaskContinuityPanel({ taskId, taskStatus, isOwner, onCha
   const selected = checkpoints.find((cp) => cp.id === selectedId);
   return <section className="task-detail-section task-detail-wide continuity-section">
     <div className="task-detail-section-head">
-      <div><h3><ClipboardCheck size={16} />检查点与故障交接</h3><p>仅由持有效租约的 Agent 创建检查点；所有者负责核验、撤销旧租约及审查交接内容。</p></div>
+      <div><h3><ClipboardCheck size={16} />检查点与故障交接</h3><p>仅由持有效租约的 智能体 创建检查点；所有者负责核验、撤销旧租约及审查交接内容。</p></div>
       <button className="secondary-button compact" disabled={loading || saving} onClick={() => void load()}><RefreshCw size={13} />刷新</button>
     </div>
     {error && <div className="inline-error"><AlertTriangle size={14} />{error}</div>}

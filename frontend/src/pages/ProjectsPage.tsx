@@ -336,7 +336,7 @@ export default function ProjectsPage() {
     <div className="page-stack">
       <div className="page-heading">
         <div>
-          <div className="eyebrow">PROJECT WORKSPACE</div>
+          <div className="eyebrow">当前项目</div>
           <h1>项目与任务</h1>
           <p>项目、任务、成员与简报的统一入口；任务状态与权限仍由服务端治理。</p>
         </div>
@@ -388,7 +388,7 @@ export default function ProjectsPage() {
               <div className="panel project-detail-header">
                 <div className="project-detail-title">
                   <div className="project-avatar large"><FolderKanban size={21} /></div>
-                  <div><div className="eyebrow">PROJECT</div><h2>{selectedProject.name}</h2><p>{selectedProject.description || "暂无项目说明"}</p></div>
+                  <div><div className="eyebrow">当前项目</div><h2>{selectedProject.name}</h2><p>{selectedProject.description || "暂无项目说明"}</p></div>
                 </div>
                 <div className="flex-row-gap">
                   <span className={"status-tag " + (selectedProject.status === "active" ? "tag-green" : "tag-neutral")}>{selectedProject.status}</span>
@@ -516,8 +516,8 @@ export default function ProjectsPage() {
                 <form className="panel form-panel" onSubmit={addMember}>
                   <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>添加项目成员</h3></div><button type="button" className="icon-button" onClick={() => setShowMemberForm(false)}><X size={17} /></button></div>
                   <div className="form-grid">
-                    <label>选择 Agent<select value={newMemberAgentId} onChange={(e) => setNewMemberAgentId(e.target.value)} required>
-                      <option value="">选择已启用 Agent…</option>
+                    <label>选择 智能体<select value={newMemberAgentId} onChange={(e) => setNewMemberAgentId(e.target.value)} required>
+                      <option value="">选择已启用 智能体…</option>
                       {availableAgentsToAdd.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.platform})</option>)}
                     </select></label>
                     <label>项目角色<select value={newMemberRole} onChange={(e) => setNewMemberRole(e.target.value as ProjectMember["role"])}>
@@ -533,7 +533,7 @@ export default function ProjectsPage() {
 
               <div className="panel task-table-panel">
                 {members.length === 0 ? (
-                  <div className="empty-state"><Users size={24} /><strong>暂无项目成员</strong><p>点击上方「添加成员」将 Agent 加入当前项目。</p></div>
+                  <div className="empty-state"><Users size={24} /><strong>暂无项目成员</strong><p>点击上方「添加成员」将 智能体 加入当前项目。</p></div>
                 ) : (
                   <div className="task-list">
                     {members.map((member) => (
@@ -549,10 +549,10 @@ export default function ProjectsPage() {
                           onChange={(e) => void updateMemberRole(member, e.target.value as ProjectMember["role"])}
                           className="compact-select"
                         >
-                          <option value="worker">worker</option>
-                          <option value="manager">manager</option>
-                          <option value="reviewer">reviewer</option>
-                          <option value="advisor">advisor</option>
+                          <option value="worker">执行者</option>
+                          <option value="manager">管理者</option>
+                          <option value="reviewer">审查者</option>
+                          <option value="advisor">顾问</option>
                         </select>
                         <button className="text-button" disabled={saving} onClick={() => void removeMember(member)} title="移除成员">
                           <Trash2 size={14} />移除

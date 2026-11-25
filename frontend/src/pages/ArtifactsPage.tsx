@@ -245,11 +245,11 @@ export default function ArtifactsPage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><div className="eyebrow">ARTIFACT LIFECYCLE</div><h1>成果中心</h1><p>不可变成果版本、SHA-256 校验下载、所有者验收、二进制归档恢复与垃圾回收。</p></div>
+        <div><h1>成果中心</h1></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedTaskId && void loadArtifacts(selectedTaskId)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
-      <section className="panel project-toolbar"><div><div className="eyebrow">PROJECT WORKSPACE</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedProjectId} onChange={setSelectedProjectId} /><label className="task-select"><span>选择任务</span><select value={selectedTaskId} onChange={(event) => setSelectedTaskId(event.target.value)}><option value="">选择任务…</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label></section>
+      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedProjectId} onChange={setSelectedProjectId} /><label className="task-select"><span>选择任务</span><select value={selectedTaskId} onChange={(event) => setSelectedTaskId(event.target.value)}><option value="">选择任务…</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label></section>
       <section className="panel">
         <div className="panel-heading"><div className="panel-title"><FileCheck2 size={17} /><h3>成果版本</h3><span className="count-chip">{artifacts.length}</span></div></div>
         <p className="form-hint">当前任务：{selectedTask?.title || "未选择任务"}</p>
@@ -266,7 +266,7 @@ export default function ArtifactsPage() {
           <div className="artifact-card-actions"><span className={"status-tag " + (artifact.review_status === "accepted" ? "tag-green" : artifact.review_status === "rejected" ? "tag-red" : "tag-amber")}>{reviewLabel[artifact.review_status] || artifact.review_status}</span><button className="icon-button" title="下载并校验" disabled={saving || Boolean(artifact.deleted_at)} onClick={() => void downloadArtifact(artifact)}><Download size={15} /></button>{artifact.review_status === "pending" && <><button className="icon-button" title="验收通过" disabled={saving} onClick={() => void reviewArtifact(artifact, true)}><Check size={15} /></button><button className="icon-button" title="驳回" disabled={saving} onClick={() => void reviewArtifact(artifact, false)}><X size={15} /></button></>}</div>
           {artifact.review_note && <p className="artifact-review-note">验收说明：{artifact.review_note}</p>}
           {artifact.deleted_at && <small className="muted-inline">文件已由 GC 回收，元数据仍保留。</small>}
-        </article>)}{!artifacts.length && <div className="empty-state"><FileArchive size={25} /><strong>该任务尚无成果文件</strong><p>Agent 或所有者上传的文件会形成不可变版本，并在验收后保留记录。</p></div>}</div>
+        </article>)}{!artifacts.length && <div className="empty-state"><FileArchive size={25} /><strong>该任务尚无成果文件</strong><p>智能体 或所有者上传的文件会形成不可变版本，并在验收后保留记录。</p></div>}</div>
       </section>
 
       <div className="operations-grid">

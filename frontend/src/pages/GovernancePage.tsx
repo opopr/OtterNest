@@ -374,12 +374,12 @@ export default function GovernancePage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><div className="eyebrow">OWNER GOVERNANCE</div><h1>指挥中心与审批</h1><p>高风险授权、任务验收、独立决策审查与所有者最终裁决。</p></div>
+        <div><h1>指挥中心与审批</h1></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadProjectData(selectedId)} disabled={loading || detailLoading}><RefreshCw size={15} className={loading || detailLoading ? "spin" : ""} />刷新</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
       <section className="panel governance-toolbar">
-        <div><div className="eyebrow">CURRENT PROJECT</div><strong>{selectedProject?.name || "尚未选择项目"}</strong></div>
+        <div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "尚未选择项目"}</strong></div>
         <ProjectSelect projects={projects} value={selectedId} onChange={setSelectedId} />
         <div className="governance-summary"><span><strong>{pendingTasks.length}</strong> 待处理任务</span><span><strong>{decisions.filter((item) => item.status === "proposed").length}</strong> 待审决策</span></div>
       </section>
@@ -436,7 +436,7 @@ export default function GovernancePage() {
                   </div>
                 ) : selectedDecision.status === "proposed" && reviews.length === 0 ? (
                   <>
-                    <p className="form-hint">在第一轮审查开始前，可指定 2–8 名项目内已启用的 Agent 组成自动法定协商名单。</p>
+                    <p className="form-hint">在第一轮审查开始前，可指定 2–8 名项目内已启用的 智能体 组成自动法定协商名单。</p>
                     {eligibleReviewers.length < 2 ? (
                       <p className="form-hint">当前项目已启用成员不足 2 位，请先在项目管理页添加成员。</p>
                     ) : (
@@ -481,7 +481,7 @@ export default function GovernancePage() {
                 )}
                 <small className="muted-inline">{timeText(review.created_at)}</small>
               </article>)}
-              {!reviews.length && <p className="form-hint">尚无 Agent 独立审查意见。只有注册并加入该项目的 Agent 可以提交审查。</p>}
+              {!reviews.length && <p className="form-hint">尚无 智能体 独立审查意见。只有注册并加入该项目的 智能体 可以提交审查。</p>}
 
               <form className="auto-policy-panel" onSubmit={inspectEvidence}>
                 <div className="decision-subheading">
@@ -543,7 +543,7 @@ export default function GovernancePage() {
               <span>取消任务「任务名称」</span>
               <span>验收通过任务「任务名称」</span>
               <span>验收驳回任务「任务名称」原因：需要补充测试</span>
-              <span>指派任务「任务名称」给「Agent 名称」</span>
+              <span>指派任务「任务名称」给「智能体 名称」</span>
             </div>
             <div className="form-actions"><button className="primary-button compact" disabled={saving || !selectedId || commandText.trim().length < 4}>解析并生成预览</button></div>
           </form>

@@ -80,9 +80,9 @@ export default function GoalPlanComposer({projectId,onConfirmed}:Props){
 
  return <section className="panel goal-plan-composer">
   <div className="panel-heading"><div className="panel-title"><Sparkles size={17}/><h3>AI 多步骤目标规划</h3><span className="status-tag tag-violet">新功能</span></div><span className="muted-inline">2–12 个任务 · 人工确认</span></div>
-  <div className="goal-plan-intro"><div className="goal-plan-intro-icon"><GitBranch size={19}/></div><div><strong>描述你想达成的长期目标</strong><p>AI 将提出一个目标、拆分任务、验收标准和依赖关系。生成的只是草案，不会启动 Agent。</p></div></div>
+  <div className="goal-plan-intro"><div className="goal-plan-intro-icon"><GitBranch size={19}/></div><div><strong>描述你想达成的长期目标</strong><p>AI 将提出一个目标、拆分任务、验收标准和依赖关系。生成的只是草案，不会启动 智能体。</p></div></div>
   <label className="goal-plan-prompt-label">目标描述<textarea rows={3} maxLength={5000} minLength={10} value={text} onChange={event=>setText(event.target.value)} placeholder="例如：构建一个可部署的 SaaS 客户管理系统，先完成需求分析和架构设计，再开发核心功能、测试并准备部署。"/></label>
-  <div className="goal-plan-form-foot"><span><LockKeyhole size={13}/>外部模型需由服务器管理员启用。发送内容包括目标描述、项目基本信息及项目 Agent 的名称和已核验能力。</span><button className="primary-button compact" onClick={()=>void createProposal()} disabled={generating||text.trim().length<10}><Sparkles size={14}/>{generating?"正在规划…":"生成计划预览"}</button></div>
+  <div className="goal-plan-form-foot"><span><LockKeyhole size={13}/>外部模型需由服务器管理员启用。发送内容包括目标描述、项目基本信息及项目 智能体 的名称和已核验能力。</span><button className="primary-button compact" onClick={()=>void createProposal()} disabled={generating||text.trim().length<10}><Sparkles size={14}/>{generating?"正在规划…":"生成计划预览"}</button></div>
   {error&&<div className="inline-error"><AlertCircle size={15}/>{error}</div>}
   {draft&&draft.project_id===projectId&&<div className="goal-plan-preview">
    <div className="goal-plan-preview-head"><div><span className="eyebrow">PROPOSAL PREVIEW</span><h3>{draft.proposal.goal_title}</h3></div><span className="status-tag tag-amber">待人工确认</span></div>
@@ -96,7 +96,7 @@ export default function GoalPlanComposer({projectId,onConfirmed}:Props){
      {task.depends_on.length>0&&<div className="goal-plan-dependencies"><GitBranch size={12}/>依赖：{task.depends_on.map(dep=>"任务 "+(dep+1)).join("、")}</div>}
     </div>
    </article>)}</div>
-   <div className="goal-plan-safety"><LockKeyhole size={14}/><span>确认后仅创建目标、任务、依赖及审计记录。R3 任务仍需单独审批；所有任务尚未分配 Agent，也不会自动启动 Runtime。</span></div>
+   <div className="goal-plan-safety"><LockKeyhole size={14}/><span>确认后仅创建目标、任务、依赖及审计记录。R3 任务仍需单独审批；所有任务尚未分配 智能体，也不会自动启动 运行实例。</span></div>
    <div className="goal-plan-actions"><button className="secondary-button compact" onClick={()=>setDraft(null)} disabled={confirming}>关闭预览</button><button className="primary-button compact" onClick={()=>void confirmPlan()} disabled={confirming}>{confirming?<LoaderCircle size={14} className="spin"/>:<CheckCircle2 size={14}/>}确认并创建目标与任务</button></div>
   </div>}
   {confirmed&&<div className="goal-plan-confirmed"><CheckCircle2 size={17}/><div><strong>目标及任务已创建</strong><p>{confirmed.goal.title} · {confirmed.tasks.length} 个任务 · {confirmed.dependency_count} 条依赖。任务已进入项目任务体系，等待后续授权和调度。</p></div></div>}

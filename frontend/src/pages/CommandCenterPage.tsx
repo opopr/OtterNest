@@ -193,7 +193,7 @@ export default function CommandCenterPage() {
     <div className="page-stack">
       <div className="page-heading">
         <div>
-          <div className="eyebrow">OWNER-CONTROLLED COMMANDS</div>
+          
           <h1>AI 指挥中心</h1>
           <p>通过规则模板或服务器端模型提出任务操作建议；任何授权、指派、验收和取消都必须经过你的确认。</p>
         </div>

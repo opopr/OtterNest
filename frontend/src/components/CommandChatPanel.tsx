@@ -140,7 +140,7 @@ export default function CommandChatPanel({ projectId, tasks, onPlan }: Props) {
       <div className="command-chat-toolbar">
         <label>解析模式<select value={mode} onChange={(event) => setMode(event.target.value as "template" | "model")}><option value="template">规则模板（不调用外部模型）</option><option value="model" disabled={!plannerStatus.enabled}>模型建议{plannerStatus.enabled && plannerStatus.model ? " · " + plannerStatus.model : "（服务器未配置）"}</option></select></label>
         <label>当前任务上下文<select value={focusTaskId} onChange={(event) => setFocusTaskId(event.target.value)}><option value="">由系统根据会话判断</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title} · {statusLabel[task.status] || task.status}</option>)}</select></label>
-        <span className="muted-inline">{mode === "model" ? "模型将接收当前项目任务摘要、Agent 名称及最近 20 轮对话" : "规则模板仅使用本地白名单解析，不向外部发送项目内容"}</span>
+        <span className="muted-inline">{mode === "model" ? "模型将接收当前项目任务摘要、智能体 名称及最近 20 轮对话" : "规则模板仅使用本地白名单解析，不向外部发送项目内容"}</span>
       </div>
       <div className="command-chat-transcript">
         {!messages.length && <div className="chat-welcome"><div className="chat-welcome-icon"><Sparkles size={21} /></div><strong>你可以直接询问项目，也可以要求执行任务操作。</strong><p>系统会先查询权威状态；遇到对象不明确时会向你澄清，不会猜测任务。</p><div className="chat-suggestions"><button onClick={() => setText("查看项目状态和指标")}>查看项目状态和指标</button><button onClick={() => setText("为什么任务被阻塞？")}>解释任务阻塞原因</button><button onClick={() => setText("请批准它")}>批准当前任务</button></div></div>}

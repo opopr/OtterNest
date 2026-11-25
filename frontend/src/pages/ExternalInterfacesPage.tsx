@@ -233,8 +233,8 @@ export default function ExternalInterfacesPage() {
 
   return <div className="page-stack external-page">
     <div className="page-heading">
-      <div><div className="eyebrow">EXTERNAL INTERFACES</div><h1>外部接口</h1>
-        <p>统一查看平台对外能力、Webhook 与 A2A 连接；接口存在不代表外部服务已经接通。</p></div>
+      <div><h1>外部接口</h1>
+        <p>统一查看平台对外能力、回调 与 A2A 连接；接口存在不代表外部服务已经接通。</p></div>
       <button className="secondary-button compact" onClick={() => { void loadIndex(); if (projectId) void loadConnections(projectId); }} disabled={loading || saving}>
         <RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button>
     </div>
@@ -255,8 +255,8 @@ export default function ExternalInterfacesPage() {
       </section>
       <section className="panel external-protocol">
         <div className="external-protocol-head"><Link2 size={20} /><span className="status-tag tag-amber">需配置端点</span></div>
-        <h3>A2A 入站</h3><p>A2A v0.3 的 Agent Card 和入站入口；Agent Card 需要配置服务端对外地址。</p>
-        <a href={apiOrigin + "/.well-known/agent-card.json"} target="_blank" rel="noreferrer" className="secondary-button compact">Agent Card<ArrowUpRight size={14} /></a>
+        <h3>A2A 入站</h3><p>A2A v0.3 的 智能体 Card 和入站入口；智能体 Card 需要配置服务端对外地址。</p>
+        <a href={apiOrigin + "/.well-known/agent-card.json"} target="_blank" rel="noreferrer" className="secondary-button compact">智能体 Card<ArrowUpRight size={14} /></a>
       </section>
       <section className="panel external-protocol">
         <div className="external-protocol-head">
@@ -273,7 +273,7 @@ export default function ExternalInterfacesPage() {
           <span className={`status-tag ${capabilities.executors.gemini_worker?.available ? "tag-green" : "tag-amber"}`}>Gemini {capabilities.executors.gemini_worker?.available ? "✓" : "未配置"}</span>
           <span className={`status-tag ${capabilities.executors.muse_adapter?.available ? "tag-green" : "tag-amber"}`}>Muse {capabilities.executors.muse_adapter?.available ? "✓" : "未配置"}</span>
         </div>}
-        <Link to="/agents" className="secondary-button compact">Agent 管理<ArrowUpRight size={14} /></Link>
+        <Link to="/agents" className="secondary-button compact">智能体 管理<ArrowUpRight size={14} /></Link>
       </section>
     </div>
 
@@ -290,14 +290,14 @@ export default function ExternalInterfacesPage() {
     </section>}
 
     <section className="panel external-project-selector">
-      <div><strong>项目级接口配置</strong><p>Webhook 与 A2A 远端均隶属于项目，切换项目后显示各自的记录。</p></div>
+      <div><strong>项目级接口配置</strong><p>回调 与 A2A 远端均隶属于项目，切换项目后显示各自的记录。</p></div>
       <ProjectSelect projects={projects} value={projectId} onChange={(value) => {
         setProjectId(value); setNewWebhookSecret(null); setNewRemote(null); setSelectedTaskId(""); setNotice("");
       }} />
     </section>
 
-    {newWebhookSecret && <section className="panel token-panel" aria-label="Webhook 签名密钥">
-      <div className="token-panel-title"><ShieldCheck size={18} /><strong>Webhook 签名密钥（仅此时显示）</strong></div>
+    {newWebhookSecret && <section className="panel token-panel" aria-label="回调 签名密钥">
+      <div className="token-panel-title"><ShieldCheck size={18} /><strong>回调 签名密钥（仅此时显示）</strong></div>
       <p>签名密钥只在创建时返回。请在可信环境中配置接收端，不要放入 Google AI Studio 前端或公开仓库。</p>
       <div className="token-value"><code>{newWebhookSecret.signing_secret}</code>
         <button className="secondary-button compact" onClick={() => void copy(newWebhookSecret.signing_secret)}><Copy size={14} />复制</button></div>
@@ -312,14 +312,14 @@ export default function ExternalInterfacesPage() {
 
     <div className="external-management-grid">
       <section className="panel external-management">
-        <div className="panel-heading"><div className="panel-title"><Webhook size={17} /><h3>签名 Webhook</h3></div>
+        <div className="panel-heading"><div className="panel-title"><Webhook size={17} /><h3>签名 回调</h3></div>
           <div className="heading-actions"><span className="count-chip">{webhooks.length}</span>
             <button className="secondary-button compact" onClick={() => setShowWebhookForm((v) => !v)} disabled={!projectId || saving}><Plus size={14} />添加</button></div></div>
-        <p className="form-hint">向允许列表中的 HTTPS 服务器推送项目事件。需要服务端配置签名密钥、允许的主机和 Webhook Worker。</p>
+        <p className="form-hint">向允许列表中的 HTTPS 服务器推送项目事件。需要服务端配置签名密钥、允许的主机和 回调 Worker。</p>
         {showWebhookForm && <form className="form-panel external-form" onSubmit={(event) => void createWebhook(event)}>
           <label>目标 HTTPS URL<input type="url" value={webhookUrl} onChange={(event) => setWebhookUrl(event.target.value)} required placeholder="https://hooks.example.com/otternest" /></label>
           <label>事件前缀<input value={eventPrefix} onChange={(event) => setEventPrefix(event.target.value)} required maxLength={100} placeholder="task." /></label>
-          <div className="form-actions"><button className="primary-button compact" disabled={saving || !projectId}>创建 Webhook</button></div>
+          <div className="form-actions"><button className="primary-button compact" disabled={saving || !projectId}>创建 回调</button></div>
         </form>}
         {loading && <p className="muted-inline">正在刷新连接…</p>}
         <div className="external-endpoint-list">
@@ -329,7 +329,7 @@ export default function ExternalInterfacesPage() {
               {hook.enabled && <button className="text-button" disabled={saving} onClick={() => void disableWebhook(hook)}>禁用</button>}
               <button className="text-button" disabled={saving} onClick={() => void deleteWebhook(hook)}>删除</button></div>
           </div>)}
-          {!loading && webhooks.length === 0 && <div className="empty-mini">当前项目尚未登记 Webhook。</div>}
+          {!loading && webhooks.length === 0 && <div className="empty-mini">当前项目尚未登记 回调。</div>}
         </div>
       </section>
 
@@ -337,15 +337,15 @@ export default function ExternalInterfacesPage() {
         <div className="panel-heading"><div className="panel-title"><Network size={17} /><h3>A2A 远端连接</h3></div>
           <div className="heading-actions"><span className="count-chip">{remotes.length}</span>
             <button className="secondary-button compact" onClick={() => setShowRemoteForm((v) => !v)} disabled={!projectId || saving}><Plus size={14} />添加</button></div></div>
-        <p className="form-hint">登记有真实 A2A 能力的远端 Agent。必须先登记 Remote Agent 并加入当前项目，后端还需 HTTPS 主机允许列表和独立远端凭据。</p>
+        <p className="form-hint">登记有真实 A2A 能力的远端 智能体。必须先登记 Remote 智能体 并加入当前项目，后端还需 HTTPS 主机允许列表和独立远端凭据。</p>
         {showRemoteForm && <form className="form-panel external-form" onSubmit={(event) => void createRemote(event)}>
-          <label>项目内 Remote Agent<select value={remoteAgentId} onChange={(event) => setRemoteAgentId(event.target.value)} required>
-            <option value="">选择远程 Agent…</option>{eligibleRemoteAgents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+          <label>项目内 Remote 智能体<select value={remoteAgentId} onChange={(event) => setRemoteAgentId(event.target.value)} required>
+            <option value="">选择远程 智能体…</option>{eligibleRemoteAgents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
           </select></label>
           <label>A2A HTTPS URL<input type="url" value={remoteUrl} onChange={(event) => setRemoteUrl(event.target.value)} required placeholder="https://agent.example.com/a2a" /></label>
           <label>远端项目 ID（可选）<input value={remoteProjectId} onChange={(event) => setRemoteProjectId(event.target.value)} maxLength={128} /></label>
           <div className="form-actions"><button className="primary-button compact" disabled={saving || !projectId || !remoteAgentId}>登记远端</button></div>
-          {eligibleRemoteAgents.length === 0 && <p className="form-hint">暂无符合条件的 Remote Agent。请先在 Agent 管理登记远程 Agent，并加入此项目。</p>}
+          {eligibleRemoteAgents.length === 0 && <p className="form-hint">暂无符合条件的 Remote 智能体。请先在 智能体 管理登记远程 智能体，并加入此项目。</p>}
         </form>}
         {loading && <p className="muted-inline">正在刷新连接…</p>}
         <div className="external-endpoint-list">

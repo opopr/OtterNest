@@ -204,7 +204,7 @@ export default function TaskCenterPage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><div className="eyebrow">TASK OPERATIONS</div><h1>任务中心</h1><p>跨项目汇总任务状态；授权、验收和任务调度均由服务端治理。</p></div>
+        <div><h1>任务中心</h1><p>跨项目汇总任务状态；授权、验收和任务调度均由服务端治理。</p></div>
         <div className="heading-actions">
           <button className="secondary-button" onClick={() => void load()} disabled={loading || dispatching}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button>
           <button className="primary-button compact" onClick={() => void dispatchNow()} disabled={loading || dispatching || saving}><GitBranch size={15} />{dispatching ? "正在调度…" : "立即调度"}</button>
@@ -230,11 +230,11 @@ export default function TaskCenterPage() {
               ))}
             </div>
           ) : (
-            <div className="dispatch-empty">本轮没有任务被路由。请检查 Runner 是否在线且处于 idle、Agent 能力是否已核验，以及任务是否处于待执行状态。</div>
+            <div className="dispatch-empty">本轮没有任务被路由。请检查 Runner 是否在线且处于 idle、智能体 能力是否已核验，以及任务是否处于待执行状态。</div>
           )}
           {dispatchNotice.routes.length > 12 && <p className="form-hint">另有 {dispatchNotice.routes.length - 12} 个路由结果未在此处展开，可在任务列表查看。</p>}
           {dispatchNotice.errors.length > 0 && <div className="dispatch-errors">{dispatchNotice.errors.map((item, index) => <p key={index}><AlertCircle size={13} />{item}</p>)}</div>}
-          <p className="dispatch-disclaimer">调度只写入目标 Agent 和审计事件，不会启动远程进程。Runner 通过自己的 Runtime 凭据轮询队列并领取任务。</p>
+          <p className="dispatch-disclaimer">调度只写入目标 智能体 和审计事件，不会启动远程进程。Runner 通过自己的 运行实例 凭据轮询队列并领取任务。</p>
         </section>
       )}
 

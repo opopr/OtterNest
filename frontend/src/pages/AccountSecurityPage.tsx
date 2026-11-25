@@ -217,7 +217,7 @@ export default function AccountSecurityPage() {
   if (!isOwner) return <div className="page-stack"><div className="page-heading"><h1>账号安全</h1></div><div className="panel empty-state"><ShieldCheck size={26} /><strong>只有所有者可访问账号安全设置。</strong></div></div>;
 
   return <div className="page-stack admin-gap-page">
-    <div className="page-heading"><div><div className="eyebrow">OWNER ACCOUNT SECURITY</div><h1>账号安全</h1>
+    <div className="page-heading"><div><h1>账号安全</h1>
       <p>管理所有者登录密码、TOTP 双重验证、会话和安全审计记录。</p></div>
       <button className="secondary-button compact" onClick={() => void load()} disabled={loading || saving}><RefreshCw size={14} />刷新</button>
     </div>

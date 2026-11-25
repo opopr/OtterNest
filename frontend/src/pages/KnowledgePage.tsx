@@ -256,11 +256,11 @@ export default function KnowledgePage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><div className="eyebrow">KNOWLEDGE & CONTINUITY</div><h1>知识库与项目章程</h1><p>管理项目记忆的提议、发布、修订、归档，以及跨项目共享和执行边界。</p></div>
+        <div><h1>知识库与项目章程</h1></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadProjectData(selectedId, searchQuery)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
       {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
-      <section className="panel project-toolbar"><div><div className="eyebrow">PROJECT WORKSPACE</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={setSelectedId} /><span className="muted-inline">{memories.length} 条记忆 · {publishedMemories.length} 条已发布</span></section>
+      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={setSelectedId} /><span className="muted-inline">{memories.length} 条记忆 · {publishedMemories.length} 条已发布</span></section>
       <div className="governance-tabs knowledge-tabs">
         <button className={tab === "memories" ? "selected" : ""} onClick={() => setTab("memories")}><BookOpen size={16} />项目记忆 <span>{memories.length}</span></button>
         <button className={tab === "charter" ? "selected" : ""} onClick={() => setTab("charter")}><ShieldCheck size={16} />项目章程</button>
@@ -306,7 +306,7 @@ export default function KnowledgePage() {
             <label>内容<textarea rows={4} value={memoryDraft.content} onChange={(event) => setDraftField("content", event.target.value)} required maxLength={20000} /></label>
             <label>来源与依据<input value={memoryDraft.source} onChange={(event) => setDraftField("source", event.target.value)} required maxLength={3000} /></label>
             {editingId && <label>修订原因（至少 5 个字符）<textarea rows={2} value={revisionReason} onChange={(event) => setRevisionReason(event.target.value)} required minLength={5} /></label>}
-            <p className="form-hint">新记忆默认进入待审核状态。只有所有者发布后，Agent 才能把它作为正式项目知识使用。</p>
+            <p className="form-hint">新记忆默认进入待审核状态。只有所有者发布后，智能体 才能把它作为正式项目知识使用。</p>
             <div className="form-actions"><button className="primary-button compact" disabled={saving || (Boolean(editingId) && revisionReason.trim().length < 5)}>{saving ? "保存中…" : editingId ? "保存修订" : "提交记忆"}</button></div>
           </form>}
           <div className="memory-grid">
