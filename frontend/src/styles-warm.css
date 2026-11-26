@@ -48,7 +48,7 @@ body { font-size: 14px; line-height: 1.5; }
 .login-decoration, .banner-orb { display: none; }
 .login-card { background: var(--surface); border-color: var(--border); box-shadow: var(--shadow); }
 input, textarea, select { accent-color: var(--accent); }
-:where(button, a, input, textarea, select):focus-visible { outline: 2px solid var(--brand-deep-teal); outline-offset: 2px; }
+:where(button, a, input, textarea, select, summary):focus-visible { outline: 2px solid var(--brand-deep-teal); outline-offset: 2px; }
 @media (max-width: 820px) {
   .sidebar { padding: 12px; }
   .brand { padding-bottom: 12px; }

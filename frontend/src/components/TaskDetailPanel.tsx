@@ -1,6 +1,6 @@
 import { getRiskLabel, TASK_STATUS_LABELS as statusLabels } from "../utils/labels";
 import TaskStatusBadge from "./TaskStatusBadge";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, AlertCircle, ArrowRight, Clock3, GitBranch, Info,
   Pencil, Plus, RefreshCw, ShieldCheck, Trash2, X
@@ -48,6 +48,15 @@ const shortId = (value: string) => value.length > 16 ? value.slice(0,8)+"…"+va
 
 export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Props) {
   const dialog = useDialog();
+  const panelRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeRef.current?.focus({ preventScroll: true });
+    return () => {
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, []);
   const [task,setTask] = useState<TaskDetail|null>(null);
   const [graph,setGraph] = useState<TaskGraph|null>(null);
   const [dependencyInfo,setDependencyInfo] = useState<DependencyInfo|null>(null);
@@ -230,12 +239,28 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
   );
 
   return <div className="modal-backdrop task-detail-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)onClose();}}>
-    <section className="task-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="task-detail-title">
+    <section ref={panelRef} className="task-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="task-detail-title" onKeyDown={event => {
+      // Nested confirmation dialogs handle their own keyboard events in the capture phase.
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        if (!editingTask && !saving) { event.preventDefault(); onClose(); }
+      } else if (event.key === "Tab") {
+        const items = Array.from(panelRef.current?.querySelectorAll<HTMLElement>(
+          'button, input, textarea, select, a[href], summary, [tabindex]'
+        ) || []).filter(el => el.tabIndex >= 0 && !el.matches(":disabled") && el.getClientRects().length > 0 && getComputedStyle(el).visibility === "visible");
+        if (!items.length) { event.preventDefault(); return; }
+        const first = items[0], last = items[items.length - 1];
+        if (event.shiftKey ? document.activeElement === first : document.activeElement === last) {
+          event.preventDefault();
+          (event.shiftKey ? last : first).focus();
+        }
+      }
+    }}>
       <div className="task-detail-header">
         <div><div className="eyebrow">{selection.projectName}</div><h2 id="task-detail-title">{task?.title||"任务详情"}</h2>{task&&<div className="task-detail-badges"><TaskStatusBadge status={task.status}/><span className="status-tag tag-neutral">{getRiskLabel(task.risk)}</span><span className="status-tag tag-neutral">优先级 {task.priority}</span></div>}</div>
-        <div className="task-detail-header-actions"><button className="secondary-button compact" onClick={()=>void load()} disabled={loading}><RefreshCw size={14} className={loading?"spin":""}/>刷新</button><button className="icon-button" onClick={onClose} aria-label="关闭任务详情"><X size={17}/></button></div>
+        <div className="task-detail-header-actions"><button className="secondary-button compact" onClick={()=>void load()} disabled={loading}><RefreshCw size={14} className={loading?"spin":""}/>刷新</button><button ref={closeRef} type="button" className="icon-button" onClick={onClose} aria-label="关闭任务详情"><X size={17}/></button></div>
       </div>
-      {error&&<div className="inline-error"><AlertCircle size={15}/>{error}<button onClick={()=>setError("")}><X size={14}/></button></div>}
+      {error&&<div className="inline-error" role="alert"><AlertCircle size={15}/>{error}<button type="button" aria-label="关闭错误提示" onClick={()=>setError("")}><X size={14}/></button></div>}
       {loading&&!task?<div className="panel-loading"><span className="spinner"/>正在读取任务详情…</div>:task&&<>
         <div className="task-detail-grid">
           <section className="task-detail-section"><h3>任务指令</h3><p className="task-detail-pre">{task.instruction||"暂无指令"}</p></section>
@@ -251,7 +276,7 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
           <div><small>重新执行次数</small><strong>{task.rework_count}</strong></div>
           <div><small>审批状态</small><strong>{task.approval_granted?"已授权":"未授权"}</strong></div>
           <div><small>执行智能体</small><code>{task.assigned_agent_id?shortId(task.assigned_agent_id):"尚未领取"}</code></div>
-          <div><small>目标 智能体</small><code>{task.target_agent_id?shortId(task.target_agent_id):"自动调度"}</code></div>
+          <div><small>目标智能体</small><code>{task.target_agent_id?shortId(task.target_agent_id):"自动调度"}</code></div>
           <div><small>租约代次</small><strong>{task.lease_epoch}</strong></div>
           <div><small>租约到期</small><strong>{formatTime(task.lease_until)}</strong></div>
           <div><small>完成时间</small><strong>{formatTime(task.completed_at)}</strong></div>
@@ -261,11 +286,11 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
 
         {editingTask && (
           <section className="task-detail-section task-detail-wide">
-            <div className="task-detail-section-head"><h3><Pencil size={15}/>编辑任务</h3><button className="icon-button" onClick={() => setEditingTask(false)}><X size={15}/></button></div>
+            <div className="task-detail-section-head"><h3><Pencil size={15}/>编辑任务</h3><button type="button" className="icon-button" aria-label="关闭任务编辑" onClick={() => setEditingTask(false)}><X size={15}/></button></div>
             <div className="form-panel form-panel-flat">
               <div className="form-grid three">
                 <label>任务标题<input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required maxLength={240}/></label>
-                <label>风险等级<select value={editRisk} onChange={(e) => setEditRisk(e.target.value as "R0"|"R1"|"R2"|"R3")}><option value="R0">R0</option><option value="R1">R1</option><option value="R2">R2</option><option value="R3">R3</option></select></label>
+                <label>风险等级<select value={editRisk} onChange={(e) => setEditRisk(e.target.value as "R0"|"R1"|"R2"|"R3")}><option value="R0">{getRiskLabel("R0")}</option><option value="R1">{getRiskLabel("R1")}</option><option value="R2">{getRiskLabel("R2")}</option><option value="R3">{getRiskLabel("R3")}</option></select></label>
                 <label>优先级<input type="number" min={0} max={100} value={editPriority} onChange={(e) => setEditPriority(e.target.value)}/></label>
               </div>
               <label>执行说明<textarea rows={3} value={editInstruction} onChange={(e) => setEditInstruction(e.target.value)}/></label>
@@ -284,7 +309,7 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
             <div className="dag-arrow"><ArrowRight size={19}/></div>
             <div className="dag-column"><span className="dag-column-label">下游任务 · {downstream.length}</span>{downstream.length?downstream.map(row=>taskNode(row,"downstream")):<div className="dag-empty">暂无下游任务</div>}</div>
           </div>
-          {canEditDependencies&&<div className="dependency-editor"><div><strong><ShieldCheck size={15}/>依赖治理</strong><small>仅所有者可修改；任务领取后依赖图将被冻结。</small></div><div className="dependency-editor-controls"><select value={candidateId} onChange={event=>setCandidateId(event.target.value)}><option value="">选择一个上游任务…</option>{candidates.map(row=><option key={row.id} value={row.id}>{row.title} · {statusLabels[row.status]||row.status}</option>)}</select><button className="secondary-button compact" onClick={()=>void addDependency()} disabled={saving||!candidateId}><Plus size={14}/>添加依赖</button></div>
+          {canEditDependencies&&<div className="dependency-editor"><div><strong><ShieldCheck size={15}/>依赖治理</strong><small>仅所有者可修改；任务领取后依赖图将被冻结。</small></div><div className="dependency-editor-controls"><select aria-label="上游任务" value={candidateId} onChange={event=>setCandidateId(event.target.value)}><option value="">选择一个上游任务…</option>{candidates.map(row=><option key={row.id} value={row.id}>{row.title} · {statusLabels[row.status]||row.status}</option>)}</select><button className="secondary-button compact" onClick={()=>void addDependency()} disabled={saving||!candidateId}><Plus size={14}/>添加依赖</button></div>
             {upstream.map(row=><div className="dependency-remove-row" key={row.id}><span>{row.title}</span><button className="text-button" onClick={()=>void removeDependency(row.id)} disabled={saving}><Trash2 size={13}/>移除依赖</button></div>)}
           </div>}
           {isOwner&&!canEditDependencies&&<p className="form-hint dependency-lock-note">当前任务状态为「{statusLabels[task.status]||task.status}」，依赖图不可修改。服务端会在领取或进入活动状态后冻结依赖关系。</p>}

@@ -336,9 +336,9 @@ export default function GoalsWorkflowPage() {
       <ErrorNotice message={error} onDismiss={() => setError("")} />
       <UnsavedDraftNotice dirty={hasUnsavedDraft} />
       <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={id => void changeProject(id)} disabled={saving} /><span className="muted-inline">{board?.goals?.length ?? 0} 个目标 · {rules.length} 条规则 · {runs.length} 条运行记录</span></section>
-      <div className="governance-tabs">
-        <button className={tab === "goals" ? "selected" : ""} onClick={() => setTab("goals")}><GitBranch size={16} />目标依赖图 <span>{board?.goals?.length ?? 0}</span></button>
-        <button className={tab === "rules" ? "selected" : ""} onClick={() => setTab("rules")}><Workflow size={16} />工作流规则 <span>{rules.length}</span></button>
+      <div className="governance-tabs" role="group" aria-label="目标与工作流内容">
+        <button type="button" aria-pressed={tab === "goals"} className={tab === "goals" ? "selected" : ""} onClick={() => setTab("goals")}><GitBranch size={16} />目标依赖图 <span>{board?.goals?.length ?? 0}</span></button>
+        <button type="button" aria-pressed={tab === "rules"} className={tab === "rules" ? "selected" : ""} onClick={() => setTab("rules")}><Workflow size={16} />工作流规则 <span>{rules.length}</span></button>
       </div>
       {loading ? <LoadingState label="正在读取目标和工作流…"/> : tab === "goals" ? (
         <div className="page-stack">

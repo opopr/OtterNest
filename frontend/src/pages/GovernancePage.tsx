@@ -402,11 +402,11 @@ export default function GovernancePage() {
         <div className="governance-summary"><span><strong>{pendingTasks.length}</strong> 待处理任务</span><span><strong>{decisions.filter((item) => item.status === "proposed").length}</strong> 待审决策</span></div>
       </section>
 
-      <div className="governance-tabs">
-        <button className={tab === "tasks" ? "selected" : ""} onClick={() => setTab("tasks")}><ClipboardCheck size={16} />任务审批 <span>{pendingTasks.length}</span></button>
-        <button className={tab === "decisions" ? "selected" : ""} onClick={() => setTab("decisions")}><ShieldCheck size={16} />决策审查 <span>{decisions.filter((item) => item.status === "proposed").length}</span></button>
-        <button className={tab === "command" ? "selected" : ""} onClick={() => setTab("command")}><MessageSquare size={16} />受限命令</button>
-        <button className={tab === "chat" ? "selected" : ""} onClick={() => setTab("chat")}><Bot size={16} />多轮指挥</button>
+      <div className="governance-tabs" role="group" aria-label="审批与治理内容">
+        <button type="button" aria-pressed={tab === "tasks"} className={tab === "tasks" ? "selected" : ""} onClick={() => setTab("tasks")}><ClipboardCheck size={16} />任务审批 <span>{pendingTasks.length}</span></button>
+        <button type="button" aria-pressed={tab === "decisions"} className={tab === "decisions" ? "selected" : ""} onClick={() => setTab("decisions")}><ShieldCheck size={16} />决策审查 <span>{decisions.filter((item) => item.status === "proposed").length}</span></button>
+        <button type="button" aria-pressed={tab === "command"} className={tab === "command" ? "selected" : ""} onClick={() => setTab("command")}><MessageSquare size={16} />受限命令</button>
+        <button type="button" aria-pressed={tab === "chat"} className={tab === "chat" ? "selected" : ""} onClick={() => setTab("chat")}><Bot size={16} />多轮指挥</button>
       </div>
 
       {tab === "tasks" ? (

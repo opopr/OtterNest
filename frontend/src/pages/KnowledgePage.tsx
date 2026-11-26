@@ -277,10 +277,10 @@ export default function KnowledgePage() {
       <ErrorNotice message={error} onDismiss={() => setError("")} />
       <UnsavedDraftNotice dirty={hasUnsavedDraft} />
       <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={id => void changeProject(id)} disabled={saving} /><span className="muted-inline">{memories.length} 条记忆 · {publishedMemories.length} 条已发布</span></section>
-      <div className="governance-tabs knowledge-tabs">
-        <button className={tab === "memories" ? "selected" : ""} onClick={() => setTab("memories")}><BookOpen size={16} />项目记忆 <span>{memories.length}</span></button>
-        <button className={tab === "charter" ? "selected" : ""} onClick={() => setTab("charter")}><ShieldCheck size={16} />项目章程</button>
-        <button className={tab === "sharing" ? "selected" : ""} onClick={() => setTab("sharing")}><Share2 size={16} />跨项目共享 <span>{shares.filter((item) => item.status === "proposed").length}</span></button>
+      <div className="governance-tabs knowledge-tabs" role="group" aria-label="知识库内容">
+        <button type="button" aria-pressed={tab === "memories"} className={tab === "memories" ? "selected" : ""} onClick={() => setTab("memories")}><BookOpen size={16} />项目记忆 <span>{memories.length}</span></button>
+        <button type="button" aria-pressed={tab === "charter"} className={tab === "charter" ? "selected" : ""} onClick={() => setTab("charter")}><ShieldCheck size={16} />项目章程</button>
+        <button type="button" aria-pressed={tab === "sharing"} className={tab === "sharing" ? "selected" : ""} onClick={() => setTab("sharing")}><Share2 size={16} />跨项目共享 <span>{shares.filter((item) => item.status === "proposed").length}</span></button>
       </div>
       {loading ? <LoadingState label="正在读取项目知识…"/> : tab === "memories" ? (
         <section className="panel">
@@ -314,7 +314,7 @@ export default function KnowledgePage() {
             </div>
           </div>
           {showMemoryForm && <ValidatedForm className="form-panel embedded-form" onSubmit={saveMemory}>
-            <div className="panel-heading"><div className="panel-title"><FilePlus2 size={16} /><h3>{editingId ? "修订知识记录" : "提出新记忆"}</h3></div><button type="button" className="icon-button" onClick={cancelMemoryForm}><X size={16} /></button></div>
+            <div className="panel-heading"><div className="panel-title"><FilePlus2 size={16} /><h3>{editingId ? "修订知识记录" : "提出新记忆"}</h3></div><button type="button" className="icon-button" aria-label="关闭记忆表单" onClick={cancelMemoryForm}><X size={16} /></button></div>
             <div className="form-grid">
               <label>知识类型<select value={memoryDraft.kind} onChange={(event) => setDraftField("kind", event.target.value)}><option value="fact">事实</option><option value="decision">决策</option><option value="experience">经验</option><option value="skill">技能</option><option value="procedure">流程</option></select></label>
               <label>敏感级别<select value={memoryDraft.sensitivity} onChange={(event) => setDraftField("sensitivity", event.target.value)}><option value="public">公开</option><option value="internal">内部</option><option value="confidential">机密</option><option value="restricted">受限</option></select></label>
