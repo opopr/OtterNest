@@ -1,3 +1,4 @@
+import ListPagination, { useListPage } from "../components/ListPagination";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -58,6 +59,7 @@ export default function RuntimeMonitorPage(){
    return matchesFilter&&(!q||haystack.includes(q));
   }).sort((a,b)=>Number(b.online)-Number(a.online)||a.agent_name.localeCompare(b.agent_name)||a.label.localeCompare(b.label));
  },[rows,filter,query]);
+ const runtimePage=useListPage(visible,JSON.stringify([filter,query]));
 
  const rotateToken=async(row:RuntimeRow)=>{
   if(!(await dialog.confirm({title:"轮换运行实例凭据",message:"为「"+row.label+"」轮换独立运行实例凭据？旧凭据将立即失效，必须同步更新对应执行节点的配置。",confirmText:"确认轮换",tone:"warning"})))return;
@@ -108,7 +110,7 @@ export default function RuntimeMonitorPage(){
      <option value="all">全部状态</option><option value="online">在线</option><option value="offline">离线</option><option value="disabled">已禁用</option><option value="missing_token">缺少凭据</option>
     </select><button type="button" className="text-button" onClick={()=>{setFilter("all");setQuery("");}}>清除筛选</button>
    </div>
-   {loading?<LoadingState label="正在汇总运行实例状态…"/>:visible.length?<div className="runtime-monitor-list">{visible.map(row=><article className="runtime-monitor-card" key={row.id}>
+   {loading?<LoadingState label="正在汇总运行实例状态…"/>:visible.length?<div className="runtime-monitor-list">{runtimePage.rows.map(row=><article className="runtime-monitor-card" key={row.id}>
     <div className="runtime-monitor-card-head">
      <div className="runtime-monitor-identity"><div className="runtime-monitor-avatar"><Cpu size={18}/></div><div><strong>{row.label}</strong><small>{row.agent_name} · {row.agent_platform}</small><code>{row.id}</code></div></div>
      <div className="runtime-monitor-badges"><span className={"status-tag "+(!row.enabled?"tag-neutral":row.online?"tag-green":"tag-amber")}>{!row.enabled?"已禁用":row.online?"在线":"离线"}</span><span className="status-tag tag-neutral">{stateLabels[row.status]||getUiLabel(row.status)}</span>{!row.agent_enabled&&<span className="status-tag tag-red">智能体已禁用</span>}</div>
@@ -125,6 +127,7 @@ export default function RuntimeMonitorPage(){
     </div>
    </article>)}</div>:<div className="empty-state"><Monitor size={27}/><strong>{rows.length?"没有符合条件的运行实例":"尚未登记运行实例"}</strong><p>{rows.length?"调整搜索条件或状态筛选。":"请先登记智能体，再创建运行实例并签发独立凭据。"}</p>{!rows.length&&<Link className="secondary-button" to="/agents">前往智能体管理</Link>}</div>}
   </section>
+  {!loading && <ListPagination {...runtimePage} label="运行实例分页"/>}
   <p className="runtime-monitor-footnote"><Activity size={13}/>在线状态由服务端按最近 180 秒心跳、运行实例启用状态及空闲/忙碌状态计算。</p>
  </div>;
 }

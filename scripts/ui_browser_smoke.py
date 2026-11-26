@@ -503,6 +503,40 @@ def project_scope_checks(browser, problems):
         expect(page.locator(".gc-result")).to_have_count(0)
         expect(page.get_by_role("button", name="确认回收", exact=True)).to_be_disabled()
         screenshot(page, "project-scope-gc-preview")
+
+        # Use a larger fixture only after all empty-project assertions are complete.
+        with httpx.Client(base_url=ORIGIN, timeout=15, headers={"Authorization": "Bearer " + OWNER}) as client:
+            for i in range(12):
+                response = client.post(f"/api/v1/projects/{second['id']}/tasks", json={
+                    "title": f"分页验收任务{i:02d}", "instruction": "验证分页",
+                    "acceptance": "列表无重复", "risk": "R1", "priority": i,
+                })
+                response.raise_for_status()
+        visit(page, "/tasks", "项目与任务", "任务中心", True)
+        page.get_by_label("项目", exact=True).select_option(second["id"])
+        page.get_by_label("任务排序", exact=True).select_option("title")
+        page.get_by_label("每页任务数", exact=True).select_option("10")
+        pager = page.get_by_role("group", name="任务分页", exact=True)
+        expect(page.locator(".task-center-row")).to_have_count(10)
+        expect(page.get_by_text("分页验收任务00", exact=True)).to_be_visible()
+        pager.get_by_role("button", name="下一页", exact=True).click()
+        expect(page.locator(".task-center-row")).to_have_count(2)
+        expect(page.get_by_text("分页验收任务10", exact=True)).to_be_visible()
+        expect(pager.get_by_role("button", name="下一页", exact=True)).to_be_disabled()
+        page.get_by_label("关键词", exact=True).fill("分页验收任务00")
+        expect(page.locator(".task-center-row")).to_have_count(1)
+        expect(page.get_by_text("分页验收任务00", exact=True)).to_be_visible()
+        expect(pager.get_by_role("button", name="上一页", exact=True)).to_be_disabled()
+        check_width(page, "multi-page-task-list", problems)
+        visit(page, "/projects", "项目与任务", "项目管理", True)
+        page.locator(".project-list-item").filter(has_text=second["name"]).click()
+        project_pager = page.get_by_role("group", name="项目任务分页", exact=True)
+        page.get_by_label("项目任务分页每页条数", exact=True).select_option("10")
+        expect(page.locator(".task-row-clickable")).to_have_count(10)
+        project_pager.get_by_role("button", name="下一页", exact=True).click()
+        expect(page.locator(".task-row-clickable")).to_have_count(2)
+        check_width(page, "multi-page-project-tasks", problems)
+        screenshot(page, "multi-page-project-tasks")
     finally:
         context.close()
 

@@ -1,3 +1,4 @@
+import ListPagination, { useListPage } from "../components/ListPagination";
 import { useProjectSelection } from "../components/ProjectSelection";
 import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
@@ -95,6 +96,8 @@ export default function ProjectsPage() {
   const visibleTasks = tasks.filter(task => (taskStatusFilter === "all" || task.status === taskStatusFilter) && [task.title, task.id, task.instruction].join(" ").toLocaleLowerCase().includes(taskQuery.trim().toLocaleLowerCase()));
   const visibleMembers = members.filter(member => [member.agent_name, member.agent_id, getUiLabel(member.role)].join(" ").toLocaleLowerCase().includes(memberQuery.trim().toLocaleLowerCase()));
 
+  const taskPage = useListPage(visibleTasks, JSON.stringify([selectedId,taskQuery,taskStatusFilter]));
+  const memberPage = useListPage(visibleMembers, JSON.stringify([selectedId,memberQuery]));
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedId) || null,
     [projects, selectedId]
@@ -494,7 +497,7 @@ export default function ProjectsPage() {
                   </div>
                 ) : (
                   <div className="task-list">
-                    {visibleTasks.map((task) => (
+                    {taskPage.rows.map((task) => (
                       <div
                         className="task-row task-row-clickable"
                         key={task.id}
@@ -524,6 +527,7 @@ export default function ProjectsPage() {
                     ))}
                   </div>
                 )}
+                {!detailLoading && <ListPagination {...taskPage} label="项目任务分页"/>}
               </div>
 
               </div>}
@@ -558,7 +562,7 @@ export default function ProjectsPage() {
                   <div className="empty-state"><Users size={24} /><strong>{members.length ? "没有符合条件的成员" : "暂无项目成员"}</strong></div>
                 ) : (
                   <div className="task-list">
-                    {visibleMembers.map((member) => (
+                    {memberPage.rows.map((member) => (
                       <div className="task-row flex-row-gap" key={member.id}>
                         <div className="task-main">
                           <strong>{member.agent_name}</strong>
@@ -583,6 +587,7 @@ export default function ProjectsPage() {
                     ))}
                   </div>
                 )}
+                {!detailLoading && <ListPagination {...memberPage} label="项目成员分页"/>}
               </div>
               </div>}
             </>

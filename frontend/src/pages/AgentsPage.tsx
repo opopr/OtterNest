@@ -1,3 +1,4 @@
+import ListPagination, { useListPage } from "../components/ListPagination";
 import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useDraftGuard } from "../components/DraftGuard";
@@ -57,6 +58,7 @@ export default function AgentsPage() {
   const [agentFilter, setAgentFilter] = useState("all");
   useDraftGuard(Boolean(name || platform !== "local" || executionMode !== "manual" || capabilities || createdToken || runtimeToken || runtimeLabel || runtimeEnvironment !== "local" || verifiedCapabilities || (editingAgent && (editName !== editingAgent.name || editPlatform !== editingAgent.platform || editExecutionMode !== editingAgent.execution_mode || editCapabilities !== (editingAgent.declared_capabilities || []).join(", ")))));
   const visibleAgents = useMemo(() => (tab === "active" ? activeAgents : trashedAgents).filter(agent => (tab === "trash" || agentFilter === "all" || agent.enabled === (agentFilter === "enabled")) && [agent.name, agent.platform, agent.id, ...(agent.declared_capabilities || []), ...(agent.verified_capabilities || [])].join(" ").toLocaleLowerCase().includes(agentQuery.trim().toLocaleLowerCase())), [tab, activeAgents, trashedAgents, agentQuery, agentFilter]);
+  const agentPage = useListPage(visibleAgents, JSON.stringify([tab,agentQuery,agentFilter]));
   const selectedAgent = useMemo(() => agents.find((agent) => agent.id === selectedAgentId) || null, [agents, selectedAgentId]);
 
   const loadAgents = useCallback(async () => {
@@ -348,7 +350,7 @@ export default function AgentsPage() {
             {tab === "active" ? <Bot size={30} /> : <Trash2 size={30} />}
             <strong>{(tab === "active" ? activeAgents : trashedAgents).length ? "没有符合条件的智能体" : tab === "active" ? "尚未登记智能体" : "回收站为空"}</strong>
           </div>
-        ) : visibleAgents.map((agent) => (
+        ) : agentPage.rows.map((agent) => (
           <article className={"panel agent-card " + (selectedAgentId === agent.id ? "agent-card-selected" : "")} key={agent.id}>
             <div className="agent-card-head">
               <div className="agent-card-identity"><div className="agent-avatar"><Bot size={20} /></div><div><h3>{agent.name}</h3><p>{agent.platform} · {getUiLabel(agent.execution_mode)}</p></div></div>
@@ -403,6 +405,7 @@ export default function AgentsPage() {
         ))}
       </div>
 
+      {!loading && <ListPagination {...agentPage} label="智能体分页"/>}
       {selectedAgent && (
         <section className="panel runtime-panel">
           <div className="panel-heading"><div className="panel-title"><Terminal size={17} /><h3>{selectedAgent.name} · 运行实例与能力</h3></div><button className="icon-button" onClick={() => setSelectedAgentId("")}><X size={16} /></button></div>

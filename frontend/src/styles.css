@@ -1599,3 +1599,11 @@ input, textarea, select { accent-color: var(--accent); }
 .task-sort-control{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--muted);min-width:0}
 .task-sort-control select{width:auto;max-width:100%}
 @media(max-width:580px){.project-picker{flex:1 1 160px;max-width:100%}.project-search-toggle{min-height:36px;min-width:36px}.task-sort-control{flex:1 1 140px}.task-sort-control select{flex:1}}
+
+/* Shared pagination fits small workspaces as well as full-width lists. */
+.list-pagination{min-width:0;flex-wrap:wrap;gap:8px;align-items:center}
+.list-pagination>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.list-pagination label{display:inline-flex;align-items:center;gap:5px}
+.list-pagination select{min-width:52px}
+.list-pagination button:disabled{cursor:not-allowed}
+@media(max-width:580px){.list-pagination{justify-content:flex-start}.list-pagination>div{width:100%;justify-content:flex-start}.list-pagination button{min-height:36px}}

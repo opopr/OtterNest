@@ -1,3 +1,4 @@
+import ListPagination, { useListPage } from "../components/ListPagination";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import { useDraftGuard } from "../components/DraftGuard";
 import { useProjectSelection } from "../components/ProjectSelection";
@@ -42,6 +43,7 @@ export default function AccessPage() {
   const [grantFilter, setGrantFilter] = useState("all");
   const grantStatus = (grant: TaskGrant) => grant.revoked ? "revoked" : new Date(grant.expires_at).getTime() <= Date.now() ? "expired" : "active";
   const visibleGrants = grants.filter(grant => grantFilter === "all" || grantStatus(grant) === grantFilter);
+  const grantPage=useListPage(visibleGrants,JSON.stringify([selectedProjectId,selectedTaskId,grantFilter]));
   const [agentId, setAgentId] = useState("");
   const [scopes, setScopes] = useState("task.read, artifact.read");
   const [sensitivity, setSensitivity] = useState("internal");
@@ -166,13 +168,14 @@ export default function AccessPage() {
         <section className="panel">
           <div className="panel-heading"><div className="panel-title"><ShieldCheck size={17} /><h3>当前任务授权</h3></div><span className="count-chip">{grants.length}</span></div>
           {selectedTask && <p className="form-hint">任务：{selectedTask.title}</p>}
-          <div className="approval-switch" role="group" aria-label="授权状态">{[{key:"all",label:"全部"},{key:"active",label:"有效"},{key:"expired",label:"已过期"},{key:"revoked",label:"已撤销"}].map(item => <button type="button" key={item.key} aria-pressed={grantFilter === item.key} className={grantFilter === item.key ? "selected" : ""} onClick={() => setGrantFilter(item.key)}>{item.label}</button>)}</div><div className="grant-list">{visibleGrants.map((grant) => <article className="grant-card" key={grant.id}>
+          <div className="approval-switch" role="group" aria-label="授权状态">{[{key:"all",label:"全部"},{key:"active",label:"有效"},{key:"expired",label:"已过期"},{key:"revoked",label:"已撤销"}].map(item => <button type="button" key={item.key} aria-pressed={grantFilter === item.key} className={grantFilter === item.key ? "selected" : ""} onClick={() => setGrantFilter(item.key)}>{item.label}</button>)}</div><div className="grant-list">{grantPage.rows.map((grant) => <article className="grant-card" key={grant.id}>
             <div className="grant-card-head"><strong>{members.find((member) => member.agent_id === grant.agent_id)?.agent_name || grant.agent_id.slice(0, 8)}</strong><span className={"status-tag " + (grant.revoked ? "tag-neutral" : new Date(grant.expires_at).getTime() <= Date.now() ? "tag-red" : "tag-green")}>{grant.revoked ? "已撤销" : new Date(grant.expires_at).getTime() <= Date.now() ? "已过期" : "有效"}</span></div>
             <div className="grant-scopes">{grant.granted_scopes.map((scope) => <code key={scope}>{scope}</code>)}</div>
             <small>敏感级上限：{sensitivityLabels[grant.max_sensitivity] || grant.max_sensitivity}</small>
             <small>到期：{new Date(grant.expires_at).toLocaleString("zh-CN", { hour12: false })}</small>
             {!grant.revoked && new Date(grant.expires_at).getTime() > Date.now() && <button className="text-button grant-revoke" disabled={saving} onClick={() => void revokeGrant(grant)}><Trash2 size={13} />撤销授权</button>}
           </article>)}{!visibleGrants.length && <div className="empty-state"><KeyRound size={24} /><strong>{grants.length ? "没有符合条件的授权" : "暂无临时授权"}</strong></div>}</div>
+          {!loading && <ListPagination {...grantPage} label="授权分页"/>}
         </section>
       </div>
     </div>

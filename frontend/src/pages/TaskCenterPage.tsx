@@ -1,3 +1,4 @@
+import ListPagination, { useListPage } from "../components/ListPagination";
 import { ErrorNotice } from "../components/PageFeedback";
 import { getUiLabel, TASK_STATUS_LABELS as labels, RISK_LABELS as risks } from "../utils/labels";
 import TaskStatusBadge from "../components/TaskStatusBadge";
@@ -42,12 +43,9 @@ export default function TaskCenterPage() {
   const [status, setStatus] = useState(() => Object.prototype.hasOwnProperty.call(labels, searchParams.get("status") || "") ? searchParams.get("status")! : "all");
   const [risk, setRisk] = useState("all");
   const [query, setQuery] = useState(searchParams.get("q") || "");
-  const [pageIndex, setPageIndex] = useState(0);
   const [sortBy,setSortBy] = useState<"attention"|"priority"|"risk"|"title">("attention");
-  const [pageSize, setPageSize] = useState(25);
   const [compactRows, setCompactRows] = useState(() => { try { return localStorage.getItem("otternest-task-compact-rows") === "true"; } catch { return false; } });
   useEffect(() => { try { localStorage.setItem("otternest-task-compact-rows", String(compactRows)); } catch {} }, [compactRows]);
-  useEffect(() => { setPageIndex(0); }, [project, status, risk, query, pageSize, sortBy]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dispatching, setDispatching] = useState(false);
@@ -100,9 +98,7 @@ export default function TaskCenterPage() {
       });
   }, [tasks, project, status, risk, query, sortBy]);
 
-  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
-  const currentPage = Math.min(pageIndex, totalPages - 1);
-  const pageRows = rows.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const taskPage = useListPage(rows, JSON.stringify([project,status,risk,query,sortBy]),25);
   const counts = {
     all: tasks.length,
     approval: tasks.filter((t) => t.status === "waiting_approval").length,
@@ -278,7 +274,7 @@ export default function TaskCenterPage() {
           <div className="panel-loading"><span className="spinner" />正在汇总项目任务…</div>
         ) : rows.length ? (
           <div className={"task-center-list" + (compactRows ? " task-center-list-compact" : "")}>
-            {pageRows.map((t) => (
+            {taskPage.rows.map((t) => (
               <article className="task-center-row" key={t.id}>
                 <div className="task-center-main">
                   <div className="task-center-title">
@@ -306,7 +302,7 @@ export default function TaskCenterPage() {
         ) : (
           <div className="empty-state"><ClipboardCheck size={24} /><strong>没有符合条件的任务</strong></div>
         )}
-        {!loading && rows.length > 0 && <div className="task-pagination" aria-label="任务分页"><span>第 {currentPage * pageSize + 1}–{Math.min((currentPage + 1) * pageSize, rows.length)} 条，共 {rows.length} 条</span><div><label>每页 <select aria-label="每页任务数" value={pageSize} onChange={e => setPageSize(Number(e.target.value))}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option></select></label><button type="button" className="secondary-button compact" disabled={currentPage === 0} onClick={() => setPageIndex(currentPage - 1)}>上一页</button><span>{currentPage + 1}/{totalPages}</span><button type="button" className="secondary-button compact" disabled={currentPage + 1 >= totalPages} onClick={() => setPageIndex(currentPage + 1)}>下一页</button></div></div>}
+        {!loading && <ListPagination {...taskPage} label="任务分页" sizeLabel="每页任务数" sizes={[10,25,50]}/>}
       </section>
 
       {detailSelection && <TaskDetailPanel selection={detailSelection} isOwner={user?.kind === "owner"} onClose={() => setDetailSelection(null)} onChanged={() => void load()} />}
