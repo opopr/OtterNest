@@ -1,7 +1,9 @@
+import ValidatedForm from "../components/ValidatedForm";
 import { useState, type FormEvent } from "react";
 import { ArrowRight, KeyRound, LockKeyhole, RefreshCw, ShieldCheck } from "lucide-react";
 import { getApiOrigin } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
+import BrandMark from "../components/BrandMark";
 
 type LoginMode = "account" | "token";
 
@@ -51,33 +53,33 @@ export default function LoginPage() {
 
   return (
     <div className="login-screen">
-      <div className="login-decoration login-decoration-one" />
-      <div className="login-decoration login-decoration-two" />
+
+
       <div className="login-card">
         <div className="login-brand">
-          <div className="login-mascot">🦦</div>
-          <div><div className="eyebrow">PERSONAL AI TEAM OS</div><h1>欢迎回到 OtterNest</h1><p>你的 AI 团队，始终由你掌控。</p></div>
+          <div className="login-mascot"><BrandMark /></div>
+          <div><h1>登录水獭窝</h1></div>
         </div>
         {challenge ? (
-          <form className="login-form" onSubmit={handleMfa}>
+          <ValidatedForm className="login-form" onSubmit={handleMfa}>
             <div className="login-form-heading"><ShieldCheck size={19} /><strong>双重身份验证</strong></div>
-            <p className="form-hint">请输入验证器 App 的 6 位动态验证码，或 8 位一次性备用恢复码。</p>
+            <p className="form-hint">请输入验证器应用的 6 位动态验证码，或 8 位一次性备用恢复码。</p>
             <label>验证码 / 恢复码<input autoFocus value={code} onChange={(event) => setCode(event.target.value)} autoComplete="one-time-code" required /></label>
-            {error && <div className="form-error">{error}</div>}
+            {error && <div className="form-error" role="alert">{error}</div>}
             <button className="primary-button" disabled={busy}>{busy ? "正在验证…" : "验证并进入"}<ArrowRight size={16} /></button>
             <button type="button" className="text-button" onClick={() => { setChallenge(""); setCode(""); setError(""); }}>返回账号登录</button>
-          </form>
+          </ValidatedForm>
         ) : authStatus === null ? (
           <div className="login-connection-error">
             <div className="form-error setup-warning">
               {authError || "无法连接到 OtterNest FastAPI 服务，请检查网络或跨域配置。"}
             </div>
             <div className="connection-origin-list">
-              <div><span>当前前端 Origin</span><code>{window.location.origin}</code></div>
-              <div><span>后端 API Origin</span><code>{getApiOrigin()}</code></div>
+              <div><span>当前前端来源地址</span><code>{window.location.origin}</code></div>
+              <div><span>后端接口来源地址</span><code>{getApiOrigin()}</code></div>
             </div>
             <p className="form-hint">
-              请确认后端环境变量 <code>OTTERNEST_CORS_ORIGINS</code> 已精确包含上方「当前前端 Origin」（不含路径与通配符），且 <code>VITE_API_BASE_URL</code> 指向可访问的 FastAPI HTTPS Origin。
+              请确认后端环境变量 <code>OTTERNEST_CORS_ORIGINS</code> 已精确包含上方「当前前端来源地址」（不含路径与通配符），且 <code>VITE_API_BASE_URL</code> 指向可访问的 FastAPI HTTPS 来源地址。
             </p>
             <button
               type="button"
@@ -89,44 +91,44 @@ export default function LoginPage() {
             </button>
           </div>
         ) : !configured && canBootstrap ? (
-          <form className="login-form" onSubmit={handleBootstrap}>
+          <ValidatedForm className="login-form" onSubmit={handleBootstrap}>
             <div className="login-form-heading"><LockKeyhole size={19} /><strong>初始化所有者账户</strong></div>
             <p className="form-hint">使用服务端配置的所有者令牌创建账户，令牌不会保存到浏览器。</p>
             <label>所有者初始化令牌<input type="password" value={ownerToken} onChange={(event) => setOwnerToken(event.target.value)} autoComplete="off" required /></label>
             <label>显示名称<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} required /></label>
             <label>登录用户名<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required minLength={3} /></label>
             <label>登录密码<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required minLength={8} /></label>
-            {error && <div className="form-error">{error}</div>}
+            {error && <div className="form-error" role="alert">{error}</div>}
             <button className="primary-button" disabled={busy}>{busy ? "正在初始化…" : "创建所有者账户"}<ArrowRight size={16} /></button>
-          </form>
+          </ValidatedForm>
         ) : !canBootstrap ? (
           <div className="form-error setup-warning">
             后端未配置有效的 OTTERNEST_OWNER_TOKEN。所有者登录和初始化都依赖该服务端配置，请先在 FastAPI 服务端修复配置。
           </div>
         ) : (
           <>
-            {authError && !error && <div className="form-error mb-10">{authError}</div>}
+            {authError && !error && <div className="form-error mb-10" role="alert">{authError}</div>}
             <div className="login-tabs">
-              <button className={mode === "account" ? "selected" : ""} onClick={() => { setMode("account"); setError(""); }}>账号登录</button>
-              <button className={mode === "token" ? "selected" : ""} onClick={() => { setMode("token"); setError(""); }}>管理员令牌</button>
+              <button type="button" aria-pressed={mode === "account"} className={mode === "account" ? "selected" : ""} onClick={() => { setMode("account"); setError(""); }}>账号登录</button>
+              <button type="button" aria-pressed={mode === "token"} className={mode === "token" ? "selected" : ""} onClick={() => { setMode("token"); setError(""); }}>管理员令牌</button>
             </div>
             {mode === "account" ? (
-              <form className="login-form" onSubmit={handleLogin}>
+              <ValidatedForm className="login-form" onSubmit={handleLogin}>
                 <label>用户名<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required /></label>
                 <label>密码<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
-                {error && <div className="form-error">{error}</div>}
-                <button className="primary-button" disabled={busy}>{busy ? "正在登录…" : "登录 OtterNest"}<ArrowRight size={16} /></button>
-              </form>
+                {error && <div className="form-error" role="alert">{error}</div>}
+                <button className="primary-button" disabled={busy}>{busy ? "正在登录…" : "登录"}<ArrowRight size={16} /></button>
+              </ValidatedForm>
             ) : (
-              <form className="login-form" onSubmit={handleToken}>
+              <ValidatedForm className="login-form" onSubmit={handleToken}>
                 <label>管理员令牌<input type="password" value={ownerToken} onChange={(event) => setOwnerToken(event.target.value)} autoComplete="off" required /></label>
-                {error && <div className="form-error">{error}</div>}
+                {error && <div className="form-error" role="alert">{error}</div>}
                 <button className="primary-button" disabled={busy}>{busy ? "正在验证…" : "验证令牌"}<KeyRound size={16} /></button>
-              </form>
+              </ValidatedForm>
             )}
           </>
         )}
-        <div className="login-footnote"><ShieldCheck size={15} /><span>身份验证由 FastAPI 完成 · 会话令牌仅保存在当前页面内存中</span></div>
+        <div className="login-footnote"><ShieldCheck size={15} /><span>会话令牌仅保存在当前页面内存中</span></div>
       </div>
     </div>
   );

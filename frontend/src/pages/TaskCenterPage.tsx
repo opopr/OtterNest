@@ -1,5 +1,13 @@
+import EmptyState from "../components/EmptyState";
+import DataTable from "../components/DataTable";
+import { useDisplayPreference, ViewModeSwitch } from "../components/ViewModeSwitch";
+import ListPagination, { useListPage } from "../components/ListPagination";
+import { ErrorNotice } from "../components/PageFeedback";
+import { getRiskLabel, getUiLabel, TASK_STATUS_LABELS as labels, RISK_LABELS as risks } from "../utils/labels";
+import TaskStatusBadge from "../components/TaskStatusBadge";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, ClipboardCheck, Eye, Filter, GitBranch, RefreshCw, RotateCcw, ShieldCheck, X } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { request } from "../api/client";
 import type { Agent, Project, Task } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
@@ -24,17 +32,6 @@ interface DispatchNotice {
   errors: string[];
   project_count: number;
 }
-const labels: Record<string, string> = {
-  ready: "待执行", waiting_dependencies: "等待依赖", waiting_approval: "等待授权",
-  running: "执行中", submitted: "等待验收", blocked: "已阻塞",
-  completed: "已完成", cancelled: "已取消", failed: "执行失败"
-};
-const tones: Record<string, string> = {
-  ready: "tag-blue", waiting_dependencies: "tag-neutral", waiting_approval: "tag-red",
-  running: "tag-blue", submitted: "tag-amber", blocked: "tag-red",
-  completed: "tag-green", cancelled: "tag-neutral", failed: "tag-red"
-};
-const risks: Record<string, string> = { R0: "低风险", R1: "一般风险", R2: "较高风险", R3: "高风险" };
 const time = (v: string) => new Date(v).toLocaleString("zh-CN", { hour12: false });
 
 export default function TaskCenterPage() {
@@ -44,10 +41,15 @@ export default function TaskCenterPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Row[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [project, setProject] = useState("all");
-  const [status, setStatus] = useState("all");
+  const [searchParams] = useSearchParams();
+  const [project, setProject] = useState(searchParams.get("project") || "all");
+  const [status, setStatus] = useState(() => Object.prototype.hasOwnProperty.call(labels, searchParams.get("status") || "") ? searchParams.get("status")! : "all");
   const [risk, setRisk] = useState("all");
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(searchParams.get("q") || "");
+  const [sortBy,setSortBy] = useState<"attention"|"priority"|"risk"|"title">("attention");
+  const [viewMode,setViewMode] = useDisplayPreference("otternest-task-view","list");
+  const [compactRows, setCompactRows] = useState(() => { try { return localStorage.getItem("otternest-task-compact-rows") === "true"; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem("otternest-task-compact-rows", String(compactRows)); } catch {} }, [compactRows]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dispatching, setDispatching] = useState(false);
@@ -74,6 +76,13 @@ export default function TaskCenterPage() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const nextStatus = searchParams.get("status") || "";
+    setProject(searchParams.get("project") || "all");
+    setStatus(Object.prototype.hasOwnProperty.call(labels, nextStatus) ? nextStatus : "all");
+    setRisk("all");
+    setQuery(searchParams.get("q") || "");
+  }, [searchParams]);
 
   const rows = useMemo(() => {
     const q = query.trim().toLocaleLowerCase();
@@ -86,10 +95,14 @@ export default function TaskCenterPage() {
       )
       .sort((a, b) => {
         const rank = (t: Row) => t.status === "waiting_approval" ? 0 : t.status === "submitted" ? 1 : t.status === "blocked" ? 2 : 3;
+        if (sortBy === "priority") return b.priority - a.priority || rank(a)-rank(b);
+        if (sortBy === "risk") return b.risk.localeCompare(a.risk) || b.priority-a.priority;
+        if (sortBy === "title") return a.title.localeCompare(b.title,"zh-CN") || a.id.localeCompare(b.id);
         return rank(a) - rank(b) || b.priority - a.priority;
       });
-  }, [tasks, project, status, risk, query]);
+  }, [tasks, project, status, risk, query, sortBy]);
 
+  const taskPage = useListPage(rows, JSON.stringify([project,status,risk,query,sortBy]),25);
   const counts = {
     all: tasks.length,
     approval: tasks.filter((t) => t.status === "waiting_approval").length,
@@ -155,7 +168,7 @@ export default function TaskCenterPage() {
     const scope = project === "all" ? "全部活动项目" : "当前项目";
     const confirmed = await dialog.confirm({
       title: "执行任务调度",
-      message: `确认对${scope}执行一次任务调度？\n\n只会路由到最近 180 秒内心跳且处于 idle 的 Runtime。调度只设置目标 Agent，不会远程启动进程；Runner 仍需自行轮询并领取任务。`,
+      message: `确认对${scope}执行一次任务调度？\n\n只会分配给最近 180 秒内上报心跳且处于空闲状态的运行实例。调度仅设置目标智能体，不会启动远程进程；执行节点仍需自行轮询并领取任务。`,
       confirmText: "立即调度"
     });
     if (!confirmed) return;
@@ -201,10 +214,20 @@ export default function TaskCenterPage() {
       ? `退回返工（${plan.parameters?.reason || "未填原因"}）`
       : "验收通过";
 
+  const renderTaskActions = (t: Row) => (<div className="task-center-actions">
+                  <button className="secondary-button compact" onClick={() => setDetailSelection({ id: t.id, projectId: t.project_id, projectName: t.project_name })}><Eye size={14} />详情</button>
+                  {t.status === "waiting_approval" && <button className="secondary-button compact" disabled={saving} onClick={() => void preview(t, "authorize_task")}><ShieldCheck size={14} />预览授权</button>}
+                  {t.status === "submitted" && (
+                    <>
+                      <button className="secondary-button compact" disabled={saving} onClick={() => void preview(t, "review_task", true)}><CheckCircle2 size={14} />预览验收</button>
+                      <button className="secondary-button compact" disabled={saving} onClick={() => void preview(t, "review_task", false)}><RotateCcw size={14} />退回返工</button>
+                    </>
+                  )}
+                </div>);
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><div className="eyebrow">TASK OPERATIONS</div><h1>任务中心</h1><p>跨项目汇总任务状态；授权、验收和任务调度均由服务端治理。</p></div>
+        <div><h1>任务中心</h1></div>
         <div className="heading-actions">
           <button className="secondary-button" onClick={() => void load()} disabled={loading || dispatching}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button>
           <button className="primary-button compact" onClick={() => void dispatchNow()} disabled={loading || dispatching || saving}><GitBranch size={15} />{dispatching ? "正在调度…" : "立即调度"}</button>
@@ -214,7 +237,7 @@ export default function TaskCenterPage() {
       {dispatchNotice && (
         <section className="panel dispatch-notice">
           <div className="dispatch-notice-head">
-            <div><strong>本轮调度结果</strong><p>扫描 {dispatchNotice.project_count} 个活动项目，成功路由 {dispatchNotice.routes.length} 个任务。</p></div>
+            <div><strong>本轮调度结果</strong><p>扫描 {dispatchNotice.project_count} 个活动项目，成功分配 {dispatchNotice.routes.length} 个任务。</p></div>
             <button className="icon-button" onClick={() => setDispatchNotice(null)} aria-label="关闭调度结果"><X size={15} /></button>
           </div>
           {dispatchNotice.routes.length > 0 ? (
@@ -225,72 +248,78 @@ export default function TaskCenterPage() {
                   <div><strong>{route.task_title}</strong><small>{route.project_name}</small></div>
                   <span className="dispatch-route-arrow">→</span>
                   <div><strong>{route.agent_name}</strong><small>{route.agent_id.slice(0, 8)}</small></div>
-                  <span className="status-tag tag-green">已路由</span>
+                  <span className="status-tag tag-green">已分配</span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="dispatch-empty">本轮没有任务被路由。请检查 Runner 是否在线且处于 idle、Agent 能力是否已核验，以及任务是否处于待执行状态。</div>
+            <div className="dispatch-empty">本轮未分配任务。请检查执行节点是否在线且空闲、智能体能力是否已核验，以及任务是否待执行。</div>
           )}
-          {dispatchNotice.routes.length > 12 && <p className="form-hint">另有 {dispatchNotice.routes.length - 12} 个路由结果未在此处展开，可在任务列表查看。</p>}
+          {dispatchNotice.routes.length > 12 && <p className="form-hint">另有 {dispatchNotice.routes.length - 12} 个分配结果未在此处展开，可在任务列表查看。</p>}
           {dispatchNotice.errors.length > 0 && <div className="dispatch-errors">{dispatchNotice.errors.map((item, index) => <p key={index}><AlertCircle size={13} />{item}</p>)}</div>}
-          <p className="dispatch-disclaimer">调度只写入目标 Agent 和审计事件，不会启动远程进程。Runner 通过自己的 Runtime 凭据轮询队列并领取任务。</p>
+          <p className="dispatch-disclaimer">调度只记录目标智能体与审计事件，不会启动远程进程。执行节点使用独立凭据领取任务。</p>
         </section>
       )}
 
-      {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={14} /></button></div>}
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
 
-      <div className="stat-grid task-center-stats">
-        <div className="stat-card"><div className="stat-icon tone-violet"><ClipboardCheck size={18} /></div><div className="stat-copy"><span>全部任务</span><strong>{counts.all}</strong><small>所有可访问项目</small></div></div>
-        <div className="stat-card"><div className="stat-icon tone-amber"><ShieldCheck size={18} /></div><div className="stat-copy"><span>等待授权</span><strong>{counts.approval}</strong><small>需要所有者审批</small></div></div>
-        <div className="stat-card"><div className="stat-icon tone-blue"><CheckCircle2 size={18} /></div><div className="stat-copy"><span>等待验收</span><strong>{counts.review}</strong><small>等待所有者验收</small></div></div>
-        <div className="stat-card"><div className="stat-icon tone-green"><AlertCircle size={18} /></div><div className="stat-copy"><span>阻塞任务</span><strong>{counts.blocked}</strong><small>需要排查原因</small></div></div>
-      </div>
-
-      <section className="panel task-center-panel">
-        <div className="panel-heading"><div className="panel-title"><Filter size={17} /><h3>筛选任务</h3></div><span className="muted-inline">{rows.length} 条结果</span></div>
-        <div className="task-filters">
-          <label>项目<select value={project} onChange={(e) => setProject(e.target.value)}><option value="all">全部项目</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-          <label>状态<select value={status} onChange={(e) => setStatus(e.target.value)}><option value="all">全部状态</option>{Object.entries(labels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-          <label>风险等级<select value={risk} onChange={(e) => setRisk(e.target.value)}><option value="all">全部等级</option>{Object.entries(risks).map(([k, v]) => <option key={k} value={k}>{k} · {v}</option>)}</select></label>
-          <label>关键词<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="任务名称、项目或 ID" /></label>
+      <section className="panel task-center-panel task-workspace">
+        <div className="task-status-switch" role="group" aria-label="快速筛选任务状态">
+          {[
+            { key: "all", label: "全部任务", value: counts.all, icon: ClipboardCheck },
+            { key: "waiting_approval", label: "等待授权", value: counts.approval, icon: ShieldCheck },
+            { key: "submitted", label: "等待验收", value: counts.review, icon: CheckCircle2 },
+            { key: "blocked", label: "阻塞任务", value: counts.blocked, icon: AlertCircle }
+          ].map(({key, label, value, icon: Icon}) => (
+            <button key={key} type="button" aria-pressed={status === key} className={"task-status-filter" + (status === key ? " selected" : "")} onClick={() => setStatus(key)}>
+              <Icon size={16}/><span>{label}</span><strong>{value}</strong>
+            </button>
+          ))}
         </div>
-      </section>
-
-      <section className="panel task-center-panel">
-        <div className="panel-heading"><div className="panel-title"><ClipboardCheck size={17} /><h3>任务列表</h3></div><span className="muted-inline">待授权、待验收和阻塞任务优先</span></div>
+        <div className="panel-heading task-filter-heading"><div className="panel-title"><Filter size={16}/><h3>筛选</h3></div><button type="button" className="text-button" onClick={() => { setProject("all"); setStatus("all"); setRisk("all"); setQuery(""); }}>清除筛选</button></div>
+        <div className="task-filters">
+          <label>项目<select aria-label="项目" value={project} onChange={(e) => setProject(e.target.value)}><option value="all">全部项目</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+          <label>状态<select aria-label="状态" value={status} onChange={(e) => setStatus(e.target.value)}><option value="all">全部状态</option>{Object.entries(labels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+          <label>风险等级<select aria-label="风险等级" value={risk} onChange={(e) => setRisk(e.target.value)}><option value="all">全部等级</option>{Object.entries(risks).map(([k, v]) => <option key={k} value={k}>{k} · {v}</option>)}</select></label>
+          <label>关键词<input aria-label="关键词" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="任务名称、项目或 ID" /></label>
+        </div>
+        <div className="panel-heading task-results-heading"><div className="panel-title"><ClipboardCheck size={17}/><h3>任务列表</h3></div><div className="heading-actions"><span className="muted-inline">{rows.length} 条结果</span><ViewModeSwitch value={viewMode} onChange={setViewMode} label="任务显示方式" alternate="table"/><label className="task-sort-control">排序<select aria-label="任务排序" value={sortBy} onChange={event=>setSortBy(event.target.value as typeof sortBy)}><option value="attention">待处理优先</option><option value="priority">优先级从高到低</option><option value="risk">风险从高到低</option><option value="title">任务名称</option></select></label><button type="button" className="secondary-button compact" aria-pressed={compactRows} onClick={() => setCompactRows(v => !v)}>{compactRows ? "展开摘要" : "紧凑显示"}</button></div></div>
         {loading ? (
           <div className="panel-loading"><span className="spinner" />正在汇总项目任务…</div>
         ) : rows.length ? (
-          <div className="task-center-list">
-            {rows.map((t) => (
+          viewMode === "table" ? (
+            <DataTable rows={taskPage.rows} rowKey={t=>t.id} label="任务表格" preferenceKey="otternest-task-columns" className="task-data-table" rowClassName="task-table-row" columns={[
+              {id:"title",label:"任务",required:true,render:t=><><strong className="data-table-title">{t.title}</strong>{!compactRows && <small className="task-result-excerpt">{t.failure_reason || t.result_summary || t.instruction}</small>}<details className="task-row-identifier"><summary>任务编号</summary><code>{t.id}</code></details></>},
+              {id:"project",label:"项目",required:true,render:t=>t.project_name},
+              {id:"status",label:"状态",required:true,render:t=><TaskStatusBadge status={t.status}/>},
+              {id:"risk",label:"风险",required:true,render:t=>getRiskLabel(t.risk)},
+              {id:"priority",label:"优先级",numeric:true,render:t=>t.priority},
+              {id:"sensitivity",label:"敏感级",required:true,render:t=>getUiLabel(t.sensitivity)},
+              {id:"actions",label:"操作",required:true,render:renderTaskActions}
+            ]}/>
+          ) : (
+          <div className={"task-center-list" + (compactRows ? " task-center-list-compact" : "")}>
+            {taskPage.rows.map((t) => (
               <article className="task-center-row" key={t.id}>
                 <div className="task-center-main">
                   <div className="task-center-title">
                     <strong>{t.title}</strong>
-                    <span className={"status-tag " + (tones[t.status] || "tag-neutral")}>{labels[t.status] || t.status}</span>
-                    <span className="status-tag tag-neutral">{t.risk}</span>
+                    <TaskStatusBadge status={t.status}/>
+                    <span className="status-tag tag-neutral">{getRiskLabel(t.risk)}</span>
                   </div>
-                  <p>{t.project_name} · 优先级 {t.priority} · {t.sensitivity}</p>
-                  <small>{t.result_summary || t.failure_reason || t.instruction}</small>
-                  <small>任务 ID：{t.id}</small>
+                  <p>{t.project_name} · 优先级 {t.priority} · {getUiLabel(t.sensitivity)}</p>
+                  {!compactRows && <small className="task-result-excerpt">{t.failure_reason || t.result_summary || t.instruction}</small>}
+                  <details className="task-row-identifier"><summary>任务编号</summary><code>{t.id}</code></details>
                 </div>
-                <div className="task-center-actions">
-                  <button className="secondary-button compact" onClick={() => setDetailSelection({ id: t.id, projectId: t.project_id, projectName: t.project_name })}><Eye size={14} />详情</button>
-                  {t.status === "waiting_approval" && <button className="secondary-button compact" disabled={saving} onClick={() => void preview(t, "authorize_task")}><ShieldCheck size={14} />预览授权</button>}
-                  {t.status === "submitted" && (
-                    <>
-                      <button className="secondary-button compact" disabled={saving} onClick={() => void preview(t, "review_task", true)}><CheckCircle2 size={14} />预览验收</button>
-                      <button className="secondary-button compact" disabled={saving} onClick={() => void preview(t, "review_task", false)}><RotateCcw size={14} />退回返工</button>
-                    </>
-                  )}
-                </div>
+                {renderTaskActions(t)}
               </article>
             ))}
           </div>
+          )
         ) : (
-          <div className="empty-state"><ClipboardCheck size={24} /><strong>没有符合条件的任务</strong><p>调整筛选条件，或先在项目中创建任务。</p></div>
+          <EmptyState icon={ClipboardCheck} title={tasks.length ? "没有符合条件的任务" : "暂无任务"} action={tasks.length ? {label:"重置搜索",onClick:()=>{setProject("all");setStatus("all");setRisk("all");setQuery("");}}:undefined}/>
         )}
+        {!loading && <ListPagination {...taskPage} label="任务分页" sizeLabel="每页任务数" sizes={[10,25,50]}/>}
       </section>
 
       {detailSelection && <TaskDetailPanel selection={detailSelection} isOwner={user?.kind === "owner"} onClose={() => setDetailSelection(null)} onChanged={() => void load()} />}
@@ -303,7 +332,7 @@ export default function TaskCenterPage() {
             <div className="command-summary">
               <strong>{plan.task_title || tasks.find((t) => t.id === plan.task_id)?.title || "任务"}</strong>
               <span>操作：{planActionLabel}</span>
-              <span>预览状态：{plan.status}</span>
+              <span>预览状态：{getUiLabel(plan.status)}</span>
               <span>任务版本：{plan.expected_version}</span>
               <span>有效期：{time(plan.expires_at)}</span>
             </div>

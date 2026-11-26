@@ -1,0 +1,5 @@
+/* Keep the original base cascade order. */
+@import "./styles-foundation.css";
+@import "./styles-domain.css";
+@import "./styles-command.css";
+@import "./styles-shell.css";

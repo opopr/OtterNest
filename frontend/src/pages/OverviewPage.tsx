@@ -1,15 +1,18 @@
+import EmptyState from "../components/EmptyState";
+import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity, AlertCircle, ArrowRight, Bot, CheckCircle2, Clock3,
   FolderKanban, RefreshCw, ShieldAlert, Wifi, WifiOff
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { getApiOrigin, request, websocketUrl } from "../api/client";
+import { request, websocketUrl } from "../api/client";
 import type {
   Agent, BriefingTask, DailyBriefing, PortfolioMetrics, Project, SystemMode
 } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import StatCard from "../components/StatCard";
+import { getSystemModeLabel, getUiLabel } from "../utils/labels";
 import { computeReconnectDelayMs } from "../utils/reconnect";
 
 interface OverviewData {
@@ -20,37 +23,30 @@ interface OverviewData {
   system: SystemMode;
 }
 
-function StatusTag({ value }: { value: string }) {
-  const map: Record<string, string> = {
-    active: "进行中", paused: "已暂停", archived: "已归档",
-    ready: "待执行", running: "执行中", submitted: "待验收",
-    waiting_approval: "待审批", blocked: "已阻塞", completed: "已完成", cancelled: "已取消"
-  };
-  const tone = value === "completed" || value === "active" ? "tag-green"
-    : value === "blocked" || value === "waiting_approval" ? "tag-red"
-      : value === "running" || value === "submitted" ? "tag-blue" : "tag-neutral";
-  return <span className={"status-tag " + tone}>{map[value] || value}</span>;
+function StatusTag({value}: {value: string}) {
+  return <span className={"status-tag " + (value === "active" ? "tag-green" : "tag-neutral")}>{getUiLabel(value)}</span>;
 }
 
-function PendingList({ title, items, kind }: {
-  title: string; items: BriefingTask[]; kind: "approval" | "review" | "blocked";
+function PendingList({ title, items, kind, projectNames }: {
+  title: string; items: BriefingTask[]; kind: "approval" | "review" | "blocked"; projectNames: Map<string, string>;
 }) {
   const Icon = kind === "approval" ? ShieldAlert : kind === "review" ? Clock3 : AlertCircle;
-  if (items.length === 0) return null;
+  const status = kind === "approval" ? "waiting_approval" : kind === "review" ? "submitted" : "blocked";
   return (
-    <section className="panel pending-panel">
+    <section className={"pending-panel pending-" + kind}>
       <div className="panel-heading">
         <div className="panel-title"><Icon size={17} /><h3>{title}</h3></div>
-        <span className="count-chip">{items.length}</span>
+        <Link className="pending-count-link" to={"/tasks?status=" + status} aria-label={"查看" + title}><span className="count-chip">{items.length}</span><ArrowRight size={14} /></Link>
       </div>
       <div className="pending-list">
+        {!items.length && <span className="pending-empty">暂无待办</span>}
         {items.slice(0, 5).map((item) => (
           <div className="pending-row" key={item.task_id}>
             <div className="pending-copy">
               <strong>{item.title}</strong>
-              <small>{item.project_id.slice(0, 8)} · {item.task_id.slice(0, 8)}</small>
+              <small>{projectNames.get(item.project_id) || "项目 " + item.project_id.slice(0, 8)}</small>
             </div>
-            <Link to={"/projects?project=" + encodeURIComponent(item.project_id)} className="icon-link" aria-label="查看项目">
+            <Link to={"/tasks?status=" + status + "&project=" + encodeURIComponent(item.project_id) + "&q=" + encodeURIComponent(item.task_id)} className="icon-link" aria-label={"查看任务：" + item.title}>
               <ArrowRight size={16} />
             </Link>
           </div>
@@ -180,16 +176,18 @@ export default function OverviewPage() {
     }));
   }, [data]);
 
-  if (loading && !data) return <div className="loading-panel"><div className="spinner" />正在读取真实项目数据…</div>;
-  if (error && !data) return <div className="error-panel"><AlertCircle size={18} />{error}<button onClick={() => void refresh()}>重试</button></div>;
+  if (loading && !data) return <LoadingState label="正在读取项目数据…"/>;
+  if (error && !data) return <ErrorNotice message={error} onRetry={() => void refresh()} busy={loading} />;
 
   const briefing = data?.briefing;
   const metrics = data?.metrics;
+  const projectNames = new Map((data?.projects || []).map(project => [project.id, project.name]));
+  const pendingCount = (briefing?.pending_r3_tasks?.length ?? 0) + (briefing?.pending_review_tasks?.length ?? 0) + (briefing?.blocked_tasks?.length ?? 0);
 
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><div className="eyebrow">COMMAND CENTER</div><h1>团队总览</h1><p>项目、执行节点和待处理事项的实时概况。</p></div>
+        <div><h1>总览</h1></div>
         <div className="heading-actions">
           <div className={"live-pill " + (live === "connected" ? "live-on" : "")}>
             {live === "connected" ? <Wifi size={15} /> : <WifiOff size={15} />}
@@ -200,37 +198,38 @@ export default function OverviewPage() {
           </button>
         </div>
       </div>
-      {error && <div className="inline-error">{error}</div>}
+      <ErrorNotice message={error} />
 
-      <div className="welcome-banner">
-        <div className="welcome-copy">
-          <span className="welcome-kicker">YOUR AI TEAM, YOUR RULES</span>
-          <h2>让每一只小水獭，都在正确的任务上协作。</h2>
-          <p>目标由你设定，权限由你掌控，成果由你验收。</p>
-          <Link to="/projects" className="banner-link">查看项目与任务 <ArrowRight size={16} /></Link>
-        </div>
-        <img src={getApiOrigin() + "/assets/mascots/otter-wave.png"} alt="OtterNest 水獭" />
-        <div className="banner-orb banner-orb-one" /><div className="banner-orb banner-orb-two" />
-      </div>
 
       <div className="stat-grid">
-        <StatCard label="项目空间" value={metrics?.project_count ?? 0} hint="已登记项目" icon={FolderKanban} tone="violet" />
-        <StatCard label="任务总数" value={metrics?.total_tasks ?? 0} hint="跨项目任务" icon={Activity} tone="blue" />
-        <StatCard label="已完成任务" value={metrics?.completed_count ?? 0} hint="已验收完成" icon={CheckCircle2} tone="green" />
-        <StatCard label="阻塞任务" value={metrics?.blocked_count ?? 0} hint="需要排查处理" icon={AlertCircle} tone="amber" />
-        <StatCard label="启用 Agent" value={briefing?.enabled_agents ?? 0} hint="已登记并启用" icon={Bot} tone="violet" />
+        <StatCard label="项目空间" value={metrics?.project_count ?? 0} hint="" icon={FolderKanban} tone="violet" />
+        <StatCard label="任务总数" value={metrics?.total_tasks ?? 0} hint="" icon={Activity} tone="blue" />
+        <StatCard label="已完成任务" value={metrics?.completed_count ?? 0} hint="" icon={CheckCircle2} tone="green" />
+        <StatCard label="阻塞任务" value={metrics?.blocked_count ?? 0} hint="" icon={AlertCircle} tone="amber" />
+        <StatCard label="已启用智能体" value={briefing?.enabled_agents ?? 0} hint="" icon={Bot} tone="violet" />
       </div>
 
+      <section className="panel overview-attention" aria-label="待处理事项">
+        <div className="section-heading">
+          <div><h2>待处理事项 <span className="count-chip">{pendingCount}</span></h2></div>
+          <Link to="/portfolio" className="subtle-link">{briefing?.unread_notifications ?? 0} 条未读通知 <ArrowRight size={15}/></Link>
+        </div>
+        <div className="pending-grid">
+          <PendingList title="高风险任务待审批" items={briefing?.pending_r3_tasks || []} kind="approval" projectNames={projectNames} />
+          <PendingList title="任务待验收" items={briefing?.pending_review_tasks || []} kind="review" projectNames={projectNames} />
+          <PendingList title="执行阻塞" items={briefing?.blocked_tasks || []} kind="blocked" projectNames={projectNames} />
+        </div>
+      </section>
+      <section className="overview-projects">
       <div className="section-heading">
-        <div><h2>项目运行情况</h2><p>数据来自服务端每日简报与 Portfolio 指标。</p></div>
+        <div><h2>项目运行情况</h2></div>
         <Link to="/projects" className="subtle-link">全部项目 <ArrowRight size={15} /></Link>
       </div>
-      <div className="project-grid">
+      <div className="project-grid overview-project-grid">
         {projectRows.length === 0 ? (
-          <div className="empty-state">
-            <FolderKanban size={28} /><strong>还没有项目</strong><p>创建第一个项目，开始组织你的 AI 团队。</p>
+          <EmptyState icon={FolderKanban} title="还没有项目">
             <Link to="/projects" className="primary-button compact">创建项目</Link>
-          </div>
+          </EmptyState>
         ) : projectRows.map((project) => {
           const progress = project.task_total > 0 ? Math.round(project.completed / project.task_total * 100) : 0;
           return (
@@ -249,26 +248,11 @@ export default function OverviewPage() {
         })}
       </div>
 
-      <div className="section-heading">
-        <div><h2>需要你处理</h2><p>这些事项来自真实的任务状态，不是模拟数据。</p></div>
-        <span className="muted-inline">{briefing?.unread_notifications ?? 0} 条未读通知</span>
-      </div>
-      <div className="pending-grid">
-        <PendingList title="高风险任务待审批" items={briefing?.pending_r3_tasks || []} kind="approval" />
-        <PendingList title="任务待验收" items={briefing?.pending_review_tasks || []} kind="review" />
-        <PendingList title="执行阻塞" items={briefing?.blocked_tasks || []} kind="blocked" />
-        {(!briefing || (
-          (briefing.pending_r3_tasks?.length ?? 0) === 0 &&
-          (briefing.pending_review_tasks?.length ?? 0) === 0 &&
-          (briefing.blocked_tasks?.length ?? 0) === 0
-        )) && (
-          <div className="all-clear"><CheckCircle2 size={22} /><strong>目前没有待处理的任务异常</strong><span>系统仍会持续记录项目事件和执行状态。</span></div>
-        )}
-      </div>
+      </section>
       <div className="data-footnote">
-        <span>系统模式：{data?.system?.mode || "未知"}</span>
+        <span>系统模式：{getSystemModeLabel(data?.system?.mode)}</span>
         <span>简报生成：{briefing?.generated_at ? new Date(briefing.generated_at).toLocaleString("zh-CN") : "—"}</span>
-        <span>{lastEvent ? "最近事件：" + lastEvent : "等待项目事件"}</span>
+        <span>{lastEvent ? "已收到项目事件" : "等待项目事件"}</span>
       </div>
     </div>
   );

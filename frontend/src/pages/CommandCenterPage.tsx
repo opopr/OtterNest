@@ -1,5 +1,11 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Activity, AlertCircle, CheckCircle2, Clock3, FileCode2, MessageSquare, RefreshCw, Search, ShieldCheck, X } from "lucide-react";
+import EmptyState from "../components/EmptyState";
+import ProjectSelect from "../components/ProjectSelect";
+import { useConfirmDiscard } from "../components/DraftGuard";
+import { useProjectSelection } from "../components/ProjectSelection";
+import { ErrorNotice, SuccessNotice } from "../components/PageFeedback";
+import { getUiLabel } from "../utils/labels";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { Activity, Clock3, FileCode2, MessageSquare, RefreshCw, Search, ShieldCheck, X } from "lucide-react";
 import { request } from "../api/client";
 import type { Project, Task } from "../api/types";
 import A2UIRenderer, { type A2UIResult } from "../components/A2UIRenderer";
@@ -61,8 +67,14 @@ const sampleA2UI = JSON.stringify(
 
 export default function CommandCenterPage() {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useProjectSelection(projects);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [taskProjectId, setTaskProjectId] = useState("");
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const taskRequest = useRef(0);
+  const currentProject = useRef(selectedId);
+  currentProject.current = selectedId;
+  const currentTasks = taskProjectId === selectedId ? tasks : [];
   const [plan, setPlan] = useState<CommandPlan | null>(null);
   const [recentPlanIds, setRecentPlanIds] = useState<string[]>([]);
   const [planLookupId, setPlanLookupId] = useState("");
@@ -76,6 +88,11 @@ export default function CommandCenterPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
+  const confirmDiscard = useConfirmDiscard();
+  const changeProject = async (id: string) => {
+    if (saving || id === selectedId || !(await confirmDiscard())) return;
+    setPlan(null); setPlanLookupId(""); setPlanLookupResult(null); setRecentPlanIds([]); setError(""); setSelectedId(id);
+  };
   const loadProjects = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -91,34 +108,42 @@ export default function CommandCenterPage() {
   }, []);
 
   const loadTasks = useCallback(async (projectId: string) => {
+    if (projectId !== currentProject.current) return;
+    const requestId = ++taskRequest.current;
     if (!projectId) {
+      setTaskProjectId("");
+      setTasksLoading(false);
       setTasks([]);
       setAgUiData(null);
       return;
     }
+    setTasksLoading(true);
     try {
       const [taskRows, agUiRows] = await Promise.all([
         request<Task[]>("/projects/" + encodeURIComponent(projectId) + "/tasks"),
         request<AgUiSnapshotResponse>("/projects/" + encodeURIComponent(projectId) + "/ag-ui/events?limit=25").catch(() => null)
       ]);
+      if (requestId !== taskRequest.current || currentProject.current !== projectId) return;
+      setTaskProjectId(projectId);
       setTasks(taskRows);
       setAgUiData(agUiRows);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "项目任务读取失败");
-    }
+      if (requestId === taskRequest.current && currentProject.current === projectId) setError(reason instanceof Error ? reason.message : "项目任务读取失败");
+    } finally { if (requestId === taskRequest.current) setTasksLoading(false); }
   }, []);
 
   useEffect(() => { void loadProjects(); }, [loadProjects]);
-  useEffect(() => { void loadTasks(selectedId); }, [selectedId, loadTasks]);
+  useEffect(() => { setPlan(null); setAgUiData(null); setNotice(""); void loadTasks(selectedId); return () => { taskRequest.current += 1; }; }, [selectedId, loadTasks]);
 
   const handlePlanGenerated = (nextPlan: CommandPlan) => {
+    if (nextPlan.project_id !== currentProject.current) return;
     setPlan(nextPlan);
     setPlanLookupId(nextPlan.id);
     setRecentPlanIds((cur) => [nextPlan.id, ...cur.filter((id) => id !== nextPlan.id)].slice(0, 6));
   };
 
   const confirmPlan = async () => {
-    if (!plan) return;
+    if (!plan || plan.project_id !== currentProject.current) return;
     setSaving(true);
     setError("");
     setNotice("");
@@ -159,9 +184,10 @@ export default function CommandCenterPage() {
     setToolsBusy(true);
     setError("");
     try {
-      setAgUiData(await request<AgUiSnapshotResponse>("/projects/" + encodeURIComponent(selectedId) + "/ag-ui/events?limit=25"));
+      const snapshot = await request<AgUiSnapshotResponse>("/projects/" + encodeURIComponent(selectedId) + "/ag-ui/events?limit=25");
+      if (currentProject.current === selectedId) setAgUiData(snapshot);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "读取 AG-UI 投影事件失败");
+      setError(reason instanceof Error ? reason.message : "读取事件投影失败");
     } finally {
       setToolsBusy(false);
     }
@@ -193,46 +219,37 @@ export default function CommandCenterPage() {
     <div className="page-stack">
       <div className="page-heading">
         <div>
-          <div className="eyebrow">OWNER-CONTROLLED COMMANDS</div>
-          <h1>AI 指挥中心</h1>
-          <p>通过规则模板或服务器端模型提出任务操作建议；任何授权、指派、验收和取消都必须经过你的确认。</p>
+          
+          <h1>智能指挥中心</h1>
+          
         </div>
         <button className="secondary-button" onClick={() => void loadProjects()} disabled={loading}>
           <RefreshCw size={15} className={loading ? "spin" : ""} />刷新项目
         </button>
       </div>
 
-      {error && <div className="inline-error"><AlertCircle size={15} />{error}<button onClick={() => setError("")}><X size={14} /></button></div>}
-      {notice && <div className="success-notice"><CheckCircle2 size={15} />{notice}<button onClick={() => setNotice("")}><X size={14} /></button></div>}
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
+      <SuccessNotice message={notice} onDismiss={() => setNotice("")} />
 
       <section className="panel command-project-bar">
-        <label>当前项目
-          <select value={selectedId} onChange={(event) => setSelectedId(event.target.value)} disabled={loading || projects.length === 0}>
-            {projects.length === 0 && <option value="">暂无项目</option>}
-            {projects.map((project) => <option key={project.id} value={project.id}>{project.name} · {project.status}</option>)}
-          </select>
-        </label>
+        <div className="command-project-picker"><span className="muted-inline">当前项目</span><ProjectSelect label="指挥中心项目" projects={projects} value={selectedId} onChange={id=>void changeProject(id)} disabled={loading || saving}/></div>
         <div>
-          <span className="status-tag tag-neutral">{tasks.length} 项任务上下文</span>
-          <span className="muted-inline">模型模式最多读取 50 项最新任务</span>
+          <span className="status-tag tag-neutral">{tasksLoading ? "读取任务中…" : taskProjectId !== selectedId ? "任务尚未读取" : currentTasks.length + " 项任务"}</span>
         </div>
       </section>
 
       {selectedId ? (
-        <CommandChatPanel projectId={selectedId} tasks={tasks} onPlan={handlePlanGenerated} />
+        <CommandChatPanel key={selectedId} projectId={selectedId} tasks={currentTasks} onPlan={handlePlanGenerated} />
       ) : (
-        <div className="panel empty-state">
-          <MessageSquare size={28} />
-          <strong>先创建一个项目</strong>
-          <p>指挥中心需要项目任务上下文，才能生成有约束的操作预览。</p>
-        </div>
+        <EmptyState panel icon={MessageSquare} title="先创建一个项目"/>
       )}
 
+      <details className="panel command-advanced"><summary>高级工具 <span>计划查询 · 事件与组件校验</span></summary>
       <div className="command-tools-grid">
         <section className="panel">
           <div className="panel-heading">
-            <div className="panel-title"><Search size={16} /><h3>命令计划追溯</h3></div>
-            <span className="muted-inline">GET /command/plans/&#123;id&#125;</span>
+            <div className="panel-title"><Search size={16} /><h3>操作计划查询</h3></div>
+            
           </div>
           <form className="form-panel form-panel-flat" onSubmit={(e) => void lookupPlan(e)}>
             <div className="flex-row-gap">
@@ -240,7 +257,7 @@ export default function CommandCenterPage() {
                 className="flex-1"
                 value={planLookupId}
                 onChange={(e) => setPlanLookupId(e.target.value)}
-                placeholder="输入命令计划 UUID 查询执行状态与版本结果…"
+                aria-label="操作计划编号" placeholder="输入操作计划编号"
               />
               <button type="submit" className="secondary-button compact" disabled={toolsBusy || !planLookupId.trim()}>
                 <Search size={13} />查询
@@ -264,7 +281,7 @@ export default function CommandCenterPage() {
           {planLookupResult && (
             <div className="command-summary">
               <strong>{planLookupResult.id}</strong>
-              <span>操作：{actionLabels[planLookupResult.action] || planLookupResult.action} · 状态：{planLookupResult.status} · 期望版本：v{planLookupResult.expected_version}</span>
+              <span>操作：{actionLabels[planLookupResult.action] || planLookupResult.action} · 状态：{getUiLabel(planLookupResult.status)} · 期望版本：v{planLookupResult.expected_version}</span>
               <span>过期时间：{formatTime(planLookupResult.expires_at)}</span>
               <pre className="json-preview">{JSON.stringify({ parameters: planLookupResult.parameters, result: planLookupResult.result }, null, 2)}</pre>
             </div>
@@ -273,7 +290,7 @@ export default function CommandCenterPage() {
 
         <section className="panel">
           <div className="panel-heading">
-            <div className="panel-title"><Activity size={16} /><h3>AG-UI 事件投影与 A2UI 校验</h3></div>
+            <div className="panel-title"><Activity size={16} /><h3>事件与组件校验</h3></div>
             <button type="button" className="secondary-button compact" disabled={!selectedId || toolsBusy} onClick={() => void refreshAgUi()}>
               <RefreshCw size={13} />刷新投影
             </button>
@@ -282,7 +299,7 @@ export default function CommandCenterPage() {
             <div className="tag-wrap-list">
               <span className="status-tag tag-blue">{agUiData.protocol}</span>
               {Object.entries(agUiData.state_snapshot.task_counts).map(([st, count]) => (
-                <span className="status-tag tag-neutral" key={st}>{st}: {count}</span>
+                <span className="status-tag tag-neutral" key={st}>{getUiLabel(st)}：{count}</span>
               ))}
             </div>
           )}
@@ -291,7 +308,7 @@ export default function CommandCenterPage() {
               {agUiData.events.slice(-8).reverse().map((ev) => (
                 <div className="ag-ui-event-row" key={ev.event_id}>
                   <div className="ag-ui-event-head">
-                    <strong>{ev.type}</strong>
+                    <strong>{getUiLabel(ev.type)}</strong>
                     <span className="status-tag tag-neutral">{ev.otternest_kind}</span>
                   </div>
                   <small>#{ev.event_id} · {ev.subject_id.slice(0, 12)} · {ev.timestamp ? formatTime(ev.timestamp) : "—"}</small>
@@ -303,7 +320,7 @@ export default function CommandCenterPage() {
           )}
 
           <form className="form-panel form-panel-flat section-spacer-top" onSubmit={(e) => void validateA2uiPayload(e)}>
-            <label>A2UI 组件白名单验证 (POST /a2ui/validate)
+            <label>A2UI 组件白名单验证
               <textarea rows={4} value={a2uiInput} onChange={(e) => setA2uiInput(e.target.value)} />
             </label>
             <div className="form-actions">
@@ -325,6 +342,7 @@ export default function CommandCenterPage() {
           )}
         </section>
       </div>
+      </details>
 
       {plan && (
         <div className="modal-backdrop">
@@ -337,11 +355,11 @@ export default function CommandCenterPage() {
             <div className="command-summary">
               <strong>{plan.task_title || plan.task_id}</strong>
               <span>操作：{actionLabels[plan.action] || plan.action}</span>
-              <span>任务状态：{plan.task_status || "—"} · 风险：{plan.task_risk || "—"}</span>
+              <span>任务状态：{getUiLabel(plan.task_status)} · 风险：{plan.task_risk || "—"}</span>
               <span>预览版本：v{plan.expected_version}</span>
-              {targetAgent && <span>目标 Agent：{targetAgent}</span>}
+              {targetAgent && <span>目标智能体：{targetAgent}</span>}
               <span><Clock3 size={13} />有效期至：{formatTime(plan.expires_at)}</span>
-              <span>计划状态：{plan.status}</span>
+              <span>计划状态：{getUiLabel(plan.status)}</span>
             </div>
             <div className="form-actions">
               <button className="secondary-button" onClick={() => setPlan(null)} disabled={saving}>暂不执行</button>

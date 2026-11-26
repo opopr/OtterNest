@@ -1,0 +1,125 @@
+/* Unsaved drafts stay visible without adding decorative text. */
+.unsaved-draft-notice{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--border-strong);border-radius:8px;background:var(--amber-soft);color:var(--legacy-text-warning);font-size:13px;line-height:1.5;min-width:0}
+.unsaved-draft-notice svg{flex-shrink:0}
+
+/* Shared feedback: keyboard-friendly controls and readable, wrapping diagnostics. */
+.page-feedback{align-items:flex-start;gap:8px;min-width:0}
+.page-feedback>svg{flex:0 0 auto;margin-top:2px}
+.feedback-message{flex:1;min-width:0;overflow-wrap:anywhere;white-space:pre-wrap;line-height:1.55}
+.page-feedback .feedback-dismiss,.page-feedback .feedback-retry{display:inline-flex;align-items:center;justify-content:center;gap:5px;flex-shrink:0;min-height:30px;padding:4px 8px;border:1px solid currentColor;border-radius:7px;background:transparent;color:inherit;font-size:12px;white-space:nowrap}
+.page-feedback .feedback-dismiss{border-color:transparent;width:30px;margin-left:0}
+.page-feedback button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.panel-loading[role="status"]{min-height:64px;display:flex;align-items:center;justify-content:center;gap:10px;color:var(--muted)}
+@media(max-width:580px){.page-feedback{flex-wrap:wrap}.feedback-message{flex-basis:calc(100% - 32px)}.page-feedback .feedback-retry{margin-left:24px}}
+
+/* Form constraints, independent of the browser display language. */
+.form-validation-message{display:flex;align-items:flex-start;gap:8px;grid-column:1/-1;border:1px solid var(--border);border-radius:8px;background:var(--red-soft);color:var(--red);padding:10px 12px;font-size:13px;line-height:1.55;overflow-wrap:anywhere}
+.form-validation-message svg{flex-shrink:0;margin-top:2px}
+.form-panel :is(input,select,textarea)[aria-invalid="true"],.login-form :is(input,select,textarea)[aria-invalid="true"]{border-color:var(--red);outline-color:var(--red)}
+
+/* Display preferences: preserve readable text and touch targets, adjust desktop whitespace only. */
+.user-menu .display-preferences{display:grid;gap:2px;padding:4px 0 6px;border-bottom:1px solid var(--border);margin-bottom:4px}
+.display-preferences>small{padding:5px 9px;color:var(--muted);font-size:12px}
+.user-menu .display-preferences button{min-width:208px;gap:7px;white-space:nowrap}
+.display-preferences button>span:nth-child(2){flex:1}
+.preference-state{font-size:11px;color:var(--muted)}
+.display-preferences button[aria-pressed="true"] .preference-state{color:var(--brand-deep-teal);font-weight:650}
+.task-center-list-compact .task-center-row{padding-block:8px}
+@media(min-width:1050px){
+ .wide-layout .page-content{max-width:none}
+ .wide-layout .project-grid,.wide-layout .agent-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr))}
+ .wide-layout .memory-grid,.wide-layout .skill-grid,.wide-layout .goal-board{grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr))}
+ .wide-layout .projects-layout{grid-template-columns:clamp(290px,22%,420px) minmax(0,1fr)}
+ .wide-layout .command-chat-transcript{max-height:min(72vh,920px)}
+ .wide-layout .task-detail-dialog{width:min(100%,1120px)}
+ .compact-density .page-stack{gap:14px}
+ .compact-density .panel{padding:14px}
+ .compact-density .panel-heading{margin-bottom:10px}
+ .compact-density .task-center-row,.compact-density .task-row{padding-block:8px}
+ .compact-density .project-list-item{padding-block:7px}
+ .compact-density .artifact-card,.compact-density .runtime-monitor-card{padding:10px;gap:8px}
+ .compact-density :is(.project-grid,.agent-grid,.memory-grid,.skill-grid,.goal-board){gap:10px}
+ .compact-density :is(.project-card,.agent-card,.stat-card){padding:12px}
+}
+@media(max-width:1049px){.display-preferences{display:none!important}}
+/* Remaining hard-coded pale surfaces in dark mode. */
+:root[data-ui-theme="dark"] :is(.runtime-monitor-card,.artifact-card){border-color:var(--border)}
+
+/* Keep known task statuses readable in every density and theme. */
+.status-tag[data-task-status]{flex-shrink:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.35}
+:root[data-ui-theme="dark"] .status-tag.tag-blue{color:var(--blue);background:var(--blue-soft)}
+
+/* Shared project picker retains a native select for keyboard and mobile support. */
+.project-picker{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:6px;min-width:0;max-width:100%}
+.project-picker .project-select{width:100%;min-width:0;flex:none}
+.project-search-toggle{display:inline-flex;align-items:center;justify-content:center;background:transparent;border:0;border-left:1px solid var(--border);color:var(--muted);padding:3px 0 3px 9px;flex-shrink:0;min-height:24px}
+.project-search-toggle:hover,.project-search-toggle[aria-expanded="true"]{color:var(--brand-deep-teal)}
+.project-picker-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center}
+.project-picker-search input,.task-sort-control select{min-width:0;width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:7px 9px;font-size:13px}
+.project-picker-search small{grid-column:1/-1;color:var(--muted);font-size:12px}
+.command-project-picker{display:grid;gap:5px;min-width:0;flex:1}
+.task-sort-control{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--muted);min-width:0}
+.task-sort-control select{width:auto;max-width:100%}
+@media(max-width:720px){.project-toolbar>.project-picker,.governance-toolbar>.project-picker,.external-project-selector>.project-picker,.command-project-bar>.command-project-picker{flex:0 0 auto;width:100%;align-self:stretch}.command-project-bar>.command-project-picker{display:grid}.command-project-picker>.project-picker{width:100%}}
+@media(max-width:580px){.project-search-toggle{min-height:36px;min-width:36px}.task-sort-control{flex:1 1 140px}.task-sort-control select{flex:1}}
+
+/* Shared pagination fits small workspaces as well as full-width lists. */
+.list-pagination{min-width:0;flex-wrap:wrap;gap:8px;align-items:center}
+.list-pagination>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.list-pagination label{display:inline-flex;align-items:center;gap:5px}
+.list-pagination select{min-width:52px}
+.list-pagination button:disabled{cursor:not-allowed}
+@media(max-width:580px){.list-pagination{justify-content:flex-start}.list-pagination>div{width:100%;justify-content:flex-start}.list-pagination button{min-height:36px}}
+
+/* View modes reuse the same data and action handlers. */
+.view-mode-switch{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex-shrink:0}
+.view-mode-switch button{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:6px 9px;min-height:32px;border:0;background:var(--surface);color:var(--muted);font-size:12px}
+.view-mode-switch button+button{border-left:1px solid var(--border)}
+.view-mode-switch button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent-deep);font-weight:650}
+.view-mode-switch button:focus-visible{outline:2px solid var(--brand-deep-teal);outline-offset:-3px}
+.data-table-scroll{overflow-x:auto;max-width:100%;min-width:0;border:1px solid var(--border);border-radius:9px;overscroll-behavior-x:contain}
+.data-table{width:100%;border-collapse:collapse;text-align:left;font-size:13px}
+.data-table th{background:var(--legacy-surface-subtle);color:var(--muted);font-weight:650;white-space:nowrap}
+.data-table td,.data-table th{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.data-table tr:last-child td{border-bottom:0}
+.data-table tbody tr:hover{background:var(--legacy-surface-subtle)}
+.task-data-table{min-width:860px}
+.task-data-table td:first-child{min-width:190px;max-width:380px}
+.data-table-title{display:block;color:var(--text);overflow-wrap:anywhere}
+.data-table small{color:var(--muted);font-size:12px;line-height:1.5}
+.data-table .numeric-cell{font-variant-numeric:tabular-nums;text-align:right}
+.task-data-table .task-center-actions{flex-wrap:wrap;min-width:80px}
+.agent-grid.agent-list-view{grid-template-columns:minmax(0,1fr)}
+.agent-list-view .agent-card{grid-template-columns:minmax(180px,1.3fr) minmax(110px,.65fr) minmax(150px,1fr) minmax(180px,1.15fr);align-items:center;gap:10px}
+.agent-list-view .agent-card-head{grid-column:1}
+.agent-list-view .agent-identity-details{grid-column:1/-1}
+.agent-list-view .card-action-row,.agent-list-view .card-action-row-lg{grid-column:4;grid-row:1}
+.agent-list-view .agent-capabilities,.agent-list-view .capability-list{margin:0;min-width:0;overflow-wrap:anywhere}
+@media(max-width:1100px){.agent-list-view .agent-card{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.agent-list-view .card-action-row,.agent-list-view .card-action-row-lg{grid-row:auto;grid-column:1/-1}}
+@media(max-width:580px){.agent-list-view .agent-card{grid-template-columns:minmax(0,1fr)}.view-mode-switch button{min-height:36px}.data-table .task-center-actions{width:auto}}
+
+/* Shared configurable tables. */
+.data-table-workspace{display:grid;gap:8px;min-width:0;max-width:100%}
+.table-column-settings{justify-self:start;max-width:100%;min-width:0}
+.table-column-settings summary{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-soft);font-size:13px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;background:var(--surface)}
+.table-column-options{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:8px 0}
+.table-column-options label{display:flex;align-items:center;gap:5px;color:var(--text-soft);font-size:13px}
+.table-column-options input{accent-color:var(--brand-deep-teal)}
+.data-table td{overflow-wrap:anywhere}
+.data-table td small{display:block;margin-top:4px;overflow-wrap:anywhere}
+.runtime-data-table,.artifact-data-table{min-width:760px}
+.data-table .runtime-monitor-actions,.data-table .artifact-card-actions{display:flex;flex-wrap:wrap;gap:6px;min-width:100px}
+.data-table th.numeric-cell{text-align:right}
+.data-table-scroll:focus-visible{outline:2px solid var(--brand-deep-teal);outline-offset:2px}
+@media(max-width:580px){.table-column-settings summary{min-height:36px}.table-column-options label{min-height:32px}.data-table-scroll{width:100%}}
+
+.shared-empty-state>svg{color:var(--muted)}
+
+/* Localized file controls keep the native file picker and keyboard access. */
+.localized-file-picker{position:relative;display:flex;align-items:center;gap:9px;min-width:0;max-width:100%;width:100%;font-size:13px;font-weight:400;cursor:pointer}
+.localized-file-picker input[type="file"]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:1}
+.localized-file-picker:focus-within{outline:2px solid var(--brand-deep-teal);outline-offset:2px;border-radius:8px}
+.localized-file-picker .file-picker-button{flex-shrink:0;min-height:36px;display:inline-flex;align-items:center;justify-content:center;padding:6px 12px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--text-soft);font-weight:600}
+.localized-file-picker .file-picker-name{min-width:0;overflow-wrap:anywhere;color:var(--muted)}
+.localized-file-picker:has(input:disabled){opacity:.58;cursor:not-allowed}
+.localized-file-picker input:disabled{cursor:not-allowed}

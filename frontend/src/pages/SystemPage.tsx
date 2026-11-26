@@ -1,8 +1,11 @@
+import EmptyState from "../components/EmptyState";
+import { useScopedRequest } from "../utils/useScopedRequest";
+import { useDraftGuard } from "../components/DraftGuard";
+import { useProjectSelection } from "../components/ProjectSelection";
+import { ErrorNotice, LoadingState } from "../components/PageFeedback";
+import ListPagination, { useListPage } from "../components/ListPagination";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  AlertCircle, Activity, CheckCircle2, Clock3, DownloadCloud, RefreshCw,
-  Shield, ShieldAlert, X
-} from "lucide-react";
+import { Activity, CheckCircle2, Clock3, DownloadCloud, RefreshCw, Shield, ShieldAlert } from "lucide-react";
 import { getApiOrigin, healthRequest, request } from "../api/client";
 import type { Project, SystemMode } from "../api/types";
 import { useSystemMode } from "../auth/SystemModeProvider";
@@ -70,9 +73,15 @@ export default function SystemPage() {
   const dialog = useDialog();
   const { refreshSystemMode } = useSystemMode();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useProjectSelection(projects);
   const [systemMode, setSystemMode] = useState<SystemMode | null>(null);
   const [events, setEvents] = useState<ProjectEvent[]>([]);
+  const [eventQuery, setEventQuery] = useState("");
+  const [eventKind, setEventKind] = useState("all");
+  const eventKinds = Array.from(new Set(events.map(e => e.kind))).sort();
+  const filteredEvents = events.filter(e => (eventKind === "all" || e.kind === eventKind) && [eventLabel[e.kind] || e.kind, e.kind, e.subject_id, String(e.id)].join(" ").toLocaleLowerCase().includes(eventQuery.trim().toLocaleLowerCase()));
+  const eventPage = useListPage(filteredEvents, JSON.stringify([selectedId,eventQuery,eventKind]));
+  useEffect(() => { setEventKind("all"); setEventQuery(""); }, [selectedId]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -223,12 +232,16 @@ export default function SystemPage() {
     finally { setLoading(false); }
   }, []);
 
+  const beginEventRequest = useScopedRequest(selectedId);
+  const confirmDiscard = useDraftGuard(Boolean(projectReason.trim()));
+  const changeProject = async (id: string) => { if (saving || id === selectedId || !(await confirmDiscard())) return; setEvents([]); setProjectReason(""); setSelectedId(id); };
   const loadEvents = useCallback(async (projectId: string) => {
+    const current = beginEventRequest(projectId); if (!current()) return;
     try {
       const rows = await request<ProjectEvent[]>("/projects/" + encodeURIComponent(projectId) + "/events?after=0&limit=100");
-      setEvents(rows.slice().reverse());
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "项目事件读取失败"); }
-  }, []);
+      if (current()) setEvents(rows.slice().reverse());
+    } catch (reason) { if (current()) setError(reason instanceof Error ? reason.message : "项目事件读取失败"); }
+  }, [beginEventRequest]);
 
   useEffect(() => { void loadSystem(); }, [loadSystem]);
   useEffect(() => { void checkConnection(); }, [checkConnection]);
@@ -287,14 +300,58 @@ export default function SystemPage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><div className="eyebrow">SYSTEM OPERATIONS</div><h1>系统设置与运行事件</h1><p>全局保护模式、项目运行状态，以及由服务端持久化的项目事件流。</p></div>
+        <div><h1>系统设置与运行事件</h1></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => void loadSystem()} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新状态</button></div>
       </div>
-      {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
 
+      {loading && !systemMode ? <LoadingState label="正在读取系统状态…"/> : <>
+        <section className={"system-mode-banner " + (isProtective ? "protective" : "normal")}>
+          <div className="system-mode-icon">{isProtective ? <ShieldAlert size={23} /> : <CheckCircle2 size={23} />}</div>
+          <div><h2>{modeLabel[systemMode?.mode || "normal"]}</h2><p>{systemMode?.reason || "当前未启用全局保护限制。"}</p></div>
+          <span className={"status-tag " + (isProtective ? "tag-amber" : "tag-green")}>{isProtective ? "保护策略生效" : "运行正常"}</span>
+        </section>
+
+        <div className="operations-grid">
+          <section className="panel">
+            <div className="panel-heading"><div className="panel-title"><Shield size={17} /><h3>全局保护模式</h3></div><span className="muted-inline">仅所有者可修改</span></div>
+            <div className="mode-options">
+              <label className={"mode-option " + (mode === "normal" ? "selected" : "")}><input type="radio" checked={mode === "normal"} onChange={() => setMode("normal")} /><span><strong>正常运行</strong><small>允许正常业务操作</small></span></label>
+              <label className={"mode-option " + (mode === "degraded" ? "selected" : "")}><input type="radio" checked={mode === "degraded"} onChange={() => setMode("degraded")} /><span><strong>降级运行</strong><small>限制高风险或需要严格授权的写操作</small></span></label>
+              <label className={"mode-option " + (mode === "readonly_protect" ? "selected" : "")}><input type="radio" checked={mode === "readonly_protect"} onChange={() => setMode("readonly_protect")} /><span><strong>只读保护</strong><small>冻结普通写操作，优先保护数据状态</small></span></label>
+            </div>
+            <label className="field-label">切换原因<textarea rows={3} value={modeReason} onChange={(event) => setModeReason(event.target.value)} maxLength={2000} placeholder="记录触发保护模式的原因；非正常模式至少 5 个字符。" /></label>
+            <div className="form-actions"><button className="primary-button compact" disabled={saving || (mode !== "normal" && modeReason.trim().length < 5)} onClick={() => void saveMode()}>保存全局模式</button></div>
+          </section>
+
+          <section className="panel">
+            <div className="panel-heading"><div className="panel-title"><Activity size={17} /><h3>项目运行状态</h3></div></div>
+            <ProjectSelect projects={projects} value={selectedId} onChange={id=>void changeProject(id)} disabled={saving} />
+            {selectedProject ? <>
+              <div className="project-status-current"><span>当前项目</span><strong>{selectedProject.name}</strong><span className={"status-tag " + (selectedProject.status === "active" ? "tag-green" : "tag-neutral")}>{projectStatusLabel[selectedProject.status] || selectedProject.status}</span></div>
+              <label className="field-label">目标状态<select value={projectStatus} onChange={(event) => setProjectStatus(event.target.value)}><option value="active">运行中</option><option value="paused">暂停</option><option value="archived">归档</option></select></label>
+              <label className="field-label">状态变更原因<textarea rows={3} value={projectReason} onChange={(event) => setProjectReason(event.target.value)} maxLength={2000} placeholder="至少 5 个字符，说明为什么调整项目状态。" /></label>
+              <div className="form-actions"><button className="secondary-button compact" disabled={saving || projectReason.trim().length < 5 || projectStatus === selectedProject.status} onClick={() => void saveProjectStatus()}>提交状态变更</button></div>
+            </> : <div className="empty-mini">暂无项目</div>}
+          </section>
+        </div>
+
+        <section className="panel">
+          <div className="panel-heading"><div className="panel-title"><Clock3 size={17} /><h3>项目事件流</h3></div><div className="heading-actions"><span className="muted-inline">最近 100 条 · 倒序展示</span><button className="icon-button" title="刷新事件" onClick={() => selectedId && void loadEvents(selectedId)}><RefreshCw size={15} /></button></div></div>
+          <div className="library-filter-bar"><label>关键词<input aria-label="搜索项目事件" value={eventQuery} onChange={e => setEventQuery(e.target.value)} placeholder="事件名称或对象编号" /></label><label>事件类型<select aria-label="事件类型" value={eventKind} onChange={e => setEventKind(e.target.value)}><option value="all">全部类型</option>{eventKinds.map(k => <option key={k} value={k}>{eventLabel[k] || k}</option>)}</select></label><button type="button" className="text-button" onClick={() => {setEventQuery("");setEventKind("all");}}>清除筛选</button></div><div className="event-timeline">
+            {eventPage.rows.map((event) => <article className="event-timeline-row" key={event.id}>
+              <span className="event-timeline-marker" />
+              <div className="event-timeline-content"><div><strong>{eventLabel[event.kind] || event.kind}</strong><code>{event.kind}</code></div><p>对象：{event.subject_id}</p>{Object.keys(event.payload || {}).length > 0 && <details className="library-disclosure event-payload"><summary>事件详情</summary><pre>{JSON.stringify(event.payload, null, 2)}</pre></details>}<small>{new Date(event.created_at).toLocaleString("zh-CN", { hour12: false })} · 事件 #{event.id}</small></div>
+            </article>)}
+            {!filteredEvents.length && <EmptyState icon={Activity} title={events.length ? "没有符合条件的事件" : "暂无项目事件"}/>}
+          </div>
+          <ListPagination {...eventPage} label="事件分页" />
+        </section>
+      </>}
+      <details className="panel maintenance-disclosure"><summary>服务诊断与版本维护</summary><div className="system-maintenance-stack">
       <section className="panel connection-diagnostics-panel">
         <div className="panel-heading">
-          <div className="panel-title"><Activity size={17} /><h3>API 与数据库连接诊断</h3></div>
+          <div className="panel-title"><Activity size={17} /><h3>连接诊断</h3></div>
           <div className="heading-actions">
             <span className="muted-inline">{connectionCheckedAt ? "检测于 " + new Date(connectionCheckedAt).toLocaleString("zh-CN", { hour12: false }) : "尚未检测"}</span>
             <button className="secondary-button compact" onClick={() => void checkConnection()} disabled={checkingConnection}>
@@ -303,8 +360,8 @@ export default function SystemPage() {
           </div>
         </div>
         <div className="connection-origin-list">
-          <div><span>前端 Origin</span><code>{window.location.origin}</code></div>
-          <div><span>后端 API Origin</span><code>{getApiOrigin()}</code></div>
+          <div><span>前端地址</span><code>{window.location.origin}</code></div>
+          <div><span>后端接口地址</span><code>{getApiOrigin()}</code></div>
         </div>
         <div className="stat-grid connection-check-grid">
           <div className="stat-card">
@@ -322,17 +379,17 @@ export default function SystemPage() {
         </div>
         {(connectionChecks?.api.state === "error" || connectionChecks?.database.state === "error" || connectionChecks?.identity.state === "error") && (
           <div className="connection-help">
-            如果当前从 Google AI Studio 预览访问，请确认 <code>VITE_API_BASE_URL</code> 指向后端 HTTPS Origin，并让服务端 <code>OTTERNEST_CORS_ORIGINS</code> 精确包含上方的前端 Origin。不要把数据库地址或令牌写入 VITE_ 变量。
+            如果当前从 Google AI Studio 预览访问，请确认 <code>VITE_API_BASE_URL</code> 指向后端 HTTPS 来源地址，并让服务端 <code>OTTERNEST_CORS_ORIGINS</code> 精确包含上方的前端 Origin。不要把数据库地址或令牌写入 VITE_ 变量。
           </div>
         )}
         <div className="form-actions">
-          <a className="secondary-button compact" href={getApiOrigin() + "/api/docs"} target="_blank" rel="noreferrer">打开 FastAPI 文档</a>
+          <a className="secondary-button compact" href={getApiOrigin() + "/api/docs"} target="_blank" rel="noreferrer">接口文档</a>
         </div>
       </section>
 
       <section className="panel">
         <div className="panel-heading">
-          <div className="panel-title"><DownloadCloud size={17} /><h3>系统版本与一键更新</h3></div>
+          <div className="panel-title"><DownloadCloud size={17} /><h3>版本与更新</h3></div>
           <div className="heading-actions flex-row-gap">
             {updateCheck && updateCheck.git_available !== false && (
               <span className={"status-tag " + (updateCheck.update_available ? "tag-amber" : "tag-green")}>
@@ -361,7 +418,7 @@ export default function SystemPage() {
             <span>分支：<code>{updateCheck.branch}</code></span>
             <span>当前版本：<code>{updateCheck.current_commit}</code></span>
             <span>远端版本：<code>{updateCheck.remote_commit}</code></span>
-            <span>工作区：{updateCheck.working_tree_clean ? "干净" : "有未提交修改"}</span>
+            <span>工作区：{updateCheck.working_tree_clean ? "无未提交修改" : "有未提交修改"}</span>
             <span>自动重启：{updateCheck.restart_command_configured ? "已配置" : "未配置（仅拉取/迁移/构建）"}</span>
           </div>
         )}
@@ -386,48 +443,7 @@ export default function SystemPage() {
         )}
       </section>
 
-      {loading && !systemMode ? <div className="panel-loading"><div className="spinner" />正在读取系统状态…</div> : <>
-        <section className={"system-mode-banner " + (isProtective ? "protective" : "normal")}>
-          <div className="system-mode-icon">{isProtective ? <ShieldAlert size={23} /> : <CheckCircle2 size={23} />}</div>
-          <div><div className="eyebrow">GLOBAL CONTROL PLANE</div><h2>{modeLabel[systemMode?.mode || "normal"]}</h2><p>{systemMode?.reason || "当前未启用全局保护限制。"}</p></div>
-          <span className={"status-tag " + (isProtective ? "tag-amber" : "tag-green")}>{isProtective ? "保护策略生效" : "运行正常"}</span>
-        </section>
-
-        <div className="operations-grid">
-          <section className="panel">
-            <div className="panel-heading"><div className="panel-title"><Shield size={17} /><h3>全局保护模式</h3></div><span className="muted-inline">仅所有者可修改</span></div>
-            <div className="mode-options">
-              <label className={"mode-option " + (mode === "normal" ? "selected" : "")}><input type="radio" checked={mode === "normal"} onChange={() => setMode("normal")} /><span><strong>正常运行</strong><small>允许正常业务操作</small></span></label>
-              <label className={"mode-option " + (mode === "degraded" ? "selected" : "")}><input type="radio" checked={mode === "degraded"} onChange={() => setMode("degraded")} /><span><strong>降级运行</strong><small>限制高风险或需要严格授权的写操作</small></span></label>
-              <label className={"mode-option " + (mode === "readonly_protect" ? "selected" : "")}><input type="radio" checked={mode === "readonly_protect"} onChange={() => setMode("readonly_protect")} /><span><strong>只读保护</strong><small>冻结普通写操作，优先保护数据状态</small></span></label>
-            </div>
-            <label className="field-label">切换原因<textarea rows={3} value={modeReason} onChange={(event) => setModeReason(event.target.value)} maxLength={2000} placeholder="记录触发保护模式的原因；非正常模式至少 5 个字符。" /></label>
-            <div className="form-actions"><button className="primary-button compact" disabled={saving || (mode !== "normal" && modeReason.trim().length < 5)} onClick={() => void saveMode()}>保存全局模式</button></div>
-          </section>
-
-          <section className="panel">
-            <div className="panel-heading"><div className="panel-title"><Activity size={17} /><h3>项目运行状态</h3></div></div>
-            <ProjectSelect projects={projects} value={selectedId} onChange={setSelectedId} />
-            {selectedProject ? <>
-              <div className="project-status-current"><span>当前项目</span><strong>{selectedProject.name}</strong><span className={"status-tag " + (selectedProject.status === "active" ? "tag-green" : "tag-neutral")}>{projectStatusLabel[selectedProject.status] || selectedProject.status}</span></div>
-              <label className="field-label">目标状态<select value={projectStatus} onChange={(event) => setProjectStatus(event.target.value)}><option value="active">运行中</option><option value="paused">暂停</option><option value="archived">归档</option></select></label>
-              <label className="field-label">状态变更原因<textarea rows={3} value={projectReason} onChange={(event) => setProjectReason(event.target.value)} maxLength={2000} placeholder="至少 5 个字符，说明为什么调整项目状态。" /></label>
-              <div className="form-actions"><button className="secondary-button compact" disabled={saving || projectReason.trim().length < 5 || projectStatus === selectedProject.status} onClick={() => void saveProjectStatus()}>提交状态变更</button></div>
-            </> : <div className="empty-mini">暂无项目</div>}
-          </section>
-        </div>
-
-        <section className="panel">
-          <div className="panel-heading"><div className="panel-title"><Clock3 size={17} /><h3>项目事件流</h3></div><div className="heading-actions"><span className="muted-inline">最近 100 条 · 倒序展示</span><button className="icon-button" title="刷新事件" onClick={() => selectedId && void loadEvents(selectedId)}><RefreshCw size={15} /></button></div></div>
-          <div className="event-timeline">
-            {events.map((event) => <article className="event-timeline-row" key={event.id}>
-              <span className="event-timeline-marker" />
-              <div className="event-timeline-content"><div><strong>{eventLabel[event.kind] || event.kind}</strong><code>{event.kind}</code></div><p>对象：{event.subject_id}</p>{Object.keys(event.payload || {}).length > 0 && <pre>{JSON.stringify(event.payload, null, 2)}</pre>}<small>{new Date(event.created_at).toLocaleString("zh-CN", { hour12: false })} · 事件 #{event.id}</small></div>
-            </article>)}
-            {!events.length && <div className="empty-state"><Activity size={24} /><strong>暂无项目事件</strong><p>项目中的任务、目标、记忆和治理变更会在这里形成可追踪记录。</p></div>}
-          </div>
-        </section>
-      </>}
+      </div></details>
     </div>
   );
 }

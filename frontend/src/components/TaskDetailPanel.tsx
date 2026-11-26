@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { getRiskLabel, TASK_STATUS_LABELS as statusLabels } from "../utils/labels";
+import TaskStatusBadge from "./TaskStatusBadge";
+import ValidatedForm from "./ValidatedForm";
+import { useDraftGuard, UnsavedDraftNotice } from "./DraftGuard";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, AlertCircle, ArrowRight, Clock3, GitBranch, Info,
   Pencil, Plus, RefreshCw, ShieldCheck, Trash2, X
@@ -32,19 +36,9 @@ interface Props {
   onChanged: () => void;
 }
 
-const statusLabels: Record<string,string> = {
-  ready:"待执行", waiting_dependencies:"等待依赖", waiting_approval:"等待授权",
-  running:"执行中", submitted:"等待验收", blocked:"已阻塞",
-  completed:"已完成", cancelled:"已取消", failed:"执行失败"
-};
-const statusTones: Record<string,string> = {
-  ready:"tag-blue", waiting_dependencies:"tag-neutral", waiting_approval:"tag-red",
-  running:"tag-blue", submitted:"tag-amber", blocked:"tag-red",
-  completed:"tag-green", cancelled:"tag-neutral", failed:"tag-red"
-};
 const eventLabels: Record<string,string> = {
-  "task.created":"任务创建", "task.routed":"分配目标 Agent",
-  "task.authorized":"任务已授权", "task.claimed":"Agent 已领取",
+  "task.created":"任务创建", "task.routed":"分配目标智能体",
+  "task.authorized":"任务已授权", "task.claimed":"智能体已领取",
   "task.submitted":"提交执行结果", "task.accepted":"验收通过",
   "task.changes_requested":"验收要求修改", "task.blocked":"任务阻塞",
   "task.unblocked":"解除阻塞", "task.cancelled":"任务取消",
@@ -56,6 +50,15 @@ const shortId = (value: string) => value.length > 16 ? value.slice(0,8)+"…"+va
 
 export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Props) {
   const dialog = useDialog();
+  const panelRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeRef.current?.focus({ preventScroll: true });
+    return () => {
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, []);
   const [task,setTask] = useState<TaskDetail|null>(null);
   const [graph,setGraph] = useState<TaskGraph|null>(null);
   const [dependencyInfo,setDependencyInfo] = useState<DependencyInfo|null>(null);
@@ -193,8 +196,29 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
   const [editRisk, setEditRisk] = useState<"R0" | "R1" | "R2" | "R3">("R1");
   const [editPriority, setEditPriority] = useState("50");
 
+  const editDirty = Boolean(editingTask && task && (editTitle !== task.title || editInstruction !== task.instruction || editAcceptance !== task.acceptance || editRisk !== task.risk || editPriority !== String(task.priority)));
+  useDraftGuard(editDirty);
+  const confirmEditDiscard = async () => !editDirty || await dialog.confirm({
+    title: "放弃任务修改？", message: "尚未保存的任务修改将丢失。", confirmText: "放弃修改", cancelText: "继续编辑", tone: "warning"
+  });
+  const closingRef = useRef(false);
+  const requestDiscard = async () => {
+    if (saving || closingRef.current) return false;
+    closingRef.current = true;
+    try { return await confirmEditDiscard(); }
+    finally { closingRef.current = false; }
+  };
+  const closeDetails = async () => {
+    if (!(await requestDiscard())) return;
+    onClose();
+  };
+  const closeEditor = async () => {
+    if (!(await requestDiscard())) return;
+    setEditingTask(false);
+    closeRef.current?.focus({preventScroll:true});
+  };
   const startEditTask = () => {
-    if (!task) return;
+    if (!task || editingTask || saving) return;
     setEditTitle(task.title);
     setEditInstruction(task.instruction);
     setEditAcceptance(task.acceptance);
@@ -204,7 +228,12 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
   };
 
   const saveEditTask = async () => {
-    if (!task) return;
+    if (!task || saving) return;
+    const priority = Number(editPriority);
+    if (!editTitle.trim() || !editPriority.trim() || !Number.isInteger(priority) || priority < 0 || priority > 100) {
+      setError("请填写任务标题，并输入 0 至 100 的整数优先级。");
+      return;
+    }
     setSaving(true); setError("");
     try {
       await request("/tasks/" + encodeURIComponent(task.id), {
@@ -214,7 +243,7 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
           instruction: editInstruction.trim(),
           acceptance: editAcceptance.trim(),
           risk: editRisk,
-          priority: Number(editPriority) || 50
+          priority
         })
       });
       setEditingTask(false);
@@ -227,95 +256,119 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
     }
   };
 
+  const [dependencyView, setDependencyView] = useState<"all"|"waiting">("all");
+  const visibleUpstream = dependencyView === "waiting" ? upstream.filter(row=>row.status!=="completed") : upstream;
   const taskNode = (row:Task,role:"upstream"|"downstream") => (
     <div className="dag-task" key={row.id}>
-      <div className="dag-task-title"><strong>{row.title}</strong><span className={"status-tag "+(statusTones[row.status]||"tag-neutral")}>{statusLabels[row.status]||row.status}</span></div>
+      <div className="dag-task-title"><strong>{row.title}</strong><TaskStatusBadge status={row.status}/></div>
       <small>{role==="upstream"?"必须先完成":"等待当前任务"}</small>
       <code>{shortId(row.id)}</code>
     </div>
   );
 
-  return <div className="modal-backdrop task-detail-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)onClose();}}>
-    <section className="task-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="task-detail-title">
+  return <div className="modal-backdrop task-detail-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)void closeDetails();}}>
+    <section ref={panelRef} className="task-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="task-detail-title" onKeyDown={event => {
+      // Nested confirmation dialogs handle their own keyboard events in the capture phase.
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        event.preventDefault(); if (!saving) void closeDetails();
+      } else if (event.key === "Tab") {
+        const items = Array.from(panelRef.current?.querySelectorAll<HTMLElement>(
+          'button, input, textarea, select, a[href], summary, [tabindex]'
+        ) || []).filter(el => el.tabIndex >= 0 && !el.matches(":disabled") && el.getClientRects().length > 0 && getComputedStyle(el).visibility === "visible");
+        if (!items.length) { event.preventDefault(); return; }
+        const first = items[0], last = items[items.length - 1];
+        if (event.shiftKey ? document.activeElement === first : document.activeElement === last) {
+          event.preventDefault();
+          (event.shiftKey ? last : first).focus();
+        }
+      }
+    }}>
       <div className="task-detail-header">
-        <div><div className="eyebrow">TASK DETAIL · {selection.projectName}</div><h2 id="task-detail-title">{task?.title||"任务详情"}</h2>{task&&<div className="task-detail-badges"><span className={"status-tag "+(statusTones[task.status]||"tag-neutral")}>{statusLabels[task.status]||task.status}</span><span className="status-tag tag-neutral">{task.risk}</span><span className="status-tag tag-neutral">优先级 {task.priority}</span></div>}</div>
-        <div className="task-detail-header-actions"><button className="secondary-button compact" onClick={()=>void load()} disabled={loading}><RefreshCw size={14} className={loading?"spin":""}/>刷新</button><button className="icon-button" onClick={onClose} aria-label="关闭任务详情"><X size={17}/></button></div>
+        <div><div className="eyebrow">{selection.projectName}</div><h2 id="task-detail-title">{task?.title||"任务详情"}</h2>{task&&<div className="task-detail-badges"><TaskStatusBadge status={task.status}/><span className="status-tag tag-neutral">{getRiskLabel(task.risk)}</span><span className="status-tag tag-neutral">优先级 {task.priority}</span></div>}</div>
+        <div className="task-detail-header-actions"><button className="secondary-button compact" onClick={()=>void load()} disabled={loading || saving || editingTask}><RefreshCw size={14} className={loading?"spin":""}/>刷新</button><button ref={closeRef} type="button" className="icon-button" onClick={()=>void closeDetails()} aria-label="关闭任务详情"><X size={17}/></button></div>
       </div>
-      {error&&<div className="inline-error"><AlertCircle size={15}/>{error}<button onClick={()=>setError("")}><X size={14}/></button></div>}
+      {error&&<div className="inline-error" role="alert"><AlertCircle size={15}/>{error}<button type="button" aria-label="关闭错误提示" onClick={()=>setError("")}><X size={14}/></button></div>}
       {loading&&!task?<div className="panel-loading"><span className="spinner"/>正在读取任务详情…</div>:task&&<>
+        <div className="task-detail-grid">
+          <section className="task-detail-section"><h3>任务指令</h3><p className="task-detail-pre">{task.instruction||"暂无指令"}</p></section>
+          <section className="task-detail-section"><h3>验收标准</h3><p className="task-detail-pre">{task.acceptance||"暂无验收标准"}</p></section>
+          <section className="task-detail-section"><h3>执行结果</h3><p className="task-detail-pre">{task.result_summary||"尚未提交结果"}</p></section>
+          {task.failure_reason && <section className="task-detail-section task-failure-section"><h3>失败原因</h3><p className="task-detail-pre">{task.failure_reason}</p></section>}
+        </div>
+
+        <details className="task-detail-disclosure"><summary>执行信息与任务标识</summary>
         <div className="task-detail-meta">
           <div><small>任务 ID</small><code>{task.id}</code></div>
           <div><small>当前版本</small><strong>v{task.version}</strong></div>
           <div><small>重新执行次数</small><strong>{task.rework_count}</strong></div>
           <div><small>审批状态</small><strong>{task.approval_granted?"已授权":"未授权"}</strong></div>
-          <div><small>执行 Agent</small><code>{task.assigned_agent_id?shortId(task.assigned_agent_id):"尚未领取"}</code></div>
-          <div><small>目标 Agent</small><code>{task.target_agent_id?shortId(task.target_agent_id):"自动调度"}</code></div>
+          <div><small>执行智能体</small><code>{task.assigned_agent_id?shortId(task.assigned_agent_id):"尚未领取"}</code></div>
+          <div><small>目标智能体</small><code>{task.target_agent_id?shortId(task.target_agent_id):"自动调度"}</code></div>
           <div><small>租约代次</small><strong>{task.lease_epoch}</strong></div>
           <div><small>租约到期</small><strong>{formatTime(task.lease_until)}</strong></div>
           <div><small>完成时间</small><strong>{formatTime(task.completed_at)}</strong></div>
         </div>
 
-        <div className="task-detail-grid">
-          <section className="task-detail-section"><h3>任务指令</h3><p className="task-detail-pre">{task.instruction||"暂无指令"}</p></section>
-          <section className="task-detail-section"><h3>验收标准</h3><p className="task-detail-pre">{task.acceptance||"暂无验收标准"}</p></section>
-          <section className="task-detail-section"><h3>执行结果</h3><p className="task-detail-pre">{task.result_summary||"尚未提交结果"}</p></section>
-          <section className="task-detail-section"><h3>失败原因</h3><p className="task-detail-pre">{task.failure_reason||"暂无失败记录"}</p></section>
-        </div>
+        </details>
 
         {editingTask && (
           <section className="task-detail-section task-detail-wide">
-            <div className="task-detail-section-head"><h3><Pencil size={15}/>编辑任务</h3><button className="icon-button" onClick={() => setEditingTask(false)}><X size={15}/></button></div>
-            <div className="form-panel form-panel-flat">
+            <div className="task-detail-section-head"><h3><Pencil size={15}/>编辑任务</h3><button type="button" className="icon-button" aria-label="关闭任务编辑" disabled={saving} onClick={()=>void closeEditor()}><X size={15}/></button></div>
+            <UnsavedDraftNotice dirty={editDirty}/>
+            <ValidatedForm className="form-panel form-panel-flat" onSubmit={event=>{event.preventDefault();void saveEditTask();}}>
               <div className="form-grid three">
                 <label>任务标题<input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required maxLength={240}/></label>
-                <label>风险等级<select value={editRisk} onChange={(e) => setEditRisk(e.target.value as "R0"|"R1"|"R2"|"R3")}><option value="R0">R0</option><option value="R1">R1</option><option value="R2">R2</option><option value="R3">R3</option></select></label>
-                <label>优先级<input type="number" min={0} max={100} value={editPriority} onChange={(e) => setEditPriority(e.target.value)}/></label>
+                <label>风险等级<select value={editRisk} onChange={(e) => setEditRisk(e.target.value as "R0"|"R1"|"R2"|"R3")}><option value="R0">{getRiskLabel("R0")}</option><option value="R1">{getRiskLabel("R1")}</option><option value="R2">{getRiskLabel("R2")}</option><option value="R3">{getRiskLabel("R3")}</option></select></label>
+                <label>优先级<input type="number" min={0} max={100} step={1} required value={editPriority} onChange={(e) => setEditPriority(e.target.value)}/></label>
               </div>
               <label>执行说明<textarea rows={3} value={editInstruction} onChange={(e) => setEditInstruction(e.target.value)}/></label>
               <label>验收标准<textarea rows={2} value={editAcceptance} onChange={(e) => setEditAcceptance(e.target.value)}/></label>
-              <div className="form-actions"><button className="primary-button compact" disabled={saving || !editTitle.trim()} onClick={() => void saveEditTask()}>保存任务修改</button></div>
-            </div>
+              <div className="form-actions"><button type="submit" className="primary-button compact" disabled={saving}>保存任务修改</button></div>
+            </ValidatedForm>
           </section>
         )}
 
-        <section className="task-detail-section task-detail-wide">
-          <div className="task-detail-section-head"><div><h3><GitBranch size={16}/>依赖关系 DAG</h3><p>箭头方向表示执行顺序：上游依赖 → 当前任务 → 下游任务。</p></div><span className={"status-tag "+(dependencyInfo?.satisfied?"tag-green":"tag-amber")}>{dependencyInfo?.satisfied?"上游依赖已满足":"仍有依赖未满足"}</span></div>
-          <div className="dag-layout">
-            <div className="dag-column"><span className="dag-column-label">上游依赖 · {upstream.length}</span>{upstream.length?upstream.map(row=>taskNode(row,"upstream")):<div className="dag-empty">无上游依赖</div>}</div>
+        <details className="task-detail-disclosure" open><summary>任务依赖关系</summary><section className="task-detail-section task-detail-wide">
+          <div className="task-detail-section-head"><div><h3><GitBranch size={16}/>依赖图</h3><p>箭头方向表示执行顺序：上游依赖 → 当前任务 → 下游任务。</p></div><span className={"status-tag "+(dependencyInfo?.satisfied?"tag-green":"tag-amber")}>{dependencyInfo?.satisfied?"上游依赖已满足":"仍有依赖未满足"}</span></div>
+          <div className="approval-switch dependency-switch" role="group" aria-label="上游依赖筛选"><button type="button" aria-pressed={dependencyView==="all"} className={dependencyView==="all"?"selected":""} onClick={()=>setDependencyView("all")}>全部依赖 <span>{upstream.length}</span></button><button type="button" aria-pressed={dependencyView==="waiting"} className={dependencyView==="waiting"?"selected":""} onClick={()=>setDependencyView("waiting")}>未完成 <span>{upstream.filter(row=>row.status!=="completed").length}</span></button></div><div className="dag-layout">
+            <div className="dag-column"><span className="dag-column-label">上游依赖 · {upstream.length}</span>{visibleUpstream.length?visibleUpstream.map(row=>taskNode(row,"upstream")):<div className="dag-empty">{dependencyView==="waiting"?"无未完成上游任务":"无上游依赖"}</div>}</div>
             <div className="dag-arrow"><ArrowRight size={19}/></div>
-            <div className="dag-current"><span className="dag-column-label">当前任务</span><div className="dag-task dag-task-current"><div className="dag-task-title"><strong>{task.title}</strong><span className={"status-tag "+(statusTones[task.status]||"tag-neutral")}>{statusLabels[task.status]||task.status}</span></div><small>{task.risk} · 版本 {task.version}</small><code>{shortId(task.id)}</code></div></div>
+            <div className="dag-current"><span className="dag-column-label">当前任务</span><div className="dag-task dag-task-current"><div className="dag-task-title"><strong>{task.title}</strong><TaskStatusBadge status={task.status}/></div><small>{getRiskLabel(task.risk)} · 版本 {task.version}</small><code>{shortId(task.id)}</code></div></div>
             <div className="dag-arrow"><ArrowRight size={19}/></div>
             <div className="dag-column"><span className="dag-column-label">下游任务 · {downstream.length}</span>{downstream.length?downstream.map(row=>taskNode(row,"downstream")):<div className="dag-empty">暂无下游任务</div>}</div>
           </div>
-          {canEditDependencies&&<div className="dependency-editor"><div><strong><ShieldCheck size={15}/>依赖治理</strong><small>仅所有者可修改；任务领取后依赖图将被冻结。</small></div><div className="dependency-editor-controls"><select value={candidateId} onChange={event=>setCandidateId(event.target.value)}><option value="">选择一个上游任务…</option>{candidates.map(row=><option key={row.id} value={row.id}>{row.title} · {statusLabels[row.status]||row.status}</option>)}</select><button className="secondary-button compact" onClick={()=>void addDependency()} disabled={saving||!candidateId}><Plus size={14}/>添加依赖</button></div>
+          {canEditDependencies&&<div className="dependency-editor"><div><strong><ShieldCheck size={15}/>依赖治理</strong><small>仅所有者可修改；任务领取后依赖图将被冻结。</small></div><div className="dependency-editor-controls"><select aria-label="上游任务" value={candidateId} onChange={event=>setCandidateId(event.target.value)}><option value="">选择一个上游任务…</option>{candidates.map(row=><option key={row.id} value={row.id}>{row.title} · {statusLabels[row.status]||row.status}</option>)}</select><button className="secondary-button compact" onClick={()=>void addDependency()} disabled={saving||!candidateId}><Plus size={14}/>添加依赖</button></div>
             {upstream.map(row=><div className="dependency-remove-row" key={row.id}><span>{row.title}</span><button className="text-button" onClick={()=>void removeDependency(row.id)} disabled={saving}><Trash2 size={13}/>移除依赖</button></div>)}
           </div>}
           {isOwner&&!canEditDependencies&&<p className="form-hint dependency-lock-note">当前任务状态为「{statusLabels[task.status]||task.status}」，依赖图不可修改。服务端会在领取或进入活动状态后冻结依赖关系。</p>}
-        </section>
+        </section></details>
 
-        <TaskExecutionSafety taskId={task.id} projectId={selection.projectId} taskStatus={task.status} taskRisk={task.risk} isOwner={isOwner} onChanged={() => { void load(); onChanged(); }} />
-        <TaskContinuityPanel taskId={task.id} taskStatus={task.status} isOwner={isOwner} onChanged={() => { void load(); onChanged(); }} />
+        <details className="task-detail-disclosure" open><summary>执行安全与外部操作</summary><TaskExecutionSafety taskId={task.id} projectId={selection.projectId} taskStatus={task.status} taskRisk={task.risk} isOwner={isOwner} onChanged={() => { void load(); onChanged(); }} />
+        </details>
+        <details className="task-detail-disclosure" open><summary>执行连续性</summary><TaskContinuityPanel taskId={task.id} taskStatus={task.status} isOwner={isOwner} onChanged={() => { void load(); onChanged(); }} />
 
-        <section className="task-detail-section task-detail-wide">
-          <div className="task-detail-section-head"><div><h3><Activity size={16}/>关联事件</h3><p>来自项目事件流中 subject_id 与当前任务匹配的记录。</p></div><span className="muted-inline">{events.length} 条</span></div>
+        </details>
+        <details className="task-detail-disclosure"><summary>关联事件 · {events.length} 条</summary><section className="task-detail-section task-detail-wide">
+          <div className="task-detail-section-head"><div><h3><Activity size={16}/>事件记录</h3></div><span className="muted-inline">{events.length} 条</span></div>
           {events.length?<div className="task-event-list">{events.map(event=><div className="task-event-row" key={event.id}><span className="task-event-dot"/><div><strong>{eventLabels[event.kind]||event.kind}</strong><small>{formatTime(event.created_at)} · #{event.id}</small></div></div>)}</div>:<div className="dag-empty">暂时没有关联事件记录。</div>}
           <p className="task-event-note"><Info size={13}/>事件来自项目事件流；当前接口单次最多读取 500 条项目事件，因此事件量超过 500 条时，后续记录可能未包含，列表不保证覆盖完整任务历史。</p>
-        </section>
+        </section></details>
       </>}
       <div className="task-detail-footer">
-        <span><Clock3 size={13}/>任务数据以 FastAPI 服务端为准</span>
+        <span><Clock3 size={13}/>任务数据以服务端为准</span>
         <div className="flex-row-gap">
           {isOwner && task && !["running", "completed", "cancelled"].includes(task.status) && (
-            <button className="secondary-button compact" disabled={saving} onClick={startEditTask}>
+            <button className="secondary-button compact" disabled={saving || editingTask} onClick={startEditTask}>
               <Pencil size={13}/>编辑任务
             </button>
           )}
           {isOwner && task && task.status !== "running" && (
-            <button className="text-button" disabled={saving} onClick={() => void deleteTask()}>
+            <button className="text-button" disabled={saving || editingTask} onClick={() => void deleteTask()}>
               <Trash2 size={14}/>删除任务
             </button>
           )}
-          <button className="secondary-button compact" onClick={onClose}>关闭</button>
+          <button type="button" className="secondary-button compact" onClick={()=>void closeDetails()}>关闭</button>
         </div>
       </div>
     </section>

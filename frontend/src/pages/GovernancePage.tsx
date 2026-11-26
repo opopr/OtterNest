@@ -1,3 +1,10 @@
+import EmptyState from "../components/EmptyState";
+import { useScopedRequest } from "../utils/useScopedRequest";
+import { useDraftGuard } from "../components/DraftGuard";
+import { useProjectSelection } from "../components/ProjectSelection";
+import TaskStatusBadge from "../components/TaskStatusBadge";
+import { ErrorNotice } from "../components/PageFeedback";
+import { getRiskLabel, getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertCircle, Bot, Check, CheckCircle2, ClipboardCheck, FileSearch, MessageSquare,
@@ -78,7 +85,6 @@ interface CommandPlan {
   result?: Record<string, unknown> | null;
 }
 
-const taskStatus: Record<string, string> = { waiting_approval: "等待授权", submitted: "等待验收" };
 const stanceLabel: Record<string, string> = { support: "支持", oppose: "反对", alternative: "替代方案" };
 const evidenceStatusLabel: Record<string, string> = {
   linked: "已关联项目记录",
@@ -90,7 +96,7 @@ const timeText = (value: string) => new Date(value).toLocaleString("zh-CN", { ho
 export default function GovernancePage() {
   const dialog = useDialog();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useProjectSelection(projects);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [members, setMembers] = useState<ProjectMember[]>([]);
@@ -109,6 +115,7 @@ export default function GovernancePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"tasks" | "decisions" | "command" | "chat">("tasks");
+  const [approvalFilter, setApprovalFilter] = useState("all");
   const [commandText, setCommandText] = useState("");
 
   const selectedProject = useMemo(() => projects.find((item) => item.id === selectedId) || null, [projects, selectedId]);
@@ -123,6 +130,13 @@ export default function GovernancePage() {
     return map;
   }, [members]);
 
+  const beginProjectRequest = useScopedRequest(selectedId);
+  const beginDecisionRequest = useScopedRequest(selectedDecisionId);
+  const confirmDiscard = useDraftGuard(Boolean(plan || resolutionNote || closingNote || commandText || policySelection.length));
+  const changeProject = async (id: string) => {
+    if (saving || id === selectedId || !(await confirmDiscard())) return;
+    setTasks([]); setDecisions([]); setMembers([]); setSelectedDecisionId(""); setReviews([]); setDeliberation(null); setAutoPolicy(null); setPolicySelection([]); setEvidenceInput(""); setEvidenceResult(null); setPlan(null); setCommandText(""); setResolutionNote(""); setClosingNote(""); setError(""); setDetailLoading(true); setSelectedId(id);
+  };
   const loadProjects = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -135,6 +149,7 @@ export default function GovernancePage() {
   }, []);
 
   const loadProjectData = useCallback(async (projectId: string) => {
+    const current = beginProjectRequest(projectId); if (!current()) return;
     setDetailLoading(true);
     setError("");
     try {
@@ -144,6 +159,7 @@ export default function GovernancePage() {
         request<Decision[]>("/projects/" + encoded + "/decisions"),
         request<ProjectMember[]>("/projects/" + encoded + "/members").catch(() => [] as ProjectMember[])
       ]);
+      if (!current()) return;
       const taskRows = Array.isArray(rawTasks) ? rawTasks : [];
       const decisionRows = Array.isArray(rawDecisions) ? rawDecisions : [];
       const memberRows = Array.isArray(rawMembers) ? rawMembers : [];
@@ -151,11 +167,12 @@ export default function GovernancePage() {
       setDecisions(decisionRows);
       setMembers(memberRows);
       setSelectedDecisionId((current) => decisionRows.some((item) => item.id === current) ? current : decisionRows.find((item) => item.status === "proposed")?.id || decisionRows[0]?.id || "");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "治理事项读取失败"); }
-    finally { setDetailLoading(false); }
-  }, []);
+    } catch (reason) { if (current()) setError(reason instanceof Error ? reason.message : "治理事项读取失败"); }
+    finally { if (current()) setDetailLoading(false); }
+  }, [beginProjectRequest]);
 
   const loadDecision = useCallback(async (decisionId: string) => {
+    const current = beginDecisionRequest(decisionId); if (!current()) return;
     if (!decisionId) {
       setReviews([]);
       setDeliberation(null);
@@ -174,6 +191,7 @@ export default function GovernancePage() {
         request<Deliberation>("/decisions/" + encoded + "/deliberation").catch(() => null),
         request<AutoPolicy>("/decisions/" + encoded + "/deliberation/auto-policy").catch(() => null)
       ]);
+      if (!current()) return;
       const reviewRows = Array.isArray(rawReviews) ? rawReviews : [];
       setReviews(reviewRows);
       setDeliberation(delibRow);
@@ -185,9 +203,9 @@ export default function GovernancePage() {
         ])
       );
       setEvidenceInput(collectedRefs.join("\n"));
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "决策审查信息读取失败"); }
-    finally { setDetailLoading(false); }
-  }, []);
+    } catch (reason) { if (current()) setError(reason instanceof Error ? reason.message : "决策审查信息读取失败"); }
+    finally { if (current()) setDetailLoading(false); }
+  }, [beginDecisionRequest]);
 
   useEffect(() => { void loadProjects(); }, [loadProjects]);
   useEffect(() => { if (selectedId) void loadProjectData(selectedId); else { setTasks([]); setDecisions([]); setMembers([]); } }, [selectedId, loadProjectData]);
@@ -374,29 +392,30 @@ export default function GovernancePage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><div className="eyebrow">OWNER GOVERNANCE</div><h1>指挥中心与审批</h1><p>高风险授权、任务验收、独立决策审查与所有者最终裁决。</p></div>
+        <div><h1>审批与治理</h1></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadProjectData(selectedId)} disabled={loading || detailLoading}><RefreshCw size={15} className={loading || detailLoading ? "spin" : ""} />刷新</button></div>
       </div>
-      {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
       <section className="panel governance-toolbar">
-        <div><div className="eyebrow">CURRENT PROJECT</div><strong>{selectedProject?.name || "尚未选择项目"}</strong></div>
-        <ProjectSelect projects={projects} value={selectedId} onChange={setSelectedId} />
+        <div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "尚未选择项目"}</strong></div>
+        <ProjectSelect projects={projects} value={selectedId} onChange={id=>void changeProject(id)} disabled={saving} />
         <div className="governance-summary"><span><strong>{pendingTasks.length}</strong> 待处理任务</span><span><strong>{decisions.filter((item) => item.status === "proposed").length}</strong> 待审决策</span></div>
       </section>
 
-      <div className="governance-tabs">
-        <button className={tab === "tasks" ? "selected" : ""} onClick={() => setTab("tasks")}><ClipboardCheck size={16} />任务审批 <span>{pendingTasks.length}</span></button>
-        <button className={tab === "decisions" ? "selected" : ""} onClick={() => setTab("decisions")}><ShieldCheck size={16} />决策审查 <span>{decisions.filter((item) => item.status === "proposed").length}</span></button>
-        <button className={tab === "command" ? "selected" : ""} onClick={() => setTab("command")}><MessageSquare size={16} />受限命令</button>
-        <button className={tab === "chat" ? "selected" : ""} onClick={() => setTab("chat")}><Bot size={16} />多轮指挥</button>
+      <div className="governance-tabs" role="group" aria-label="审批与治理内容">
+        <button type="button" aria-pressed={tab === "tasks"} className={tab === "tasks" ? "selected" : ""} onClick={() => setTab("tasks")}><ClipboardCheck size={16} />任务审批 <span>{pendingTasks.length}</span></button>
+        <button type="button" aria-pressed={tab === "decisions"} className={tab === "decisions" ? "selected" : ""} onClick={() => setTab("decisions")}><ShieldCheck size={16} />决策审查 <span>{decisions.filter((item) => item.status === "proposed").length}</span></button>
+        <button type="button" aria-pressed={tab === "command"} className={tab === "command" ? "selected" : ""} onClick={() => setTab("command")}><MessageSquare size={16} />受限命令</button>
+        <button type="button" aria-pressed={tab === "chat"} className={tab === "chat" ? "selected" : ""} onClick={() => setTab("chat")}><Bot size={16} />多轮指挥</button>
       </div>
 
       {tab === "tasks" ? (
         <section className="panel">
           <div className="panel-heading"><div className="panel-title"><ClipboardCheck size={17} /><h3>待授权与待验收任务</h3></div><span className="muted-inline">所有写操作先预览，再由所有者确认</span></div>
+          <div className="approval-switch" role="group" aria-label="审批状态">{[{key:"all",label:"全部待办"},{key:"waiting_approval",label:"待授权"},{key:"submitted",label:"待验收"}].map(item => <button type="button" key={item.key} aria-pressed={approvalFilter === item.key} className={approvalFilter === item.key ? "selected" : ""} onClick={() => setApprovalFilter(item.key)}>{item.label}<span>{item.key === "all" ? pendingTasks.length : pendingTasks.filter(task => task.status === item.key).length}</span></button>)}</div>
           <div className="governance-task-list">
-            {pendingTasks.map((task) => <article className="governance-task" key={task.id}>
-              <div className="governance-task-main"><div><strong>{task.title}</strong><span className={"status-tag " + (task.status === "waiting_approval" ? "tag-red" : "tag-blue")}>{taskStatus[task.status]}</span></div><p>{task.id} · {task.risk} · 优先级 {task.priority}</p><small>{task.instruction}</small></div>
+            {pendingTasks.filter(task => approvalFilter === "all" || task.status === approvalFilter).map((task) => <article className="governance-task" key={task.id}>
+              <div className="governance-task-main"><div><strong>{task.title}</strong><TaskStatusBadge status={task.status}/></div><p>{task.id} · {getRiskLabel(task.risk)} · 优先级 {task.priority}</p><small>{task.instruction}</small></div>
               <div className="governance-task-actions">
                 {task.status === "waiting_approval" ? <button className="primary-button compact" disabled={saving} onClick={() => void createTaskPlan(task, "authorize_task")}><ShieldCheck size={14} />生成授权预览</button> : <>
                   <button className="primary-button compact" disabled={saving} onClick={() => void createTaskPlan(task, "review_task", true)}><Check size={14} />验收通过预览</button>
@@ -404,7 +423,7 @@ export default function GovernancePage() {
                 </>}
               </div>
             </article>)}
-            {!pendingTasks.length && <div className="empty-state"><CheckCircle2 size={26} /><strong>没有待处理任务</strong><p>该项目当前没有等待授权或验收的任务。</p></div>}
+            {!pendingTasks.some(task => approvalFilter === "all" || task.status === approvalFilter) && <EmptyState icon={CheckCircle2} title="暂无此类待办"/>}
           </div>
         </section>
       ) : tab === "decisions" ? (
@@ -418,7 +437,7 @@ export default function GovernancePage() {
             {!decisions.length && <div className="empty-mini">该项目暂无决策记录</div>}
           </section>
           <section className="panel decision-detail-panel">
-            {!selectedDecision ? <div className="empty-state"><MessageSquare size={26} /><strong>选择一项决策</strong><p>查看独立审查意见和讨论过程。</p></div> : <>
+            {!selectedDecision ? <EmptyState icon={MessageSquare} title="选择一项决策"><p>查看独立审查意见和讨论过程。</p></EmptyState> : <>
               <div className="panel-heading"><div className="panel-title"><MessageSquare size={17} /><h3>决策详情</h3></div><span className={"status-tag " + (selectedDecision.status === "proposed" ? "tag-amber" : "tag-green")}>{selectedDecision.status === "proposed" ? "待裁决" : "已批准"}</span></div>
               <div className="decision-question">{selectedDecision.question}</div>
               <div className="decision-answer-grid"><div><small>建议方案</small><p>{selectedDecision.resolution}</p></div><div><small>决策依据</small><p>{selectedDecision.rationale}</p></div></div>
@@ -436,7 +455,7 @@ export default function GovernancePage() {
                   </div>
                 ) : selectedDecision.status === "proposed" && reviews.length === 0 ? (
                   <>
-                    <p className="form-hint">在第一轮审查开始前，可指定 2–8 名项目内已启用的 Agent 组成自动法定协商名单。</p>
+                    <p className="form-hint">在第一轮审查开始前，可指定 2–8 名项目内已启用的 智能体 组成自动法定协商名单。</p>
                     {eligibleReviewers.length < 2 ? (
                       <p className="form-hint">当前项目已启用成员不足 2 位，请先在项目管理页添加成员。</p>
                     ) : (
@@ -449,7 +468,7 @@ export default function GovernancePage() {
                                 checked={policySelection.includes(m.agent_id)}
                                 onChange={() => togglePolicyMember(m.agent_id)}
                               />
-                              <span>{m.agent_name} ({m.role})</span>
+                              <span>{m.agent_name} ({getUiLabel(m.role)})</span>
                             </label>
                           ))}
                         </div>
@@ -468,7 +487,7 @@ export default function GovernancePage() {
 
               <div className="decision-subheading"><strong>第一轮独立审查</strong><span>{reviews.length} 条意见</span></div>
               {reviews.map((review) => <article className="review-card" key={review.id}>
-                <div className="review-card-head"><strong>{memberNameMap.get(review.agent_id) || `Agent ${review.agent_id.slice(0, 8)}`}</strong><span className={"status-tag " + (review.stance === "support" ? "tag-green" : review.stance === "oppose" ? "tag-red" : "tag-amber")}>{stanceLabel[review.stance]}</span></div>
+                <div className="review-card-head"><strong>{memberNameMap.get(review.agent_id) || `智能体 ${review.agent_id.slice(0, 8)}`}</strong><span className={"status-tag " + (review.stance === "support" ? "tag-green" : review.stance === "oppose" ? "tag-red" : "tag-amber")}>{stanceLabel[review.stance]}</span></div>
                 <p>{review.reasoning}</p>
                 {review.evidence.length > 0 && (
                   <div className="evidence-list">
@@ -481,7 +500,7 @@ export default function GovernancePage() {
                 )}
                 <small className="muted-inline">{timeText(review.created_at)}</small>
               </article>)}
-              {!reviews.length && <p className="form-hint">尚无 Agent 独立审查意见。只有注册并加入该项目的 Agent 可以提交审查。</p>}
+              {!reviews.length && <p className="form-hint">尚无 智能体 独立审查意见。只有注册并加入该项目的 智能体 可以提交审查。</p>}
 
               <form className="auto-policy-panel" onSubmit={inspectEvidence}>
                 <div className="decision-subheading">
@@ -520,7 +539,7 @@ export default function GovernancePage() {
               {deliberation && <div className="deliberation-panel">
                 <div className="decision-subheading"><strong>第二轮讨论</strong><span className={"status-tag " + (deliberation.status === "open" ? "tag-blue" : "tag-neutral")}>{deliberation.status === "open" ? "讨论中" : "已关闭"}</span></div>
                 <p className="form-hint">第二轮最多一轮，不会自动批准决策。所有者仍需最终裁决。</p>
-                {deliberation.rebuttals.map((reply) => <article className="review-card" key={reply.id}><div className="review-card-head"><strong>{memberNameMap.get(reply.agent_id) || `Agent ${reply.agent_id.slice(0, 8)}`}</strong><span className="status-tag tag-neutral">{stanceLabel[reply.stance] || reply.stance}</span></div><p>{reply.reasoning}</p></article>)}
+                {deliberation.rebuttals.map((reply) => <article className="review-card" key={reply.id}><div className="review-card-head"><strong>{memberNameMap.get(reply.agent_id) || `智能体 ${reply.agent_id.slice(0, 8)}`}</strong><span className="status-tag tag-neutral">{stanceLabel[reply.stance] || reply.stance}</span></div><p>{reply.reasoning}</p></article>)}
                 {deliberation.status === "open" && selectedDecision.status === "proposed" && <div className="form-panel"><label>关闭说明（至少 10 个字符）<textarea rows={2} value={closingNote} onChange={(event) => setClosingNote(event.target.value)} /></label><button className="secondary-button compact" disabled={saving || closingNote.trim().length < 10} onClick={() => void closeSecondRound()}>关闭第二轮</button></div>}
                 {deliberation.closing_note && <p className="form-hint">关闭说明：{deliberation.closing_note}</p>}
               </div>}
@@ -534,7 +553,7 @@ export default function GovernancePage() {
         </div>
       ) : tab === "command" ? (
         <section className="panel command-input-panel">
-          <div className="panel-heading"><div className="panel-title"><MessageSquare size={17} /><h3>受限自然语言命令</h3></div><span className="status-tag tag-blue">模板解析 · 非 LLM</span></div>
+          <div className="panel-heading"><div className="panel-title"><MessageSquare size={17} /><h3>受限自然语言命令</h3></div><span className="status-tag tag-blue">本地规则解析</span></div>
           <p className="form-hint">该入口只支持后端白名单中的中文命令模板，不会调用外部模型，也不会直接执行操作。解析成功后会创建与任务审批相同的版本化命令预览。</p>
           <form className="form-panel" onSubmit={interpretCommand}>
             <label>输入命令<textarea rows={3} value={commandText} onChange={(event) => setCommandText(event.target.value)} required minLength={4} maxLength={3500} placeholder="例如：验收通过任务「完成首页 React 改造」" /></label>
@@ -543,20 +562,20 @@ export default function GovernancePage() {
               <span>取消任务「任务名称」</span>
               <span>验收通过任务「任务名称」</span>
               <span>验收驳回任务「任务名称」原因：需要补充测试</span>
-              <span>指派任务「任务名称」给「Agent 名称」</span>
+              <span>指派任务「任务名称」给「智能体 名称」</span>
             </div>
             <div className="form-actions"><button className="primary-button compact" disabled={saving || !selectedId || commandText.trim().length < 4}>解析并生成预览</button></div>
           </form>
           <div className="command-safety-note"><ShieldCheck size={16} /><span>命令只会生成预览。你仍需在预览弹窗中检查任务、操作、版本和风险，再点击确认执行。</span></div>
         </section>
       ) : (
-        <CommandChatPanel projectId={selectedId} tasks={tasks} onPlan={setPlan} />
+        <CommandChatPanel key={selectedId} projectId={selectedId} tasks={tasks} onPlan={setPlan} />
       )}
 
       {plan && <div className="modal-backdrop"><section className="panel command-preview">
         <div className="panel-heading"><div className="panel-title"><ShieldCheck size={17} /><h3>命令执行预览</h3></div><button className="icon-button" onClick={() => setPlan(null)}><X size={17} /></button></div>
         <div className="command-preview-warning"><AlertCircle size={18} /><span>此操作必须由所有者明确确认。预览有效期至 {timeText(plan.expires_at)}，任务版本为 {plan.expected_version}。</span></div>
-        <div className="command-preview-grid"><div><small>任务</small><strong>{plan.task_title || plan.task_id}</strong></div><div><small>操作</small><strong>{plan.action}</strong></div><div><small>当前状态</small><strong>{plan.task_status}</strong></div><div><small>风险等级</small><strong>{plan.task_risk}</strong></div></div>
+        <div className="command-preview-grid"><div><small>任务</small><strong>{plan.task_title || plan.task_id}</strong></div><div><small>操作</small><strong>{getUiLabel(plan.action)}</strong></div><div><small>当前状态</small><strong>{getUiLabel(plan.task_status)}</strong></div><div><small>风险等级</small><strong>{plan.task_risk}</strong></div></div>
         <pre className="json-preview">{JSON.stringify(plan.parameters, null, 2)}</pre>
         <div className="form-actions"><button className="secondary-button" onClick={() => setPlan(null)}>取消</button><button className="primary-button" disabled={saving} onClick={() => void confirmPlan()}>{saving ? "执行中…" : "确认执行命令"}</button></div>
       </section></div>}

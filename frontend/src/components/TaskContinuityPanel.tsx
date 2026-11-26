@@ -32,7 +32,7 @@ type ReviewStatus = "owner_verified" | "rejected";
 interface Props { taskId: string; taskStatus: string; isOwner: boolean; onChanged: () => void; }
 const time = (date: string | null) => date ? new Date(date).toLocaleString("zh-CN", { hour12: false }) : "—";
 const labels: Record<string, string> = {
-  self_reported: "Agent 自报，未经核验",
+  self_reported: "智能体 自报，未经核验",
   owner_verified: "所有者已核验",
   rejected: "所有者已驳回"
 };
@@ -70,7 +70,7 @@ export default function TaskContinuityPanel({ taskId, taskStatus, isOwner, onCha
     if (!selected || selected.verification_status !== "self_reported") return;
     const confirmed = await dialog.confirm({
       title: reviewStatus === "owner_verified" ? "核验检查点" : "驳回检查点",
-      message: "确认" + (reviewStatus === "owner_verified" ? "核验通过" : "驳回") + "这条 Agent 检查点？\n\n核验只确认这一条记录，不证明模型对话状态或外部进程已经安全迁移。",
+      message: "确认" + (reviewStatus === "owner_verified" ? "核验通过" : "驳回") + "这条 智能体 检查点？\n\n核验只确认这一条记录，不证明模型对话状态或外部进程已经安全迁移。",
       confirmText: reviewStatus === "owner_verified" ? "确认通过" : "确认驳回",
       tone: reviewStatus === "rejected" ? "warning" : "default"
     });
@@ -92,7 +92,7 @@ export default function TaskContinuityPanel({ taskId, taskStatus, isOwner, onCha
     if (!isOwner || taskStatus !== "running" || !understandFencing || revokeReason.trim().length < 5) return;
     const confirmed = await dialog.confirm({
       title: "高风险：撤销旧执行租约",
-      message: "撤销旧租约只会隔离旧 epoch 的控制平面提交，不能停止外部进程或撤销已发生的副作用。\n\n非 R3 任务可能重新进入可调度状态，务必已在执行节点人工核实进程状态。确定继续？",
+      message: "撤销旧租约只会隔离旧租约代次的控制平面提交，不能停止外部进程或撤销已发生的副作用。\n\n非 R3 任务可能重新进入可调度状态，务必已在执行节点人工核实进程状态。确定继续？",
       confirmText: "撤销旧租约",
       tone: "danger"
     });
@@ -106,7 +106,7 @@ export default function TaskContinuityPanel({ taskId, taskStatus, isOwner, onCha
       );
       setRevokeReason(""); setUnderstandFencing(false);
       await load(); setHandoff(null);
-      setNotice("旧租约已隔离，新 epoch 为 " + result.lease_epoch + "。外部执行已停止：未验证（服务端返回 " + String(result.remote_execution_stopped_verified) + "）。");
+      setNotice("旧租约已隔离，新租约代次为 " + result.lease_epoch + "。外部执行已停止：未验证（服务端返回 " + (result.remote_execution_stopped_verified ? "是" : "否") + "）。");
       onChanged();
     } catch (reason) { setError(message(reason)); }
     finally { setSaving(false); }
@@ -140,22 +140,20 @@ export default function TaskContinuityPanel({ taskId, taskStatus, isOwner, onCha
   const selected = checkpoints.find((cp) => cp.id === selectedId);
   return <section className="task-detail-section task-detail-wide continuity-section">
     <div className="task-detail-section-head">
-      <div><h3><ClipboardCheck size={16} />检查点与故障交接</h3><p>仅由持有效租约的 Agent 创建检查点；所有者负责核验、撤销旧租约及审查交接内容。</p></div>
-      <button className="secondary-button compact" disabled={loading || saving} onClick={() => void load()}><RefreshCw size={13} />刷新</button>
+      <div><h3><ClipboardCheck size={16} />检查点与故障交接</h3><p>执行者提交检查点，所有者核验并管理交接。</p></div>
+      <div className="heading-actions"><span className="status-tag tag-green">已核验 {checkpoints.filter(cp => cp.verification_status === "owner_verified").length}</span><span className="status-tag tag-amber">待核验 {checkpoints.filter(cp => cp.verification_status === "self_reported").length}</span><button className="secondary-button compact" disabled={loading || saving} onClick={() => void load()}><RefreshCw size={13} />刷新</button></div>
     </div>
     {error && <div className="inline-error"><AlertTriangle size={14} />{error}</div>}
     {notice && <div className="success-notice"><CheckCircle2 size={14} />{notice}<button onClick={() => setNotice("")}>关闭</button></div>}
     <div className="continuity-checkpoint-list">
-      {checkpoints.map((cp) => <article className="continuity-checkpoint" key={cp.id}>
+      {checkpoints.slice().sort((a,b) => Number(b.verification_status === "self_reported") - Number(a.verification_status === "self_reported")).map((cp) => <article className="continuity-checkpoint" key={cp.id}>
         <div className="continuity-checkpoint-title">
           <strong>租约 #{cp.lease_epoch} · 步骤 {cp.step_number}</strong>
           <span className={"status-tag " + (cp.verification_status === "owner_verified" ? "tag-green" : cp.verification_status === "rejected" ? "tag-red" : "tag-amber")}>{labels[cp.verification_status] || cp.verification_status}</span>
         </div>
         <p>{cp.summary}</p>
-        {cp.next_steps && <p><b>后续步骤：</b>{cp.next_steps}</p>}
-        {cp.artifact_ids.length > 0 && <p><b>关联成果：</b>{cp.artifact_ids.length} 个</p>}
-        {cp.owner_note && <p><b>审核备注：</b>{cp.owner_note}</p>}
-        <small>提交 Agent {cp.agent_id.slice(0, 8)} · {time(cp.created_at)}</small>
+        {(cp.next_steps || cp.artifact_ids.length > 0 || cp.owner_note) && <details className="library-disclosure checkpoint-extra" open={cp.verification_status === "self_reported" || undefined}><summary>交接信息</summary>{cp.next_steps && <p><b>后续步骤：</b>{cp.next_steps}</p>}{cp.artifact_ids.length > 0 && <p><b>关联成果：</b>{cp.artifact_ids.length} 个</p>}{cp.owner_note && <p><b>审核备注：</b>{cp.owner_note}</p>}</details>}
+        <small>提交智能体 {cp.agent_id.slice(0, 8)} · {time(cp.created_at)}</small>
         {isOwner && cp.verification_status === "self_reported" && <button className="secondary-button compact" disabled={saving}
           onClick={() => { setSelectedId(cp.id); setReviewStatus("owner_verified"); setReviewNote(""); }}>审核检查点</button>}
       </article>)}
@@ -192,7 +190,7 @@ export default function TaskContinuityPanel({ taskId, taskStatus, isOwner, onCha
 
     {isOwner && taskStatus === "running" && <form className="continuity-form continuity-revoke" onSubmit={(event) => void revokeLease(event)}>
       <div className="continuity-ops-heading"><ShieldAlert size={16} /><strong>撤销旧执行租约</strong></div>
-      <p className="continuity-boundary"><AlertTriangle size={14} />此操作只使旧 epoch 无法在控制平面提交，不会终止远端进程。服务端也不验证远端已停止；非 R3 任务可能重新进入调度。</p>
+      <p className="continuity-boundary"><AlertTriangle size={14} />此操作只使旧租约代次无法在控制平面提交，不会终止远端进程。服务端也不验证远端已停止；非 R3 任务可能重新进入调度。</p>
       <label>撤销原因（至少 5 字符）<textarea rows={2} value={revokeReason} maxLength={2000} required minLength={5}
         onChange={(event) => setRevokeReason(event.target.value)} placeholder="说明旧节点故障、外部执行状态核查结果及撤销原因…" /></label>
       <label className="continuity-checkbox"><input type="checkbox" checked={understandFencing} onChange={(event) => setUnderstandFencing(event.target.checked)} />
