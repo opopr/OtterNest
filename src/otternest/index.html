@@ -1781,20 +1781,22 @@ function agentMascot(agent){
 }
 
 function displayRequestError(detail,status){
-  const raw=typeof detail==='string'?detail:detail?JSON.stringify(detail):'';
-  if(/[\u3400-\u9fff]/.test(raw))return raw;
+  const safeDetail=Array.isArray(detail)?detail.map(row=>row&&typeof row==='object'?{loc:row.loc,msg:row.msg,type:row.type}:typeof row==='string'?row:null):typeof detail==='string'?detail:null;
+  const raw=(typeof safeDetail==='string'?safeDetail:safeDetail?JSON.stringify(safeDetail):'').slice(0,1000);
+  if(typeof detail==='string'&&/[\u3400-\u9fff]/.test(raw))return raw;
   const labels={400:'请求参数有误',401:'身份验证失败，请重新登录',403:'没有操作权限',404:'资源不存在',409:'状态冲突，请刷新后重试',422:'输入校验失败',429:'请求过于频繁',500:'服务内部错误',502:'上游服务不可用',503:'服务暂不可用',504:'请求超时'};
   return (labels[status]||'请求失败')+(raw?'（原始信息：'+raw+'）':'');
 }
 const api=async(path,method="GET",data)=>{
   setLoading(1);
   try{
-    const response=await fetch('/api/v1'+path,{
+    let response;
+    try{response=await fetch('/api/v1'+path,{
       method,
       headers:{'Authorization':'Bearer '+token,...(data!==undefined?{'Content-Type':'application/json'}:{})},
       body:data===undefined?undefined:JSON.stringify(data)
-    });
-    const out=await response.json();
+    });}catch(_){throw Error(['GET','HEAD','OPTIONS'].includes(method.toUpperCase())?'无法连接服务，请检查网络后重新读取。':'无法连接服务，操作结果尚不确定，请先核对状态，不要重复提交。')}
+    let out;try{out=await response.json()}catch(_){throw Error(response.ok?'服务响应格式异常，请刷新核对状态。':displayRequestError(null,response.status))}
     if(!response.ok)throw Error(displayRequestError(out.detail||response.statusText,response.status));
     return out;
   }finally{setLoading(-1);}
@@ -2220,36 +2222,36 @@ function priorityBadge(p){
   return '<span class="tag tag-ok">低</span>';
 }
 
+function displayUiLabel(value){
+  const labels={ready:'待执行',waiting_dependencies:'等待依赖',waiting_approval:'等待授权',running:'执行中',submitted:'等待验收',blocked:'已阻塞',completed:'已完成',cancelled:'已取消',failed:'执行失败',worker:'执行者',manager:'管理者',reviewer:'审查者',advisor:'顾问',owner:'所有者',agent:'智能体',member:'成员',manual:'人工接入',polling:'主动轮询',remote:'远程接入',public:'公开',internal:'内部',confidential:'机密',restricted:'受限',idle:'空闲',busy:'忙碌',stopped:'已停止',active:'进行中',paused:'已暂停',archived:'已归档',enabled:'已启用',disabled:'已禁用'};
+  return Object.prototype.hasOwnProperty.call(labels,value)?labels[value]:String(value??'');
+}
 function statusBadge(s){
-  const labels={
-    running:'进行中',submitted:'待审核',ready:'待执行',waiting_approval:'待审批',
-    waiting_dependencies:'待依赖',blocked:'已阻塞',completed:'已完成',cancelled:'已取消'
-  };
-  return `<span class="${tagCls(s)}">${esc(labels[s]||s)}</span>`;
+  return `<span class="${tagCls(s)}">${esc(displayUiLabel(s))}</span>`;
 }
 function projectStatusBadge(s){
   const labels={active:'运行中',paused:'已暂停',archived:'已归档'};
-  return `<span class="${tagCls(s)}">${esc(labels[s]||s)}</span>`;
+  return `<span class="${tagCls(s)}">${esc(Object.prototype.hasOwnProperty.call(labels,s)?labels[s]:s)}</span>`;
 }
 function sideEffectStatusBadge(s){
   const labels={pending:'待登记',unknown:'状态未知',verified_executed:'已核对执行',verified_not_executed:'已核对未执行'};
-  return `<span class="${tagCls(s)}">${esc(labels[s]||s)}</span>`;
+  return `<span class="${tagCls(s)}">${esc(Object.prototype.hasOwnProperty.call(labels,s)?labels[s]:s)}</span>`;
 }
 function knowledgeStatusBadge(s,prefix=''){
   const labels={proposed:'待发布审批',published:'已发布',archived:'已归档'};
-  return `<span class="${tagCls(s)}">${esc(prefix)}${esc(labels[s]||s)}</span>`;
+  return `<span class="${tagCls(s)}">${esc(prefix)}${esc(Object.prototype.hasOwnProperty.call(labels,s)?labels[s]:s)}</span>`;
 }
 function decisionStatusBadge(s){
   const labels={proposed:'待裁决',approved:'已裁决',resolved:'已裁决',rejected:'已驳回'};
-  return `<span class="${tagCls(s)}">${esc(labels[s]||s)}</span>`;
+  return `<span class="${tagCls(s)}">${esc(Object.prototype.hasOwnProperty.call(labels,s)?labels[s]:s)}</span>`;
 }
 function stanceBadge(s){
   const labels={support:'支持',concern:'保留关注',alternative:'替代方案',oppose:'反对'};
-  return `<span class="${tagCls(s)}">${esc(labels[s]||s)}</span>`;
+  return `<span class="${tagCls(s)}">${esc(Object.prototype.hasOwnProperty.call(labels,s)?labels[s]:s)}</span>`;
 }
 function verdictBadge(v){
   const labels={pass:'评估通过',concern:'存在隐患',fail:'未通过'};
-  return `<span class="${tagCls(v)}">${esc(labels[v]||v)}</span>`;
+  return `<span class="${tagCls(v)}">${esc(Object.prototype.hasOwnProperty.call(labels,v)?labels[v]:v)}</span>`;
 }
 function itemKindLabel(k){return k==='skill'?'技能':(k==='memory'?'项目记忆':String(k||''))}
 function pageHero(iconSrc,title,subtitle,mascotSrc,pillsHtml=''){
@@ -2528,7 +2530,7 @@ async function render(){
         <p class="muted"><strong>验收标准：</strong>${esc(t.acceptance)}</p>
         ${['ready','waiting_dependencies','waiting_approval'].includes(t.status)?`
         <div class="stack stack-grow" style="margin-top:10px">
-          <select id="target-${esc(t.id)}"><option value="">不指定智能体</option>${eligible.map(m=>`<option value="${esc(m.agent_id)}" ${m.agent_id===t.target_agent_id?'selected':''}>${esc(m.agent_name)}（${esc(m.role)}）</option>`).join('')}</select>
+          <select id="target-${esc(t.id)}"><option value="">不指定智能体</option>${eligible.map(m=>`<option value="${esc(m.agent_id)}" ${m.agent_id===t.target_agent_id?'selected':''}>${esc(m.agent_name)}（${esc(displayUiLabel(m.role))}）</option>`).join('')}</select>
           <button class="secondary sm" style="flex:0 0 auto" onclick="targetTask('${esc(t.id)}')">保存指派</button>
         </div>`:''}
         <div class="actions">
@@ -2622,14 +2624,14 @@ async function render(){
           </div>
           <div class="grid-2">
             <div><label>优先级（0–100）</label><input name="priority" type="number" value="50" min="0" max="100" required></div>
-            <div><label>数据敏感级别（ABAC）</label><select name="sensitivity"><option value="public">public（公开）</option><option value="internal" selected>internal（内部）</option><option value="confidential">confidential（机密）</option><option value="restricted">restricted（高敏感，需专项授权）</option></select></div>
+            <div><label>数据敏感级别（ABAC）</label><select name="sensitivity"><option value="public">公开</option><option value="internal" selected>内部</option><option value="confidential">机密</option><option value="restricted">高敏感（需专项授权）</option></select></div>
           </div>
           <label>关联目标</label><select name="goal_id"><option value="">不关联目标</option>${cachedGoals.filter(g=>g.status==='active').map(g=>`<option value="${esc(g.id)}">${esc(g.title)} · ${esc(goalStatusLabel[g.status]||g.status)}</option>`).join('')}</select>
           <label>所需已验证能力（英文小写，逗号分隔）</label><input name="required_capabilities" placeholder="coding, testing">
           <label>执行说明</label><textarea name="instruction" required></textarea>
           <label>验收标准</label><textarea name="acceptance" required></textarea>
           <label>前置依赖任务（可选，按 Ctrl/Cmd 多选）</label>
-          <select name="dependencies" multiple size="${Math.max(2,Math.min(6,tasks.length))}">${tasks.map(t=>`<option value="${esc(t.id)}">${esc(t.title)} · ${esc(t.status)}</option>`).join('')}</select>
+          <select name="dependencies" multiple size="${Math.max(2,Math.min(6,tasks.length))}">${tasks.map(t=>`<option value="${esc(t.id)}">${esc(t.title)} · ${esc(displayUiLabel(t.status))}</option>`).join('')}</select>
           <div class="actions"><button type="submit">创建任务</button></div>
         </form>
       </div>`:''}
@@ -2757,7 +2759,7 @@ async function render(){
           <select name="agent_id">${agents.filter(a=>a.enabled).map(a=>`<option value="${esc(a.id)}">${esc(a.name)}（${esc(a.platform)}）</option>`).join('')}</select>
           <div class="grid-2">
             <div><label>项目角色</label><select name="role"><option value="worker">worker（执行者）</option><option value="manager">manager（项目协调者）</option><option value="reviewer">reviewer（独立评审者）</option><option value="advisor">advisor（顾问）</option></select></div>
-            <div><label>ABAC 最高可见敏感级</label><select name="max_sensitivity"><option value="public">public</option><option value="internal">internal</option><option value="confidential" selected>confidential</option><option value="restricted">restricted</option></select></div>
+            <div><label>ABAC 最高可见敏感级</label><select name="max_sensitivity"><option value="public">公开</option><option value="internal">内部</option><option value="confidential" selected>机密</option><option value="restricted">受限</option></select></div>
           </div>
           <label>临时成员有效期（小时，留空为长期）</label><input name="expires_in_hours" type="number" min="1" max="8760" placeholder="例如：24">
           <div class="actions"><button type="submit">分配项目权限</button></div>
@@ -2775,7 +2777,7 @@ async function render(){
           <label>平台标识</label><input name="platform" required placeholder="例如：codex / gemini / muse">
           <label>声明能力（小写英文标识，逗号分隔）</label><input name="capabilities" placeholder="design, docs, coding, testing">
           <label>接入方式</label>
-          <select name="execution_mode"><option value="manual">manual（人工接入）</option><option value="polling">polling（主动轮询）</option><option value="remote">remote（远端 A2A/Webhook）</option></select>
+          <select name="execution_mode"><option value="manual">人工接入</option><option value="polling">主动轮询</option><option value="remote">远程接入（A2A/回调）</option></select>
           <div class="actions"><button type="submit">登记智能体</button></div>
         </form>
         <p class="muted" style="margin-top:12px">智能体令牌仅在注册时明文显示一次，服务端只保存 SHA-256 哈希。</p>
@@ -2876,7 +2878,7 @@ async function render(){
                 <label style="margin:0">上下文焦点任务：</label>
                 <select id="chatFocusTask" style="width:auto;min-width:220px" onchange="focusTaskId=this.value">
                   <option value="">自动识别 / 无固定焦点</option>
-                  ${tasks.map(t=>`<option value="${esc(t.id)}" ${focusTaskId===t.id?'selected':''}>${esc(t.title)} (${esc(t.status)})</option>`).join('')}
+                  ${tasks.map(t=>`<option value="${esc(t.id)}" ${focusTaskId===t.id?'selected':''}>${esc(t.title)} (${esc(displayUiLabel(t.status))})</option>`).join('')}
                 </select>
               </div>
               <textarea id="chatInputBox" name="text" required minlength="1" maxlength="3500" placeholder="输入问题或指令（Enter 发送，Shift+Enter 换行）" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.form.requestSubmit();}"></textarea>
@@ -3277,7 +3279,7 @@ async function render(){
         <form onsubmit="createMemory(event)">
           <div class="grid-2" style="margin-bottom:0">
             <div><label>记忆类别</label><select name="kind"><option value="fact">fact（事实记录）</option><option value="decision">decision（决策沉淀）</option><option value="experience">experience（经验教训）</option><option value="procedure">procedure（操作规程）</option></select></div>
-            <div><label>敏感级别（ABAC）</label><select name="sensitivity"><option value="public">public</option><option value="internal" selected>internal</option><option value="confidential">confidential</option><option value="restricted">restricted</option></select></div>
+            <div><label>敏感级别（ABAC）</label><select name="sensitivity"><option value="public">公开</option><option value="internal" selected>内部</option><option value="confidential">机密</option><option value="restricted">受限</option></select></div>
           </div>
           <label>标题</label><input name="title" required>
           <label>内容</label><textarea name="content" required></textarea>
@@ -3417,7 +3419,7 @@ async function render(){
           <div class="card-head">
             <div class="card-title-group"><img class="card-title-icon" src="/assets/icons/SVG/操作/download-下载.svg" alt=""><h2>无密文可携带项目导出</h2></div>
           </div>
-          <p class="muted">生成规范化项目导出 JSON 包（永久设置 <code>secrets_included: false</code>，不含任何 Token/Secret）。</p>
+          <p class="muted">生成规范化项目导出 JSON 包（永久设置 <code>secrets_included: false</code>，不含任何令牌或密钥）。</p>
           <div class="actions"><button type="button" onclick="exportProjectBundle()"><img src="/assets/icons/SVG/操作/download-下载.svg" width="20" height="20" style="filter:brightness(0) invert(1)" alt="">导出项目 JSON 包</button></div>
           <div id="export-preview"></div>
         </div>
@@ -3524,7 +3526,7 @@ function discardCommandPreview(){
 }
 async function confirmCurrentPlan(){if(!currentPlan)return;await safe(async()=>{const id=currentPlan;const result=await api('/command/plans/'+id+'/confirm','POST');currentPlan=null;notice('已执行并记录：'+result.result.status);await refresh()})}
 async function showDecisionReviews(id){await safe(async()=>{const reviews=await api('/decisions/'+id+'/reviews');const el=document.getElementById('reviews-'+id);el.innerHTML='<div class="continuity-box"><h3>独立意见（仅检验引用存在性）</h3>'+(reviews.map(r=>item(`<div class="item-head">${stanceBadge(r.stance)}<span class="muted">智能体：<code>${esc(r.agent_id)}</code></span></div><p>${esc(r.reasoning)}</p><p class="muted">证据引用：${esc(r.evidence.join(', ')||'未提供')}</p>`)).join('')||'<p class="muted">暂无独立意见</p>')+'</div>'})}
-async function configureAutoDeliberation(id){await safe(async()=>{const pool=(cachedMembers&&cachedMembers.length)?cachedMembers.map(m=>({value:m.agent_id,label:`${m.agent_name} (${m.role})`})):(agents||[]).map(a=>({value:a.id,label:a.name}));const vals=await uiForm({title:'设置二轮自动协商名单',subtitle:'选择 2–8 名评审 Agent；设置后不可更改，全员发表独立意见后自动进入二轮。',fields:[pool.length?{name:'roster',label:'参与协商 Agent',type:'checks',options:pool,value:[]}:{name:'ids',label:'Agent ID 列表（逗号分隔）',type:'text',required:true,placeholder:'agent-1, agent-2'}],submitText:'锁定协商名单'});if(!vals)return;const roster=Array.isArray(vals.roster)?vals.roster:String(vals.ids||'').split(',').map(x=>x.trim()).filter(Boolean);await api('/decisions/'+id+'/deliberation/auto-policy','POST',{reviewer_ids:roster});notice('已锁定自动协商名单；二轮协商不会自动批准决策')})}
+async function configureAutoDeliberation(id){await safe(async()=>{const pool=(cachedMembers&&cachedMembers.length)?cachedMembers.map(m=>({value:m.agent_id,label:`${m.agent_name} (${displayUiLabel(m.role)})`})):(agents||[]).map(a=>({value:a.id,label:a.name}));const vals=await uiForm({title:'设置二轮自动协商名单',subtitle:'选择 2–8 名评审智能体；设置后不可更改，全员发表独立意见后自动进入二轮。',fields:[pool.length?{name:'roster',label:'参与协商的智能体',type:'checks',options:pool,value:[]}:{name:'ids',label:'智能体编号列表（逗号分隔）',type:'text',required:true,placeholder:'agent-1, agent-2'}],submitText:'锁定协商名单'});if(!vals)return;const roster=Array.isArray(vals.roster)?vals.roster:String(vals.ids||'').split(',').map(x=>x.trim()).filter(Boolean);await api('/decisions/'+id+'/deliberation/auto-policy','POST',{reviewer_ids:roster});notice('已锁定自动协商名单；二轮协商不会自动批准决策')})}
 async function openDeliberation(id){await safe(async()=>{await api('/decisions/'+id+'/deliberation/open','POST');notice('二轮协商已开启，仅第一轮参与者可发表回应');await showDeliberation(id)})}
 async function showDeliberation(id){await safe(async()=>{const data=await api('/decisions/'+id+'/deliberation');const root=document.getElementById('deliberation-'+id);if(!root)return;const stLabel={open:'进行中',closed:'已关闭'}[data.status]||data.status;root.innerHTML=`<div class="continuity-box"><h3>二轮协商详情（${esc(stLabel)}）</h3><p class="muted">证据引用尚未独立核实，最终裁决权属于管理员。</p><details class="payload-details"><summary>查看首轮意见与二轮交锋 JSON 详情</summary><pre>${esc(JSON.stringify({first_round:data.first_round,rebuttals:data.rebuttals},null,2))}</pre></details>${data.status==='open'?`<div class="actions"><button class="secondary sm" onclick="closeDeliberation('${esc(id)}')">关闭二轮协商</button></div>`:''}</div>`})}
 async function closeDeliberation(id){await safe(async()=>{const vals=await uiForm({title:'关闭二轮协商',subtitle:'关闭后不再接收新一轮辩论，仍需管理员作最终裁决。',fields:[{name:'reason',label:'结束第二轮的实质说明（至少 10 字）',type:'textarea',required:true,minlength:10}],submitText:'确认关闭'});if(!vals)return;await api('/decisions/'+id+'/deliberation/close','POST',{reason:vals.reason.trim()});notice('第二轮已关闭，仍需管理员最终裁决');await showDeliberation(id)})}
@@ -3532,7 +3534,7 @@ async function resolveDecision(id){await safe(async()=>{const reviews=await api(
 const form=e=>Object.fromEntries(new FormData(e.target).entries());
 function parseCapabilities(value){return String(value||'').split(',').map(x=>x.trim()).filter(Boolean)}
 async function schedule(){await safe(async()=>{const result=await api('/projects/'+project+'/schedule','POST',{limit:20});notice('已匹配 '+result.count+' 项任务；实际执行仍须 智能体主动领取');await refresh()})}
-async function showRuntimes(id){await safe(async()=>{const list=await api('/agents/'+id+'/runtimes');const el=document.getElementById('runtime-'+id);el.innerHTML=`<div class="continuity-box"><h3>已登记运行实例</h3>`+(list.map(r=>item(`<div class="item-head"><strong>${esc(r.label)}</strong><div class="stack"><span class="chip">${r.has_token?'已签发独立 Token':'共用 Agent Token'}</span><span class="tag ${r.online?'tag-ok':'tag-warn'}">${r.online?'在线心跳':'离线/未知'}</span></div></div><p class="muted">执行环境：${esc(r.environment)} · 最近上报：${esc(r.last_seen||'从未')}${r.enabled?'':' · 已禁用'}</p>${r.last_health&&Object.keys(r.last_health).length?`<p class="muted">自报诊断：<code>${esc(JSON.stringify(r.last_health))}</code></p>`:''}<div class="actions"><button class="secondary sm" onclick="issueRuntimeToken('${esc(id)}','${esc(r.id)}')">签发/轮换 Runtime 凭据</button></div><pre id="rt-tok-${esc(r.id)}" hidden></pre>`)).join('')||'<p class="muted">暂无运行实例</p>')+`<h3>新增运行实例</h3><form onsubmit="registerRuntime(event,'${esc(id)}')"><div class="grid-2"><div><label>实例标签</label><input name="label" required></div><div><label>运行环境</label><input name="environment" required></div></div><div class="actions"><button type="submit">注册实例</button></div></form></div>`})}
+async function showRuntimes(id){await safe(async()=>{const list=await api('/agents/'+id+'/runtimes');const el=document.getElementById('runtime-'+id);el.innerHTML=`<div class="continuity-box"><h3>已登记运行实例</h3>`+(list.map(r=>item(`<div class="item-head"><strong>${esc(r.label)}</strong><div class="stack"><span class="chip">${r.has_token?'已签发独立 Token':'共用 Agent Token'}</span><span class="tag ${r.online?'tag-ok':'tag-warn'}">${r.online?'在线心跳':'离线/未知'}</span></div></div><p class="muted">执行环境：${esc(r.environment)} · 最近上报：${esc(r.last_seen||'从未')}${r.enabled?'':' · 已禁用'}</p>${r.last_health&&Object.keys(r.last_health).length?`<p class="muted">自报诊断：<code>${esc(JSON.stringify(r.last_health))}</code></p>`:''}<div class="actions"><button class="secondary sm" onclick="issueRuntimeToken('${esc(id)}','${esc(r.id)}')">签发或轮换运行实例凭据</button></div><pre id="rt-tok-${esc(r.id)}" hidden></pre>`)).join('')||'<p class="muted">暂无运行实例</p>')+`<h3>新增运行实例</h3><form onsubmit="registerRuntime(event,'${esc(id)}')"><div class="grid-2"><div><label>实例标签</label><input name="label" required></div><div><label>运行环境</label><input name="environment" required></div></div><div class="actions"><button type="submit">注册实例</button></div></form></div>`})}
 async function issueRuntimeToken(agentId,runtimeId){await safe(async()=>{const res=await api('/agents/'+agentId+'/runtimes/'+runtimeId+'/token','POST',{});const pre=document.getElementById('rt-tok-'+runtimeId);if(pre){pre.hidden=false;pre.textContent='一次性 Runtime 凭据（仅显示一次）：'+res.token;}notice('已签发独立 Runtime 凭据')})}
 async function registerRuntime(e,id){e.preventDefault();await safe(async()=>{await api('/agents/'+id+'/runtimes','POST',form(e));notice('实例已注册，后续须由该智能体主动上报心跳');await refresh();await showRuntimes(id)})}
 async function verifyCapabilities(id){await safe(async()=>{const record=agents.find(a=>a.id===id);if(!record)return;const declared=record.declared_capabilities||[];if(!declared.length){notice('该智能体尚未声明任何能力，无法核验',true);return}const vals=await uiForm({title:`核验 Agent 能力：${record.name}`,subtitle:'仅勾选已经独立验证的能力（不得超出其声明范围）。',fields:[{name:'caps',label:'已声明能力列表',type:'checks',options:declared.map(c=>({value:c,label:c})),value:record.verified_capabilities||[]}],submitText:'保存核验结果'});if(!vals)return;const approved=vals.caps||[];if(!approved.every(c=>declared.includes(c))){notice('不能验证未声明的能力',true);return}await api('/agents/'+id+'/verified-capabilities','PUT',{capabilities:approved});notice('已保存能力核验记录');await refresh()})}
@@ -3558,16 +3560,16 @@ async function showTaskContinuity(id){await safe(async()=>{const [cps,handoff,se
 async function downloadArtifact(id){await safe(async()=>{const response=await fetch('/api/v1/artifacts/'+encodeURIComponent(id)+'/content',{headers:{'Authorization':'Bearer '+token}});if(!response.ok){const error=await response.json().catch(()=>({}));throw Error(displayRequestError(error.detail||response.statusText,response.status))}const disposition=response.headers.get('Content-Disposition')||'';const encodedName=disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];const filename=encodedName?decodeURIComponent(encodedName):'artifact.bin';const blob=await response.blob();const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);notice('成果文件已验证 SHA-256 并下载')})}
 async function reviewArtifact(id,accepted,taskId){await safe(async()=>{const vals=await uiForm({title:accepted?'验收成果版本':'驳回成果版本',fields:[{name:'note',label:accepted?'验收说明（可选）':'驳回原因（至少 5 字）',type:'textarea',required:!accepted,minlength:accepted?undefined:5}],submitText:accepted?'确认验收':'确认驳回',danger:!accepted});if(!vals)return;await api('/artifacts/'+id+'/review','POST',{accepted,note:(vals.note||'').trim()});notice(accepted?'成果版本已验收':'成果版本已驳回');await showTaskContinuity(taskId)})}
 async function verifyCheckpoint(cpId,status,taskId){await safe(async()=>{const isReject=status==='rejected';const vals=await uiForm({title:isReject?'驳回检查点':'核验检查点通过',fields:[{name:'note',label:isReject?'驳回原因（至少 5 字）':'核验备注（可选）',type:'textarea',required:isReject,minlength:isReject?5:undefined}],submitText:isReject?'确认驳回':'核验通过',danger:isReject});if(!vals)return;await api('/checkpoints/'+cpId+'/verify','POST',{status,note:(vals.note||'').trim()});notice('检查点状态已更新：'+status);await showTaskContinuity(taskId)})}
-async function revokeTaskLease(id){await safe(async()=>{const memberOpts=[{value:'',label:'不指定交接目标'},...(cachedMembers||[]).filter(m=>m.enabled).map(m=>({value:m.agent_id,label:`${m.agent_name} (${m.role})`}))];const vals=await uiForm({title:'撤回租约并隔离旧 Epoch',subtitle:'撤回后将递增 lease epoch，旧执行节点的后续上报会被控制面拒绝。',fields:[{name:'reason',label:'撤回与隔离原因（至少 5 字）',type:'textarea',required:true,minlength:5},{name:'target_agent_id',label:'交接目标 Agent（可选）',type:memberOpts.length>1?'select':'text',options:memberOpts,value:''}],submitText:'撤回并隔离',danger:true});if(!vals)return;await api('/tasks/'+id+'/revoke-lease','POST',{reason:vals.reason.trim(),target_agent_id:(vals.target_agent_id||'').trim()||null});notice('租约已撤回并提升 epoch；旧进程未获远端终止核实');await refresh()})}
+async function revokeTaskLease(id){await safe(async()=>{const memberOpts=[{value:'',label:'不指定交接目标'},...(cachedMembers||[]).filter(m=>m.enabled).map(m=>({value:m.agent_id,label:`${m.agent_name} (${displayUiLabel(m.role)})`}))];const vals=await uiForm({title:'撤回租约并隔离旧 Epoch',subtitle:'撤回后将递增 lease epoch，旧执行节点的后续上报会被控制面拒绝。',fields:[{name:'reason',label:'撤回与隔离原因（至少 5 字）',type:'textarea',required:true,minlength:5},{name:'target_agent_id',label:'交接目标智能体（可选）',type:memberOpts.length>1?'select':'text',options:memberOpts,value:''}],submitText:'撤回并隔离',danger:true});if(!vals)return;await api('/tasks/'+id+'/revoke-lease','POST',{reason:vals.reason.trim(),target_agent_id:(vals.target_agent_id||'').trim()||null});notice('租约已撤回并提升 epoch；旧进程未获远端终止核实');await refresh()})}
 async function reconcileSideEffect(effectId,status,taskId){await safe(async()=>{const isExec=status==='verified_executed';const vals=await uiForm({title:isExec?'核对副作用：已执行':'核对副作用：未执行（允许重开）',fields:[{name:'note',label:isExec?'核对已执行的依据（至少 5 字）':'核对未执行、允许下一轮重开的依据（至少 5 字）',type:'textarea',required:true,minlength:5}],submitText:'保存对账结论',danger:!isExec});if(!vals)return;await api('/side-effects/'+effectId+'/reconcile','POST',{status,note:vals.note.trim()});notice('副作用台账已核对：'+status);await refresh();const el=document.getElementById('continuity-'+taskId);if(el)await showTaskContinuity(taskId)})}
 async function exportProjectBundle(){await safe(async()=>{if(!project)return;const bundle=await api('/projects/'+project+'/export');const root=document.getElementById('export-preview');const summary={schema_version:bundle.schema_version,exported_at:bundle.exported_at,secrets_included:bundle.secrets_included,sha256_digest:bundle.sha256_digest,counts:{tasks:bundle.tasks.length,checkpoints:bundle.checkpoints.length,side_effects:bundle.side_effects.length,memories:bundle.memories.length,decisions:bundle.decisions.length,skills:bundle.skills.length,skill_evaluations:bundle.skill_evaluations.length,cross_project_shares:bundle.cross_project_shares.length}};if(root){root.innerHTML=`<div class="callout" style="margin-top:14px"><code>schema_version=${esc(bundle.schema_version)}</code> · <code>secrets_included=${esc(bundle.secrets_included)}</code><br><code>sha256=${esc(bundle.sha256_digest)}</code></div><pre>${esc(JSON.stringify(summary,null,2))}</pre>`}const blob=new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`otternest-export-${bundle.project.id}.json`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);notice('已导出可携带项目 JSON 包（不含 Secret）')})}
-async function previewProjectImport(){await safe(async()=>{const input=document.getElementById('projectImportFile');const file=input?.files?.[0];if(!file)throw Error('请先选择 OtterNest JSON 导出包');if(file.size>10*1024*1024)throw Error('导入包超过 10 MiB 上限');let bundle;try{bundle=JSON.parse(await file.text())}catch(_){throw Error('文件不是有效的 JSON')};const preview=await api('/projects/import/preview','POST',{bundle});pendingImportBundle=bundle;const root=document.getElementById('import-preview');if(!root)return;const rows=Object.entries(preview.counts||{}).map(([k,v])=>`<li><code>${esc(k)}</code>：${esc(v)}</li>`).join('');root.innerHTML=`<div class="callout" style="margin-top:14px"><strong>包校验通过</strong><br>${esc(preview.source_project.name)} · <code>${esc(preview.source_project.id)}</code><br><code>sha256=${esc(preview.sha256_digest)}</code></div><ul class="info-list">${rows}</ul><ul class="info-list"><li>恢复项目会保持 paused；未完成任务转为 blocked，R3 任务必须重新授权。</li><li>Agent 身份以禁用状态恢复，记忆、Skill 和决策需要在本地重新审查。</li><li>成果文件内容及外部连接不会恢复，也不会发送远端请求。</li></ul><div class="actions"><button type="button" onclick="commitProjectImport()">创建暂停的恢复项目</button></div>`;notice('导出包摘要与结构校验通过，可以检查恢复范围')})}
-async function commitProjectImport(){await safe(async()=>{if(!pendingImportBundle)throw Error('请先校验并预览一个导出包');const suggested=pendingImportBundle.project?.name?`${String(pendingImportBundle.project.name).slice(0,154)} (导入)`:'';const vals=await uiForm({title:'创建暂停的恢复项目',subtitle:'恢复项目将保持 paused，未完成任务保持 blocked 且 Agent 身份默认禁用，确认后创建。',fields:[{name:'new_name',label:'恢复项目名称',type:'text',value:suggested,required:true}],submitText:'确认创建恢复项目'});if(!vals)return;const result=await api('/projects/import','POST',{bundle:pendingImportBundle,new_name:(vals.new_name||'').trim()||undefined,confirm_restore:true});pendingImportBundle=null;project=result.project_id;await refresh();notice(`已创建暂停的恢复项目「${result.project_name}」。检查任务、知识和 Agent 后再决定是否启用。`)})}
+async function previewProjectImport(){await safe(async()=>{const input=document.getElementById('projectImportFile');const file=input?.files?.[0];if(!file)throw Error('请先选择 OtterNest JSON 导出包');if(file.size>10*1024*1024)throw Error('导入包超过 10 MiB 上限');let bundle;try{bundle=JSON.parse(await file.text())}catch(_){throw Error('文件不是有效的 JSON')};const preview=await api('/projects/import/preview','POST',{bundle});pendingImportBundle=bundle;const root=document.getElementById('import-preview');if(!root)return;const rows=Object.entries(preview.counts||{}).map(([k,v])=>`<li><code>${esc(k)}</code>：${esc(v)}</li>`).join('');root.innerHTML=`<div class="callout" style="margin-top:14px"><strong>包校验通过</strong><br>${esc(preview.source_project.name)} · <code>${esc(preview.source_project.id)}</code><br><code>sha256=${esc(preview.sha256_digest)}</code></div><ul class="info-list">${rows}</ul><ul class="info-list"><li>恢复项目会保持 paused；未完成任务转为 blocked，R3 任务必须重新授权。</li><li>智能体身份以禁用状态恢复，记忆、技能和决策需要在本地重新审查。</li><li>成果文件内容及外部连接不会恢复，也不会发送远端请求。</li></ul><div class="actions"><button type="button" onclick="commitProjectImport()">创建暂停的恢复项目</button></div>`;notice('导出包摘要与结构校验通过，可以检查恢复范围')})}
+async function commitProjectImport(){await safe(async()=>{if(!pendingImportBundle)throw Error('请先校验并预览一个导出包');const suggested=pendingImportBundle.project?.name?`${String(pendingImportBundle.project.name).slice(0,154)} (导入)`:'';const vals=await uiForm({title:'创建暂停的恢复项目',subtitle:'恢复项目将保持暂停，未完成任务保持阻塞 且 智能体身份默认禁用，确认后创建。',fields:[{name:'new_name',label:'恢复项目名称',type:'text',value:suggested,required:true}],submitText:'确认创建恢复项目'});if(!vals)return;const result=await api('/projects/import','POST',{bundle:pendingImportBundle,new_name:(vals.new_name||'').trim()||undefined,confirm_restore:true});pendingImportBundle=null;project=result.project_id;await refresh();notice(`已创建暂停的恢复项目「${result.project_name}」。检查任务、知识和 Agent 后再决定是否启用。`)})}
 async function reviseMemory(id){await safe(async()=>{const cur=(globalThis._memMap&&globalThis._memMap[id])||{};const vals=await uiForm({title:'修订项目记忆（保留版本历史）',fields:[{name:'title',label:'修订后标题',type:'text',value:cur.title||'',required:true},{name:'content',label:'修订后内容',type:'textarea',value:cur.content||'',required:true},{name:'source',label:'修订后出处',type:'text',value:cur.source||'',required:true},{name:'reason',label:'修订原因（至少 5 字）',type:'textarea',required:true,minlength:5}],submitText:'保存并升级版本'});if(!vals)return;await api('/memories/'+id+'/revise','POST',{title:vals.title,content:vals.content,source:vals.source,reason:vals.reason.trim()});notice('记忆已修订并提升版本号');await refresh()})}
 async function archiveMemory(id){await safe(async()=>{const vals=await uiForm({title:'归档项目记忆',subtitle:'归档后不再注入后续任务上下文，历史版本仍保留审计。',fields:[{name:'reason',label:'归档原因（至少 5 字）',type:'textarea',required:true,minlength:5}],submitText:'确认归档',danger:true});if(!vals)return;await api('/memories/'+id+'/archive','POST',{reason:vals.reason.trim()});notice('记忆已归档');await refresh()})}
 async function publishSkill(id){await safe(async()=>{await api('/skills/'+id+'/publish','POST',{});notice('技能已发布');await refresh()})}
-async function evaluateSkill(id){await safe(async()=>{const taskOpts=[{value:'',label:'不关联特定任务'},...(cachedTasks||[]).map(t=>({value:t.id,label:t.title}))];const vals=await uiForm({title:'录入技能评价',fields:[{name:'verdict',label:'评价结论',type:'select',value:'pass',options:[{value:'pass',label:'pass（通过）'},{value:'concern',label:'concern（需关注）'},{value:'fail',label:'fail（不通过）'}]},{name:'notes',label:'评价依据（至少 5 字）',type:'textarea',required:true,minlength:5},{name:'task_id',label:'关联任务（可选）',type:'select',value:'',options:taskOpts}],submitText:'保存评价'});if(!vals)return;await api('/skills/'+id+'/evaluations','POST',{verdict:vals.verdict,notes:vals.notes.trim(),task_id:(vals.task_id||'').trim()||null});notice('Skill 评价已记录');await showSkillEvaluations(id)})}
-async function showSkillEvaluations(id){await safe(async()=>{const rows=await api('/skills/'+id+'/evaluations');const el=document.getElementById('skill-evals-'+id);if(!el)return;el.innerHTML=`<div class="continuity-box"><h3>Skill 评价历史</h3>`+(rows.map(ev=>item(`<div class="item-head">${verdictBadge(ev.verdict)}<span class="muted">${esc(ev.actor_kind)}: <code>${esc(ev.actor_id)}</code>${ev.task_id?` · task <code>${esc(ev.task_id)}</code>`:''}</span></div><p>${esc(ev.notes)}</p>`)).join('')||'<p class="muted">暂无评价记录</p>')+`</div>`})}
+async function evaluateSkill(id){await safe(async()=>{const taskOpts=[{value:'',label:'不关联特定任务'},...(cachedTasks||[]).map(t=>({value:t.id,label:t.title}))];const vals=await uiForm({title:'录入技能评价',fields:[{name:'verdict',label:'评价结论',type:'select',value:'pass',options:[{value:'pass',label:'通过'},{value:'concern',label:'concern（需关注）'},{value:'fail',label:'不通过'}]},{name:'notes',label:'评价依据（至少 5 字）',type:'textarea',required:true,minlength:5},{name:'task_id',label:'关联任务（可选）',type:'select',value:'',options:taskOpts}],submitText:'保存评价'});if(!vals)return;await api('/skills/'+id+'/evaluations','POST',{verdict:vals.verdict,notes:vals.notes.trim(),task_id:(vals.task_id||'').trim()||null});notice('Skill 评价已记录');await showSkillEvaluations(id)})}
+async function showSkillEvaluations(id){await safe(async()=>{const rows=await api('/skills/'+id+'/evaluations');const el=document.getElementById('skill-evals-'+id);if(!el)return;el.innerHTML=`<div class="continuity-box"><h3>技能评价历史</h3>`+(rows.map(ev=>item(`<div class="item-head">${verdictBadge(ev.verdict)}<span class="muted">${esc(displayUiLabel(ev.actor_kind))}: <code>${esc(ev.actor_id)}</code>${ev.task_id?` · task <code>${esc(ev.task_id)}</code>`:''}</span></div><p>${esc(ev.notes)}</p>`)).join('')||'<p class="muted">暂无评价记录</p>')+`</div>`})}
 async function archiveSkill(id){await safe(async()=>{const vals=await uiForm({title:'归档技能',subtitle:'归档后仅保留审计不对外展示。',fields:[{name:'reason',label:'归档原因（至少 5 字）',type:'textarea',required:true,minlength:5}],submitText:'确认归档',danger:true});if(!vals)return;await api('/skills/'+id+'/archive','POST',{reason:vals.reason.trim()});notice('Skill 已归档');await refresh()})}
 async function proposeShare(itemKind,itemId){await safe(async()=>{const otherProjects=(projects||[]).filter(p=>p.id!==project);const vals=await uiForm({title:'提交跨项目知识共享提案',subtitle:'跨项目共享需经管理员审批后以只读快照克隆到目标项目。',fields:[otherProjects.length?{name:'target_project_id',label:'目标项目',type:'select',options:otherProjects.map(p=>({value:p.id,label:p.name})),required:true}:{name:'target_project_id',label:'目标 Project ID',type:'text',required:true},{name:'rationale',label:'共享理由（至少 5 字）',type:'textarea',required:true,minlength:5}],submitText:'提交提案'});if(!vals)return;await api('/projects/'+project+'/knowledge-shares','POST',{target_project_id:vals.target_project_id.trim(),item_kind:itemKind,source_item_id:itemId,rationale:vals.rationale.trim()});notice('已提交跨项目共享提案，等待管理员审批');await refresh()})}
 async function resolveShare(shareId,approved){await safe(async()=>{const vals=await uiForm({title:approved?'批准跨项目共享':'拒绝跨项目共享',fields:[{name:'note',label:approved?'批准共享备注（至少 5 字）':'拒绝共享备注（至少 5 字）',type:'textarea',required:true,minlength:5}],submitText:approved?'批准并克隆':'拒绝提案',danger:!approved});if(!vals)return;await api('/knowledge-shares/'+shareId+'/resolve','POST',{approved,note:vals.note.trim()});notice(approved?'已批准共享并克隆到目标项目':'已拒绝共享提案');await refresh()})}
@@ -3674,7 +3676,7 @@ function renderTaskDagSvg(tasks,edges){
   </div>`;
 }
 
-async function grantTaskAccess(taskId){await safe(async()=>{const eligible=(cachedMembers||[]).filter(m=>m.enabled);if(!eligible.length)throw Error('当前项目暂无成员可授权');const vals=await uiForm({title:'颁发任务级 ABAC 临时授权',subtitle:'授权将在到期后自动失效，仅授予本任务所需敏感上下文范围。',fields:[{name:'agent_id',label:'被授权 Agent',type:'select',value:eligible[0].agent_id,options:eligible.map(m=>({value:m.agent_id,label:`${m.agent_name} (${m.role})`})),required:true},{name:'max_sensitivity',label:'最高可访问敏感级别',type:'select',value:'restricted',options:[{value:'public',label:'public'},{value:'internal',label:'internal'},{value:'confidential',label:'confidential'},{value:'restricted',label:'restricted'}],required:true},{name:'expires_in_hours',label:'有效期（小时，1–720）',type:'number',value:24,min:1,max:720,required:true}],submitText:'颁发临时授权'});if(!vals)return;await api('/tasks/'+taskId+'/grants','POST',{agent_id:vals.agent_id,granted_scopes:['read_sensitive_context'],max_sensitivity:vals.max_sensitivity,expires_in_hours:Number(vals.expires_in_hours||24)});notice('已颁发任务级临时授权')})}
+async function grantTaskAccess(taskId){await safe(async()=>{const eligible=(cachedMembers||[]).filter(m=>m.enabled);if(!eligible.length)throw Error('当前项目暂无成员可授权');const vals=await uiForm({title:'颁发任务级 ABAC 临时授权',subtitle:'授权将在到期后自动失效，仅授予本任务所需敏感上下文范围。',fields:[{name:'agent_id',label:'被授权智能体',type:'select',value:eligible[0].agent_id,options:eligible.map(m=>({value:m.agent_id,label:`${m.agent_name} (${displayUiLabel(m.role)})`})),required:true},{name:'max_sensitivity',label:'最高可访问敏感级别',type:'select',value:'restricted',options:[{value:'public',label:'公开'},{value:'internal',label:'内部'},{value:'confidential',label:'机密'},{value:'restricted',label:'受限'}],required:true},{name:'expires_in_hours',label:'有效期（小时，1–720）',type:'number',value:24,min:1,max:720,required:true}],submitText:'颁发临时授权'});if(!vals)return;await api('/tasks/'+taskId+'/grants','POST',{agent_id:vals.agent_id,granted_scopes:['read_sensitive_context'],max_sensitivity:vals.max_sensitivity,expires_in_hours:Number(vals.expires_in_hours||24)});notice('已颁发任务级临时授权')})}
 async function runPortfolioSchedule(){await safe(async()=>{const res=await api('/portfolio/schedule','POST',{limit_per_project:10});notice(`已完成 ${res.projects_evaluated} 个项目的公平调度，共匹配 ${res.total_routes} 项任务`);await refresh()})}
 
 function renderA2uiNodes(a2ui){

@@ -403,6 +403,16 @@ def legacy_checks(browser, problems):
         check_width(page, "legacy-mobile-overview", problems)
         page.locator("#themeToggleBtn").click()
         screenshot(page, "legacy-mobile-dark")
+        check_width(page, "legacy-mobile-dark", problems)
+        assert page.evaluate("displayUiLabel('waiting_approval')") == "等待授权"
+        assert page.evaluate("displayUiLabel('reviewer')") == "审查者"
+        assert page.evaluate("displayUiLabel('future_code')") == "future_code"
+        error = page.evaluate("""() => displayRequestError([{loc:["body","password"],msg:"Field required",type:"missing",input:"fixture-secret"}],422)""")
+        assert "输入校验失败" in error and "fixture-secret" not in error
+        page.route("**/api/v1/projects", lambda route: route.abort("failed"))
+        message = page.evaluate("""async () => {try {await api('/projects');return ''}catch(e){return e.message}}""")
+        assert "无法连接服务" in message
+        page.unroute("**/api/v1/projects")
     finally:
         context.close()
 

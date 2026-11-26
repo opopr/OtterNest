@@ -1,3 +1,4 @@
+import EmptyState from "../components/EmptyState";
 import { useDisplayPreference, ViewModeSwitch } from "../components/ViewModeSwitch";
 import DataTable from "../components/DataTable";
 import { useProjectSelection } from "../components/ProjectSelection";
@@ -296,7 +297,7 @@ export default function ArtifactsPage() {
           {renderArtifactActions(artifact)}
           {artifact.review_note && <p className="artifact-review-note">验收说明：{artifact.review_note}</p>}
           {artifact.deleted_at && <small className="muted-inline">文件已回收，元数据仍保留。</small>}
-        </article>)}{!visibleArtifacts.length && <div className="empty-state"><FileArchive size={25} /><strong>{artifacts.length ? "没有符合条件的文件" : "暂无成果文件"}</strong></div>}</div>}
+        </article>)}{!visibleArtifacts.length && <EmptyState icon={FileArchive} title={artifacts.length ? "没有符合条件的文件" : "暂无成果文件"} action={artifacts.length ? {label:"重置搜索",onClick:()=>{setFileQuery("");setReviewFilter("all");}}:undefined}/>}</div>}
         {!loading && <ListPagination {...artifactPage} label="成果分页" />}
       </section>
 

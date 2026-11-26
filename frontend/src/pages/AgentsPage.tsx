@@ -1,3 +1,4 @@
+import EmptyState from "../components/EmptyState";
 import { useDisplayPreference, ViewModeSwitch } from "../components/ViewModeSwitch";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import ValidatedForm from "../components/ValidatedForm";
@@ -348,10 +349,7 @@ export default function AgentsPage() {
       <div className="panel agent-filter-bar"><label className="agent-search-field"><Search size={16}/><input aria-label="搜索智能体" placeholder="搜索名称、平台或能力" value={agentQuery} onChange={event => setAgentQuery(event.target.value)}/></label>{tab === "active" && <select aria-label="智能体状态" value={agentFilter} onChange={event => setAgentFilter(event.target.value)}><option value="all">全部状态</option><option value="enabled">已启用</option><option value="disabled">已停用</option></select>}<span className="muted-inline">{visibleAgents.length} 项结果</span><ViewModeSwitch value={viewMode} onChange={setViewMode} label="智能体显示方式" alternate="list"/><button type="button" className="text-button" onClick={() => {setAgentQuery("");setAgentFilter("all");}}>清除筛选</button></div>
       <div className={"agent-grid" + (viewMode === "list" ? " agent-list-view" : "")}>
         {loading ? <LoadingState/> : visibleAgents.length === 0 ? (
-          <div className="panel empty-state">
-            {tab === "active" ? <Bot size={30} /> : <Trash2 size={30} />}
-            <strong>{(tab === "active" ? activeAgents : trashedAgents).length ? "没有符合条件的智能体" : tab === "active" ? "尚未登记智能体" : "回收站为空"}</strong>
-          </div>
+          <EmptyState panel icon={tab==="active"?Bot:Trash2} title={(tab === "active" ? activeAgents : trashedAgents).length ? "没有符合条件的智能体" : tab === "active" ? "尚未登记智能体" : "回收站为空"} action={(tab==="active"?activeAgents:trashedAgents).length ? {label:"重置搜索",onClick:()=>{setAgentQuery("");setAgentFilter("all");}}:undefined}/>
         ) : agentPage.rows.map((agent) => (
           <article className={"panel agent-card " + (selectedAgentId === agent.id ? "agent-card-selected" : "")} key={agent.id}>
             <div className="agent-card-head">

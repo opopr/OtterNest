@@ -298,7 +298,6 @@ input, textarea, select { accent-color: var(--accent); }
 .account-password>summary svg{vertical-align:middle;margin-right:6px}
 @media(max-width:1100px){.runtime-status-switch{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:580px){
- .runtime-status-switch{grid-template-columns:repeat(2,minmax(0,1fr))}
  .task-detail-disclosure{padding:10px}
  .task-detail-dialog .task-detail-header{flex-wrap:wrap}
  .task-detail-dialog .task-detail-footer .flex-row-gap{flex-wrap:wrap}

@@ -1,3 +1,4 @@
+import EmptyState from "../components/EmptyState";
 import DataTable from "../components/DataTable";
 import { useDisplayPreference, ViewModeSwitch } from "../components/ViewModeSwitch";
 import ListPagination, { useListPage } from "../components/ListPagination";
@@ -316,7 +317,7 @@ export default function TaskCenterPage() {
           </div>
           )
         ) : (
-          <div className="empty-state"><ClipboardCheck size={24} /><strong>没有符合条件的任务</strong></div>
+          <EmptyState icon={ClipboardCheck} title={tasks.length ? "没有符合条件的任务" : "暂无任务"} action={tasks.length ? {label:"重置搜索",onClick:()=>{setProject("all");setStatus("all");setRisk("all");setQuery("");}}:undefined}/>
         )}
         {!loading && <ListPagination {...taskPage} label="任务分页" sizeLabel="每页任务数" sizes={[10,25,50]}/>}
       </section>

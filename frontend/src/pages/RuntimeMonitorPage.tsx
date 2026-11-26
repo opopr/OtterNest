@@ -1,3 +1,4 @@
+import EmptyState from "../components/EmptyState";
 import { useDisplayPreference, ViewModeSwitch } from "../components/ViewModeSwitch";
 import { useDraftGuard } from "../components/DraftGuard";
 import DataTable from "../components/DataTable";
@@ -138,7 +139,7 @@ export default function RuntimeMonitorPage(){
     </div>
     <details className="library-disclosure"><summary>健康信息</summary><div className="runtime-health-row">{Object.entries(row.last_health||{}).length?Object.entries(row.last_health).map(([key,value])=><span className="runtime-health-chip" key={key}>{key}：{value}</span>):<span className="muted-inline">暂无健康信息上报</span>}</div></details>
     {renderActions(row)}
-   </article>)}</div>):<div className="empty-state"><Monitor size={27}/><strong>{rows.length?"没有符合条件的运行实例":"尚未登记运行实例"}</strong><p>{rows.length?"调整搜索条件或状态筛选。":"请先登记智能体，再创建运行实例并签发独立凭据。"}</p>{!rows.length&&<Link className="secondary-button" to="/agents">前往智能体管理</Link>}</div>}
+   </article>)}</div>):<EmptyState icon={Monitor} title={rows.length?"没有符合条件的运行实例":"尚未登记运行实例"} action={rows.length?{label:"重置搜索",onClick:()=>{setFilter("all");setQuery("");}}:undefined}>{!rows.length&&<Link className="secondary-button" to="/agents">前往智能体管理</Link>}</EmptyState>}
   </section>
   {!loading && <ListPagination {...runtimePage} label="运行实例分页"/>}
   <p className="runtime-monitor-footnote"><Activity size={13}/>在线状态由服务端按最近 180 秒心跳、运行实例启用状态及空闲/忙碌状态计算。</p>
