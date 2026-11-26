@@ -1586,3 +1586,16 @@ input, textarea, select { accent-color: var(--accent); }
 /* Keep known task statuses readable in every density and theme. */
 .status-tag[data-task-status]{flex-shrink:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.35}
 :root[data-ui-theme="dark"] .status-tag.tag-blue{color:var(--blue);background:var(--blue-soft)}
+
+/* Shared project picker retains a native select for keyboard and mobile support. */
+.project-picker{display:grid;gap:6px;min-width:0;max-width:100%}
+.project-picker .project-select{width:100%;min-width:0}
+.project-search-toggle{display:inline-flex;align-items:center;justify-content:center;background:transparent;border:0;border-left:1px solid var(--border);color:var(--muted);padding:3px 0 3px 9px;flex-shrink:0;min-height:24px}
+.project-search-toggle:hover,.project-search-toggle[aria-expanded="true"]{color:var(--brand-deep-teal)}
+.project-picker-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center}
+.project-picker-search input,.task-sort-control select{min-width:0;width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:7px 9px;font-size:13px}
+.project-picker-search small{grid-column:1/-1;color:var(--muted);font-size:12px}
+.command-project-picker{display:grid;gap:5px;min-width:0;flex:1}
+.task-sort-control{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--muted);min-width:0}
+.task-sort-control select{width:auto;max-width:100%}
+@media(max-width:580px){.project-picker{flex:1 1 160px;max-width:100%}.project-search-toggle{min-height:36px;min-width:36px}.task-sort-control{flex:1 1 140px}.task-sort-control select{flex:1}}

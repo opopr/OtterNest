@@ -43,10 +43,11 @@ export default function TaskCenterPage() {
   const [risk, setRisk] = useState("all");
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [pageIndex, setPageIndex] = useState(0);
+  const [sortBy,setSortBy] = useState<"attention"|"priority"|"risk"|"title">("attention");
   const [pageSize, setPageSize] = useState(25);
   const [compactRows, setCompactRows] = useState(() => { try { return localStorage.getItem("otternest-task-compact-rows") === "true"; } catch { return false; } });
   useEffect(() => { try { localStorage.setItem("otternest-task-compact-rows", String(compactRows)); } catch {} }, [compactRows]);
-  useEffect(() => { setPageIndex(0); }, [project, status, risk, query, pageSize]);
+  useEffect(() => { setPageIndex(0); }, [project, status, risk, query, pageSize, sortBy]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dispatching, setDispatching] = useState(false);
@@ -92,9 +93,12 @@ export default function TaskCenterPage() {
       )
       .sort((a, b) => {
         const rank = (t: Row) => t.status === "waiting_approval" ? 0 : t.status === "submitted" ? 1 : t.status === "blocked" ? 2 : 3;
+        if (sortBy === "priority") return b.priority - a.priority || rank(a)-rank(b);
+        if (sortBy === "risk") return b.risk.localeCompare(a.risk) || b.priority-a.priority;
+        if (sortBy === "title") return a.title.localeCompare(b.title,"zh-CN") || a.id.localeCompare(b.id);
         return rank(a) - rank(b) || b.priority - a.priority;
       });
-  }, [tasks, project, status, risk, query]);
+  }, [tasks, project, status, risk, query, sortBy]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const currentPage = Math.min(pageIndex, totalPages - 1);
@@ -269,7 +273,7 @@ export default function TaskCenterPage() {
           <label>风险等级<select aria-label="风险等级" value={risk} onChange={(e) => setRisk(e.target.value)}><option value="all">全部等级</option>{Object.entries(risks).map(([k, v]) => <option key={k} value={k}>{k} · {v}</option>)}</select></label>
           <label>关键词<input aria-label="关键词" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="任务名称、项目或 ID" /></label>
         </div>
-        <div className="panel-heading task-results-heading"><div className="panel-title"><ClipboardCheck size={17}/><h3>任务列表</h3></div><div className="heading-actions"><span className="muted-inline">{rows.length} 条结果</span><button type="button" className="secondary-button compact" aria-pressed={compactRows} onClick={() => setCompactRows(v => !v)}>{compactRows ? "展开摘要" : "紧凑显示"}</button></div></div>
+        <div className="panel-heading task-results-heading"><div className="panel-title"><ClipboardCheck size={17}/><h3>任务列表</h3></div><div className="heading-actions"><span className="muted-inline">{rows.length} 条结果</span><label className="task-sort-control">排序<select aria-label="任务排序" value={sortBy} onChange={event=>setSortBy(event.target.value as typeof sortBy)}><option value="attention">待处理优先</option><option value="priority">优先级从高到低</option><option value="risk">风险从高到低</option><option value="title">任务名称</option></select></label><button type="button" className="secondary-button compact" aria-pressed={compactRows} onClick={() => setCompactRows(v => !v)}>{compactRows ? "展开摘要" : "紧凑显示"}</button></div></div>
         {loading ? (
           <div className="panel-loading"><span className="spinner" />正在汇总项目任务…</div>
         ) : rows.length ? (

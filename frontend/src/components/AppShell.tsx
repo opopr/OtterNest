@@ -1,6 +1,6 @@
 import { LoadingState } from "./PageFeedback";
 import { useConfirmDiscard } from "./DraftGuard";
-import { Component, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Component, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArchiveRestore, ArrowUpRight, Bell, BookMarked, BookOpen, Bot, CheckCheck, ChevronDown,
   CircleHelp, ClipboardCheck, FileArchive, FolderKanban, Gauge, GitBranch, KeyRound,
@@ -138,7 +138,7 @@ export default function AppShell() {
     () => findNavGroupId(location.pathname)
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setExpandedNavId(findNavGroupId(location.pathname));
     setMobileNavOpen(false);
     setMenuOpen(false);

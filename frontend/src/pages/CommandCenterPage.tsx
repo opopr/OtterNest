@@ -1,3 +1,4 @@
+import ProjectSelect from "../components/ProjectSelect";
 import { useConfirmDiscard } from "../components/DraftGuard";
 import { useProjectSelection } from "../components/ProjectSelection";
 import { ErrorNotice, SuccessNotice } from "../components/PageFeedback";
@@ -230,12 +231,7 @@ export default function CommandCenterPage() {
       <SuccessNotice message={notice} onDismiss={() => setNotice("")} />
 
       <section className="panel command-project-bar">
-        <label>当前项目
-          <select aria-label="指挥中心项目" value={selectedId} onChange={(event) => void changeProject(event.target.value)} disabled={loading || saving || projects.length === 0}>
-            {projects.length === 0 && <option value="">暂无项目</option>}
-            {projects.map((project) => <option key={project.id} value={project.id}>{project.name} · {getUiLabel(project.status)}</option>)}
-          </select>
-        </label>
+        <div className="command-project-picker"><span className="muted-inline">当前项目</span><ProjectSelect label="指挥中心项目" projects={projects} value={selectedId} onChange={id=>void changeProject(id)} disabled={loading || saving}/></div>
         <div>
           <span className="status-tag tag-neutral">{tasksLoading ? "读取任务中…" : taskProjectId !== selectedId ? "任务尚未读取" : currentTasks.length + " 项任务"}</span>
         </div>
