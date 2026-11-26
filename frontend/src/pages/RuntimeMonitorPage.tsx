@@ -1,3 +1,6 @@
+import { useDisplayPreference, ViewModeSwitch } from "../components/ViewModeSwitch";
+import { useDraftGuard } from "../components/DraftGuard";
+import DataTable from "../components/DataTable";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { getUiLabel } from "../utils/labels";
@@ -31,6 +34,8 @@ export default function RuntimeMonitorPage(){
  const [filter,setFilter]=useState<Filter>("all");
  const [query,setQuery]=useState("");
  const [issuedToken,setIssuedToken]=useState<RuntimeToken|null>(null);
+ const [viewMode,setViewMode]=useDisplayPreference("otternest-runtime-view","list");
+ useDraftGuard(Boolean(issuedToken));
 
  const load=useCallback(async()=>{
   if(!isOwner){setLoading(false);return;}
@@ -88,6 +93,7 @@ export default function RuntimeMonitorPage(){
   catch{setError("浏览器未授予剪贴板权限，请手动复制令牌");}
  };
 
+ const renderActions=(row:RuntimeRow)=><div className="runtime-monitor-actions">{row.enabled&&<button className="secondary-button compact" disabled={saving} onClick={()=>void rotateToken(row)}><KeyRound size={13}/>{row.has_token?"轮换凭据":"签发凭据"}</button>}{row.enabled&&<button className="text-button" disabled={saving} onClick={()=>void disableRuntime(row)}><XCircle size={13}/>禁用运行实例</button>}</div>;
  if(!isOwner)return <div className="page-stack"><div className="page-heading"><div><h1>运行监控</h1><p>统一查看智能体 运行实例和心跳状态。</p></div></div><div className="panel empty-state"><ShieldCheck size={28}/><strong>仅所有者可以查看运行实例 全局状态</strong><p>智能体 运行实例、独立凭据和健康信息属于平台管理数据。</p></div></div>;
 
  return <div className="page-stack">
@@ -100,7 +106,7 @@ export default function RuntimeMonitorPage(){
    <button className="text-button" onClick={()=>setIssuedToken(null)}>我已安全保存</button>
   </section>}
   <section className="panel runtime-monitor-panel runtime-workspace">
-   <div className="panel-heading"><div className="panel-title"><Activity size={17}/><h3>运行实例</h3><span className="count-chip">{visible.length}</span></div><span className="muted-inline">心跳有效期 180 秒</span></div>
+   <div className="panel-heading"><div className="panel-title"><Activity size={17}/><h3>运行实例</h3><span className="count-chip">{visible.length}</span></div><div className="heading-actions"><span className="muted-inline">心跳有效期 180 秒</span><ViewModeSwitch value={viewMode} onChange={setViewMode} label="运行实例显示方式" alternate="table"/></div></div>
    <div className="task-status-switch runtime-status-switch" role="group" aria-label="运行实例快速筛选">
     {([{key:"all",label:"全部",value:counts.total,icon:Monitor},{key:"online",label:"在线",value:counts.online,icon:Wifi},{key:"offline",label:"离线",value:counts.offline,icon:WifiOff},{key:"missing_token",label:"缺少凭据",value:counts.missingToken,icon:KeyRound},{key:"disabled",label:"已禁用",value:counts.disabled,icon:XCircle}] as const).map(({key,label,value,icon:Icon})=><button key={key} type="button" aria-pressed={filter===key} className={"task-status-filter"+(filter===key?" selected":"")} onClick={()=>setFilter(key)}><Icon size={16}/><span>{label}</span><strong>{value}</strong></button>)}
    </div>
@@ -110,7 +116,17 @@ export default function RuntimeMonitorPage(){
      <option value="all">全部状态</option><option value="online">在线</option><option value="offline">离线</option><option value="disabled">已禁用</option><option value="missing_token">缺少凭据</option>
     </select><button type="button" className="text-button" onClick={()=>{setFilter("all");setQuery("");}}>清除筛选</button>
    </div>
-   {loading?<LoadingState label="正在汇总运行实例状态…"/>:visible.length?<div className="runtime-monitor-list">{runtimePage.rows.map(row=><article className="runtime-monitor-card" key={row.id}>
+   {loading?<LoadingState label="正在汇总运行实例状态…"/>:visible.length?(viewMode==="table"?<DataTable rows={runtimePage.rows} rowKey={row=>row.id} label="运行实例表格" preferenceKey="otternest-runtime-columns" className="runtime-data-table" columns={[
+   {id:"label",label:"运行实例",required:true,render:row=><><strong className="data-table-title">{row.label}</strong><small>{row.id}</small></>},
+   {id:"agent",label:"智能体",required:true,render:row=>row.agent_name},
+   {id:"online",label:"在线状态",required:true,render:row=><><span className={"status-tag "+(!row.enabled?"tag-neutral":row.online?"tag-green":"tag-amber")}>{!row.enabled?"已禁用":row.online?"在线":"离线"}</span>{!row.agent_enabled&&<span className="status-tag tag-red">智能体已禁用</span>}</>},
+   {id:"state",label:"运行状态",required:true,render:row=>stateLabels[row.status]||getUiLabel(row.status)},
+   {id:"environment",label:"环境",render:row=>row.environment},
+   {id:"heartbeat",label:"最近心跳",render:row=>formatTime(row.last_seen)},
+   {id:"token",label:"凭据",required:true,render:row=>row.has_token?"已签发":"未签发"},
+   {id:"health",label:"健康信息",render:row=><details><summary>查看</summary>{Object.entries(row.last_health||{}).map(([k,v])=><div key={k}>{k}：{v}</div>)}</details>},
+   {id:"actions",label:"操作",required:true,render:renderActions}
+  ]}/>:<div className="runtime-monitor-list">{runtimePage.rows.map(row=><article className="runtime-monitor-card" key={row.id}>
     <div className="runtime-monitor-card-head">
      <div className="runtime-monitor-identity"><div className="runtime-monitor-avatar"><Cpu size={18}/></div><div><strong>{row.label}</strong><small>{row.agent_name} · {row.agent_platform}</small><code>{row.id}</code></div></div>
      <div className="runtime-monitor-badges"><span className={"status-tag "+(!row.enabled?"tag-neutral":row.online?"tag-green":"tag-amber")}>{!row.enabled?"已禁用":row.online?"在线":"离线"}</span><span className="status-tag tag-neutral">{stateLabels[row.status]||getUiLabel(row.status)}</span>{!row.agent_enabled&&<span className="status-tag tag-red">智能体已禁用</span>}</div>
@@ -121,11 +137,8 @@ export default function RuntimeMonitorPage(){
      <div><small>独立凭据</small><strong>{row.has_token?"已签发":"未签发"}</strong></div>
     </div>
     <details className="library-disclosure"><summary>健康信息</summary><div className="runtime-health-row">{Object.entries(row.last_health||{}).length?Object.entries(row.last_health).map(([key,value])=><span className="runtime-health-chip" key={key}>{key}：{value}</span>):<span className="muted-inline">暂无健康信息上报</span>}</div></details>
-    <div className="runtime-monitor-actions">
-     {row.enabled&&<button className="secondary-button compact" disabled={saving} onClick={()=>void rotateToken(row)}><KeyRound size={13}/>{row.has_token?"轮换凭据":"签发凭据"}</button>}
-     {row.enabled&&<button className="text-button" disabled={saving} onClick={()=>void disableRuntime(row)}><XCircle size={13}/>禁用运行实例</button>}
-    </div>
-   </article>)}</div>:<div className="empty-state"><Monitor size={27}/><strong>{rows.length?"没有符合条件的运行实例":"尚未登记运行实例"}</strong><p>{rows.length?"调整搜索条件或状态筛选。":"请先登记智能体，再创建运行实例并签发独立凭据。"}</p>{!rows.length&&<Link className="secondary-button" to="/agents">前往智能体管理</Link>}</div>}
+    {renderActions(row)}
+   </article>)}</div>):<div className="empty-state"><Monitor size={27}/><strong>{rows.length?"没有符合条件的运行实例":"尚未登记运行实例"}</strong><p>{rows.length?"调整搜索条件或状态筛选。":"请先登记智能体，再创建运行实例并签发独立凭据。"}</p>{!rows.length&&<Link className="secondary-button" to="/agents">前往智能体管理</Link>}</div>}
   </section>
   {!loading && <ListPagination {...runtimePage} label="运行实例分页"/>}
   <p className="runtime-monitor-footnote"><Activity size={13}/>在线状态由服务端按最近 180 秒心跳、运行实例启用状态及空闲/忙碌状态计算。</p>

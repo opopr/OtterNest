@@ -1,3 +1,5 @@
+import { useDisplayPreference, ViewModeSwitch } from "../components/ViewModeSwitch";
+import DataTable from "../components/DataTable";
 import { useProjectSelection } from "../components/ProjectSelection";
 import { ErrorNotice } from "../components/PageFeedback";
 import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
@@ -52,6 +54,7 @@ export default function ArtifactsPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [viewMode,setViewMode]=useDisplayPreference("otternest-artifact-view","list");
   const [fileQuery, setFileQuery] = useState("");
   const [reviewFilter, setReviewFilter] = useState("all");
   const visibleArtifacts = useMemo(() => artifacts.filter(a => (reviewFilter === "all" || a.review_status === reviewFilter) && a.name.toLocaleLowerCase().includes(fileQuery.trim().toLocaleLowerCase())), [artifacts, fileQuery, reviewFilter]);
@@ -264,6 +267,7 @@ export default function ArtifactsPage() {
     finally { setSaving(false); }
   };
 
+  const renderArtifactActions=(artifact:Artifact)=>(<div className="artifact-card-actions"><span className={"status-tag " + (artifact.review_status === "accepted" ? "tag-green" : artifact.review_status === "rejected" ? "tag-red" : "tag-amber")}>{reviewLabel[artifact.review_status] || artifact.review_status}</span><button className="icon-button" title="下载并校验" disabled={saving || Boolean(artifact.deleted_at)} onClick={() => void downloadArtifact(artifact)}><Download size={15} /></button>{artifact.review_status === "pending" && <><button className="icon-button" title="验收通过" disabled={saving} onClick={() => void reviewArtifact(artifact, true)}><Check size={15} /></button><button className="icon-button" title="驳回" disabled={saving} onClick={() => void reviewArtifact(artifact, false)}><X size={15} /></button></>}</div>);
   return (
     <div className="page-stack">
       <div className="page-heading">
@@ -284,12 +288,15 @@ export default function ArtifactsPage() {
           </button>
         </div>
         <p className="form-hint">常规单次上传上限 5 MiB；超过 4 MiB 自动启用分块上传。相同任务和文件名会创建新版本，不覆盖旧文件。</p></details>
-        <div className="library-filter-bar"><label>文件名<input aria-label="搜索成果文件" value={fileQuery} onChange={event => setFileQuery(event.target.value)} placeholder="搜索文件名" /></label><label>验收状态<select aria-label="成果验收状态" value={reviewFilter} onChange={event => setReviewFilter(event.target.value)}><option value="all">全部状态</option><option value="pending">待验收</option><option value="accepted">已通过</option><option value="rejected">已驳回</option></select></label><button type="button" className="text-button" onClick={() => { setFileQuery(""); setReviewFilter("all"); }}>清除筛选</button></div><div className="artifact-list">{artifactPage.rows.map((artifact) => <article className="artifact-card" key={artifact.id}>
+        <div className="library-filter-bar"><label>文件名<input aria-label="搜索成果文件" value={fileQuery} onChange={event => setFileQuery(event.target.value)} placeholder="搜索文件名" /></label><label>验收状态<select aria-label="成果验收状态" value={reviewFilter} onChange={event => setReviewFilter(event.target.value)}><option value="all">全部状态</option><option value="pending">待验收</option><option value="accepted">已通过</option><option value="rejected">已驳回</option></select></label><button type="button" className="text-button" onClick={() => { setFileQuery(""); setReviewFilter("all"); }}>清除筛选</button><ViewModeSwitch value={viewMode} onChange={setViewMode} label="成果显示方式" alternate="table"/></div>{viewMode==="table" && visibleArtifacts.length ? <DataTable rows={artifactPage.rows} rowKey={artifact=>artifact.id} label="成果表格" preferenceKey="otternest-artifact-columns" className="artifact-data-table" columns={[
+ {id:"file",label:"文件",required:true,render:a=><><strong className="data-table-title">{a.name}</strong>{a.deleted_at&&<small>文件已回收</small>}{a.review_note&&<small>验收说明：{a.review_note}</small>}</>},
+ {id:"version",label:"版本",render:a=>a.version,numeric:true},{id:"size",label:"大小",render:a=>sizeText(a.size_bytes)}, {id:"checksum",label:"校验值",render:a=><code>{a.checksum.slice(0,16)}…</code>}, {id:"sensitivity",label:"敏感级",required:true,render:a=>getUiLabel(a.sensitivity)}, {id:"created",label:"创建时间",render:a=>new Date(a.created_at).toLocaleString("zh-CN",{hour12:false})}, {id:"actions",label:"验收与操作",required:true,render:renderArtifactActions}
+ ]}/> : <div className="artifact-list">{artifactPage.rows.map((artifact) => <article className="artifact-card" key={artifact.id}>
           <div className="artifact-card-main"><div className="artifact-file-icon"><Archive size={18} /></div><div><strong>{artifact.name}</strong><small>v{artifact.version} · {sizeText(artifact.size_bytes)} · {artifact.checksum.slice(0, 16)}…</small><small>敏感级 {getUiLabel(artifact.sensitivity)} · {new Date(artifact.created_at).toLocaleString("zh-CN", { hour12: false })}</small></div></div>
-          <div className="artifact-card-actions"><span className={"status-tag " + (artifact.review_status === "accepted" ? "tag-green" : artifact.review_status === "rejected" ? "tag-red" : "tag-amber")}>{reviewLabel[artifact.review_status] || artifact.review_status}</span><button className="icon-button" title="下载并校验" disabled={saving || Boolean(artifact.deleted_at)} onClick={() => void downloadArtifact(artifact)}><Download size={15} /></button>{artifact.review_status === "pending" && <><button className="icon-button" title="验收通过" disabled={saving} onClick={() => void reviewArtifact(artifact, true)}><Check size={15} /></button><button className="icon-button" title="驳回" disabled={saving} onClick={() => void reviewArtifact(artifact, false)}><X size={15} /></button></>}</div>
+          {renderArtifactActions(artifact)}
           {artifact.review_note && <p className="artifact-review-note">验收说明：{artifact.review_note}</p>}
           {artifact.deleted_at && <small className="muted-inline">文件已回收，元数据仍保留。</small>}
-        </article>)}{!visibleArtifacts.length && <div className="empty-state"><FileArchive size={25} /><strong>{artifacts.length ? "没有符合条件的文件" : "暂无成果文件"}</strong></div>}</div>
+        </article>)}{!visibleArtifacts.length && <div className="empty-state"><FileArchive size={25} /><strong>{artifacts.length ? "没有符合条件的文件" : "暂无成果文件"}</strong></div>}</div>}
         {!loading && <ListPagination {...artifactPage} label="成果分页" />}
       </section>
 

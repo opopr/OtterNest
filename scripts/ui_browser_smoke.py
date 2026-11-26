@@ -325,9 +325,17 @@ def react_checks(browser, name, width, height, problems):
 
         page.get_by_role("button", name="切换深色主题", exact=True).click()
         expect(page.locator("html")).to_have_attribute("data-ui-theme", "dark")
-        visit(page, "/tasks", "项目与任务", "任务中心", mobile)
-        check_width(page, f"{name}-dark-tasks", problems)
-        screenshot(page, f"{name}-dark-tasks")
+        for index, (path, group, label) in enumerate(ROUTES):
+            case = f"{name}-dark-{index:02d}-{path.strip('/') or 'overview'}"
+            try:
+                visit(page, path, group, label, mobile)
+                expect(page.locator("html")).to_have_attribute("data-ui-theme", "dark")
+                expect(page.get_by_text("页面渲染遇到异常", exact=True)).to_have_count(0)
+                check_width(page, case, problems)
+                screenshot(page, case)
+            except Exception as error:
+                problems.append(f"{case}: {error}")
+                screenshot(page, case + "-error")
         page.get_by_role("button", name="切换浅色主题", exact=True).click()
         if not mobile:
             page.get_by_role("button", name="折叠侧边栏", exact=True).click()
@@ -540,12 +548,23 @@ def project_scope_checks(browser, problems):
         task_view.get_by_role("button", name="表格", exact=True).click()
         expect(page.locator(".task-table-row")).to_have_count(1)
         expect(page.locator(".task-table-row").first).to_contain_text("分页验收任务00")
+        page.locator(".table-column-settings summary").click()
+        columns = page.get_by_role("group", name="任务表格显示列", exact=True)
+        columns.get_by_role("checkbox", name="优先级", exact=True).uncheck()
+        expect(page.get_by_role("columnheader", name="优先级", exact=True)).to_have_count(0)
+        expect(page.get_by_role("columnheader", name="风险", exact=True)).to_be_visible()
+        expect(page.get_by_role("columnheader", name="操作", exact=True)).to_be_visible()
+        expect(columns.get_by_role("checkbox", name="风险", exact=True)).to_have_count(0)
         check_width(page, "task-table-mobile", problems)
         screenshot(page, "task-table-mobile")
         visit(page, "/projects", "项目与任务", "项目管理", True)
         visit(page, "/tasks", "项目与任务", "任务中心", True)
         expect(task_view.get_by_role("button", name="表格", exact=True)).to_have_attribute("aria-pressed", "true")
         expect(page.locator(".task-data-table")).to_be_visible()
+        expect(page.get_by_role("columnheader", name="优先级", exact=True)).to_have_count(0)
+        page.locator(".table-column-settings summary").click()
+        page.get_by_role("button", name="恢复默认列", exact=True).click()
+        expect(page.get_by_role("columnheader", name="优先级", exact=True)).to_be_visible()
         task_view.get_by_role("button", name="列表", exact=True).click()
         expect(page.locator(".task-center-list")).to_be_visible()
         visit(page, "/projects", "项目与任务", "项目管理", True)
@@ -557,6 +576,33 @@ def project_scope_checks(browser, problems):
         expect(page.locator(".task-row-clickable")).to_have_count(2)
         check_width(page, "multi-page-project-tasks", problems)
         screenshot(page, "multi-page-project-tasks")
+
+        # Seed real records in the temporary instance to exercise both new table layouts.
+        with httpx.Client(base_url=ORIGIN, timeout=15, headers={"Authorization": "Bearer " + OWNER}) as client:
+            response = client.post("/api/v1/agents", json={"name":"表格验收智能体","platform":"local","execution_mode":"polling","capabilities":[]})
+            response.raise_for_status()
+            agent_id = response.json()["id"]
+            response = client.post(f"/api/v1/agents/{agent_id}/runtimes", json={"label":"表格验收实例","environment":"test"})
+            response.raise_for_status()
+            response = client.get(f"/api/v1/projects/{second['id']}/tasks")
+            response.raise_for_status()
+            task_id = next(task["id"] for task in response.json() if task["title"] == "分页验收任务00")
+            response = client.post(f"/api/v1/tasks/{task_id}/artifacts", content=b"temporary UI fixture", headers={"X-Artifact-Name":"ui-table-report.txt"})
+            response.raise_for_status()
+        visit(page, "/runtimes", "智能体与接入", "运行监控", True)
+        page.get_by_role("group", name="运行实例显示方式", exact=True).get_by_role("button", name="表格", exact=True).click()
+        expect(page.locator(".runtime-data-table")).to_contain_text("表格验收实例")
+        expect(page.locator(".runtime-data-table")).to_contain_text("未签发")
+        check_width(page, "runtime-table-mobile", problems)
+        screenshot(page, "runtime-table-mobile")
+        visit(page, "/artifacts", "知识与成果", "成果中心", True)
+        page.get_by_label("选择项目", exact=True).select_option(second["id"])
+        page.get_by_label("选择任务", exact=True).select_option(task_id)
+        page.get_by_role("group", name="成果显示方式", exact=True).get_by_role("button", name="表格", exact=True).click()
+        expect(page.locator(".artifact-data-table")).to_contain_text("ui-table-report.txt")
+        expect(page.locator(".artifact-data-table")).to_contain_text("待验收")
+        check_width(page, "artifact-table-mobile", problems)
+        screenshot(page, "artifact-table-mobile")
     finally:
         context.close()
 
@@ -571,6 +617,7 @@ def main():
             "OTTERNEST_DATABASE_URL": "sqlite+pysqlite:///" + str(Path(directory) / "ui.sqlite3"),
             "OTTERNEST_OWNER_TOKEN": OWNER,
             "OTTERNEST_WEB_DIST": str(ROOT / "frontend/dist"),
+            "OTTERNEST_ARTIFACT_DIR": str(Path(directory) / "artifacts"),
         }
         subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"],
                        cwd=ROOT, env=env, check=True)

@@ -1,3 +1,4 @@
+import DataTable from "../components/DataTable";
 import { useDisplayPreference, ViewModeSwitch } from "../components/ViewModeSwitch";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { ErrorNotice } from "../components/PageFeedback";
@@ -286,13 +287,15 @@ export default function TaskCenterPage() {
           <div className="panel-loading"><span className="spinner" />正在汇总项目任务…</div>
         ) : rows.length ? (
           viewMode === "table" ? (
-            <div className="data-table-scroll" role="region" aria-label="任务表格" tabIndex={0}>
-              <table className="data-table task-data-table"><thead><tr><th scope="col">任务</th><th scope="col">项目</th><th scope="col">状态</th><th scope="col">风险</th><th scope="col">优先级</th><th scope="col">敏感级</th><th scope="col">操作</th></tr></thead>
-              <tbody>{taskPage.rows.map(t=><tr key={t.id} className="task-table-row">
-                <td><strong className="data-table-title">{t.title}</strong>{!compactRows && <small className="task-result-excerpt">{t.failure_reason || t.result_summary || t.instruction}</small>}<details className="task-row-identifier"><summary>任务编号</summary><code>{t.id}</code></details></td>
-                <td>{t.project_name}</td><td><TaskStatusBadge status={t.status}/></td><td>{t.risk}</td><td className="numeric-cell">{t.priority}</td><td>{getUiLabel(t.sensitivity)}</td><td>{renderTaskActions(t)}</td>
-              </tr>)}</tbody></table>
-            </div>
+            <DataTable rows={taskPage.rows} rowKey={t=>t.id} label="任务表格" preferenceKey="otternest-task-columns" className="task-data-table" rowClassName="task-table-row" columns={[
+              {id:"title",label:"任务",required:true,render:t=><><strong className="data-table-title">{t.title}</strong>{!compactRows && <small className="task-result-excerpt">{t.failure_reason || t.result_summary || t.instruction}</small>}<details className="task-row-identifier"><summary>任务编号</summary><code>{t.id}</code></details></>},
+              {id:"project",label:"项目",required:true,render:t=>t.project_name},
+              {id:"status",label:"状态",required:true,render:t=><TaskStatusBadge status={t.status}/>},
+              {id:"risk",label:"风险",required:true,render:t=>t.risk},
+              {id:"priority",label:"优先级",numeric:true,render:t=>t.priority},
+              {id:"sensitivity",label:"敏感级",required:true,render:t=>getUiLabel(t.sensitivity)},
+              {id:"actions",label:"操作",required:true,render:renderTaskActions}
+            ]}/>
           ) : (
           <div className={"task-center-list" + (compactRows ? " task-center-list-compact" : "")}>
             {taskPage.rows.map((t) => (
