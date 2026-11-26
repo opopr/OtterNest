@@ -1,3 +1,4 @@
+import { useProjectSelection } from "../components/ProjectSelection";
 import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
@@ -63,7 +64,7 @@ const emptyDraft: MemoryDraft = { kind: "fact", title: "", content: "", source: 
 export default function KnowledgePage() {
   const dialog = useDialog();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useProjectSelection(projects);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [charter, setCharter] = useState<Charter | null>(null);
   const [shares, setShares] = useState<KnowledgeShare[]>([]);

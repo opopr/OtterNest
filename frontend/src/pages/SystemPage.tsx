@@ -1,3 +1,6 @@
+import { useScopedRequest } from "../utils/useScopedRequest";
+import { useDraftGuard } from "../components/DraftGuard";
+import { useProjectSelection } from "../components/ProjectSelection";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -69,7 +72,7 @@ export default function SystemPage() {
   const dialog = useDialog();
   const { refreshSystemMode } = useSystemMode();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useProjectSelection(projects);
   const [systemMode, setSystemMode] = useState<SystemMode | null>(null);
   const [events, setEvents] = useState<ProjectEvent[]>([]);
   const [eventQuery, setEventQuery] = useState("");
@@ -228,12 +231,16 @@ export default function SystemPage() {
     finally { setLoading(false); }
   }, []);
 
+  const beginEventRequest = useScopedRequest(selectedId);
+  const confirmDiscard = useDraftGuard(Boolean(projectReason.trim()));
+  const changeProject = async (id: string) => { if (saving || id === selectedId || !(await confirmDiscard())) return; setEvents([]); setProjectReason(""); setSelectedId(id); };
   const loadEvents = useCallback(async (projectId: string) => {
+    const current = beginEventRequest(projectId); if (!current()) return;
     try {
       const rows = await request<ProjectEvent[]>("/projects/" + encodeURIComponent(projectId) + "/events?after=0&limit=100");
-      setEvents(rows.slice().reverse());
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "项目事件读取失败"); }
-  }, []);
+      if (current()) setEvents(rows.slice().reverse());
+    } catch (reason) { if (current()) setError(reason instanceof Error ? reason.message : "项目事件读取失败"); }
+  }, [beginEventRequest]);
 
   useEffect(() => { void loadSystem(); }, [loadSystem]);
   useEffect(() => { void checkConnection(); }, [checkConnection]);
@@ -318,7 +325,7 @@ export default function SystemPage() {
 
           <section className="panel">
             <div className="panel-heading"><div className="panel-title"><Activity size={17} /><h3>项目运行状态</h3></div></div>
-            <ProjectSelect projects={projects} value={selectedId} onChange={setSelectedId} />
+            <ProjectSelect projects={projects} value={selectedId} onChange={id=>void changeProject(id)} disabled={saving} />
             {selectedProject ? <>
               <div className="project-status-current"><span>当前项目</span><strong>{selectedProject.name}</strong><span className={"status-tag " + (selectedProject.status === "active" ? "tag-green" : "tag-neutral")}>{projectStatusLabel[selectedProject.status] || selectedProject.status}</span></div>
               <label className="field-label">目标状态<select value={projectStatus} onChange={(event) => setProjectStatus(event.target.value)}><option value="active">运行中</option><option value="paused">暂停</option><option value="archived">归档</option></select></label>

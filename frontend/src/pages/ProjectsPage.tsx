@@ -1,3 +1,4 @@
+import { useProjectSelection } from "../components/ProjectSelection";
 import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
@@ -55,7 +56,7 @@ export default function ProjectsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedProjectId = searchParams.get("project") || "";
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedId, setSelectedId] = useState(requestedProjectId);
+  const [selectedId, setSelectedId] = useProjectSelection(projects, requestedProjectId);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);

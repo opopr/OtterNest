@@ -1,3 +1,5 @@
+import { useScopedRequest } from "../utils/useScopedRequest";
+import { useProjectSelection } from "../components/ProjectSelection";
 import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice } from "../components/PageFeedback";
 import { useDraftGuard } from "../components/DraftGuard";
@@ -68,7 +70,7 @@ export default function ExternalInterfacesPage() {
   const dialog = useDialog();
   const isOwner = user?.kind === "owner";
   const [projects, setProjects] = useState<Project[]>([]);
-  const [projectId, setProjectId] = useState("");
+  const [projectId, setProjectId] = useProjectSelection(projects);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [webhooks, setWebhooks] = useState<WebhookEndpoint[]>([]);
@@ -113,7 +115,9 @@ export default function ExternalInterfacesPage() {
     finally { setLoading(false); }
   }, [isOwner]);
 
+  const beginConnectionRequest = useScopedRequest(projectId);
   const loadConnections = useCallback(async (id: string) => {
+    const current = beginConnectionRequest(id); if (!current()) return;
     if (!isOwner || !id) {
       setWebhooks([]); setRemotes([]); setMembers([]); setDelegations([]);
       return;
@@ -131,13 +135,14 @@ export default function ExternalInterfacesPage() {
         request<ProjectMember[]>("/projects/" + encodeURIComponent(id) + "/members"),
         request<DelegationRow[]>("/projects/" + encodeURIComponent(id) + "/a2a/delegations?limit=200")
       ]);
+      if (!current()) return;
       setWebhooks(hooks);
       setRemotes(peers);
       setMembers(memberships);
       setDelegations(delegationRows);
-    } catch (reason) { setError(errorMessage(reason)); }
-    finally { setLoading(false); }
-  }, [isOwner]);
+    } catch (reason) { if (current()) setError(errorMessage(reason)); }
+    finally { if (current()) setLoading(false); }
+  }, [isOwner,beginConnectionRequest]);
 
   useEffect(() => { void loadIndex(); }, [loadIndex]);
   useEffect(() => { void loadConnections(projectId); }, [loadConnections, projectId]);
@@ -251,7 +256,7 @@ export default function ExternalInterfacesPage() {
 
     <section className="panel external-project-selector">
       <div><strong>当前项目</strong></div>
-      <ProjectSelect projects={projects} value={projectId} disabled={saving} onChange={value => { if (value === projectId || saving) return; void confirmDiscard().then(allowed => { if (!allowed) return; setProjectId(value); setNewWebhookSecret(null); setNewRemote(null); setSelectedTaskId(""); setNotice(""); setWebhookUrl(""); setEventPrefix("task."); setRemoteAgentId(""); setRemoteUrl(""); setRemoteProjectId(""); setShowWebhookForm(false); setShowRemoteForm(false); }); }} />
+      <ProjectSelect projects={projects} value={projectId} disabled={saving} onChange={value => { if (value === projectId || saving) return; void confirmDiscard().then(allowed => { if (!allowed) return; setWebhooks([]); setRemotes([]); setMembers([]); setDelegations([]); setLoading(true); setProjectId(value); setNewWebhookSecret(null); setNewRemote(null); setSelectedTaskId(""); setNotice(""); setWebhookUrl(""); setEventPrefix("task."); setRemoteAgentId(""); setRemoteUrl(""); setRemoteProjectId(""); setShowWebhookForm(false); setShowRemoteForm(false); }); }} />
     </section>
 
     {newWebhookSecret && <section className="panel token-panel" aria-label="回调签名密钥">

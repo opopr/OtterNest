@@ -1,3 +1,6 @@
+import { useScopedRequest } from "../utils/useScopedRequest";
+import { useDraftGuard } from "../components/DraftGuard";
+import { useProjectSelection } from "../components/ProjectSelection";
 import TaskStatusBadge from "../components/TaskStatusBadge";
 import { ErrorNotice } from "../components/PageFeedback";
 import { getUiLabel } from "../utils/labels";
@@ -92,7 +95,7 @@ const timeText = (value: string) => new Date(value).toLocaleString("zh-CN", { ho
 export default function GovernancePage() {
   const dialog = useDialog();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useProjectSelection(projects);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [members, setMembers] = useState<ProjectMember[]>([]);
@@ -126,6 +129,13 @@ export default function GovernancePage() {
     return map;
   }, [members]);
 
+  const beginProjectRequest = useScopedRequest(selectedId);
+  const beginDecisionRequest = useScopedRequest(selectedDecisionId);
+  const confirmDiscard = useDraftGuard(Boolean(plan || resolutionNote || closingNote || commandText || policySelection.length));
+  const changeProject = async (id: string) => {
+    if (saving || id === selectedId || !(await confirmDiscard())) return;
+    setTasks([]); setDecisions([]); setMembers([]); setSelectedDecisionId(""); setReviews([]); setDeliberation(null); setAutoPolicy(null); setPolicySelection([]); setEvidenceInput(""); setEvidenceResult(null); setPlan(null); setCommandText(""); setResolutionNote(""); setClosingNote(""); setError(""); setDetailLoading(true); setSelectedId(id);
+  };
   const loadProjects = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -138,6 +148,7 @@ export default function GovernancePage() {
   }, []);
 
   const loadProjectData = useCallback(async (projectId: string) => {
+    const current = beginProjectRequest(projectId); if (!current()) return;
     setDetailLoading(true);
     setError("");
     try {
@@ -147,6 +158,7 @@ export default function GovernancePage() {
         request<Decision[]>("/projects/" + encoded + "/decisions"),
         request<ProjectMember[]>("/projects/" + encoded + "/members").catch(() => [] as ProjectMember[])
       ]);
+      if (!current()) return;
       const taskRows = Array.isArray(rawTasks) ? rawTasks : [];
       const decisionRows = Array.isArray(rawDecisions) ? rawDecisions : [];
       const memberRows = Array.isArray(rawMembers) ? rawMembers : [];
@@ -154,11 +166,12 @@ export default function GovernancePage() {
       setDecisions(decisionRows);
       setMembers(memberRows);
       setSelectedDecisionId((current) => decisionRows.some((item) => item.id === current) ? current : decisionRows.find((item) => item.status === "proposed")?.id || decisionRows[0]?.id || "");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "治理事项读取失败"); }
-    finally { setDetailLoading(false); }
-  }, []);
+    } catch (reason) { if (current()) setError(reason instanceof Error ? reason.message : "治理事项读取失败"); }
+    finally { if (current()) setDetailLoading(false); }
+  }, [beginProjectRequest]);
 
   const loadDecision = useCallback(async (decisionId: string) => {
+    const current = beginDecisionRequest(decisionId); if (!current()) return;
     if (!decisionId) {
       setReviews([]);
       setDeliberation(null);
@@ -177,6 +190,7 @@ export default function GovernancePage() {
         request<Deliberation>("/decisions/" + encoded + "/deliberation").catch(() => null),
         request<AutoPolicy>("/decisions/" + encoded + "/deliberation/auto-policy").catch(() => null)
       ]);
+      if (!current()) return;
       const reviewRows = Array.isArray(rawReviews) ? rawReviews : [];
       setReviews(reviewRows);
       setDeliberation(delibRow);
@@ -188,9 +202,9 @@ export default function GovernancePage() {
         ])
       );
       setEvidenceInput(collectedRefs.join("\n"));
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "决策审查信息读取失败"); }
-    finally { setDetailLoading(false); }
-  }, []);
+    } catch (reason) { if (current()) setError(reason instanceof Error ? reason.message : "决策审查信息读取失败"); }
+    finally { if (current()) setDetailLoading(false); }
+  }, [beginDecisionRequest]);
 
   useEffect(() => { void loadProjects(); }, [loadProjects]);
   useEffect(() => { if (selectedId) void loadProjectData(selectedId); else { setTasks([]); setDecisions([]); setMembers([]); } }, [selectedId, loadProjectData]);
@@ -383,7 +397,7 @@ export default function GovernancePage() {
       <ErrorNotice message={error} onDismiss={() => setError("")} />
       <section className="panel governance-toolbar">
         <div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "尚未选择项目"}</strong></div>
-        <ProjectSelect projects={projects} value={selectedId} onChange={setSelectedId} />
+        <ProjectSelect projects={projects} value={selectedId} onChange={id=>void changeProject(id)} disabled={saving} />
         <div className="governance-summary"><span><strong>{pendingTasks.length}</strong> 待处理任务</span><span><strong>{decisions.filter((item) => item.status === "proposed").length}</strong> 待审决策</span></div>
       </section>
 

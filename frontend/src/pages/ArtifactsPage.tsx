@@ -1,3 +1,4 @@
+import { useProjectSelection } from "../components/ProjectSelection";
 import { ErrorNotice } from "../components/PageFeedback";
 import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
 import { useScopedRequest } from "../utils/useScopedRequest";
@@ -47,7 +48,7 @@ function saveBlob(blob: Blob, filename: string) {
 
 export default function ArtifactsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useProjectSelection(projects);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);

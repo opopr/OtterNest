@@ -1,3 +1,4 @@
+import { useProjectSelection } from "../components/ProjectSelection";
 import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
@@ -36,7 +37,7 @@ const verdictLabel: Record<string, string> = { pass: "通过", fail: "未通过"
 
 export default function SkillsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useProjectSelection(projects);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [skillQuery, setSkillQuery] = useState("");
   const [skillFilter, setSkillFilter] = useState("all");

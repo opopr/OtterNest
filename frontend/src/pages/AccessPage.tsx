@@ -1,3 +1,6 @@
+import { useScopedRequest } from "../utils/useScopedRequest";
+import { useDraftGuard } from "../components/DraftGuard";
+import { useProjectSelection } from "../components/ProjectSelection";
 import { ErrorNotice } from "../components/PageFeedback";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
@@ -31,7 +34,7 @@ const sensitivityLabels: Record<string, string> = { public: "公开", internal: 
 
 export default function AccessPage() {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useProjectSelection(projects);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState("");
@@ -52,6 +55,18 @@ export default function AccessPage() {
   const selectedTask = useMemo(() => tasks.find((item) => item.id === selectedTaskId) || null, [tasks, selectedTaskId]);
   const eligibleMembers = members.filter((member) => member.enabled);
 
+  const beginProjectRequest = useScopedRequest(selectedProjectId);
+  const beginGrantRequest = useScopedRequest(selectedTaskId);
+  const confirmDiscard = useDraftGuard(scopes !== "task.read, artifact.read" || sensitivity !== "internal" || expires !== "24");
+  const resetGrant = () => { setScopes("task.read, artifact.read"); setSensitivity("internal"); setExpires("24"); setGrants([]); setGrantFilter("all"); setError(""); };
+  const changeProject = async (id: string) => {
+    if (saving || id === selectedProjectId || !(await confirmDiscard())) return;
+    resetGrant(); setTasks([]); setMembers([]); setSelectedTaskId(""); setAgentId(""); setLoading(true); setSelectedProjectId(id);
+  };
+  const changeTask = async (id: string) => {
+    if (saving || id === selectedTaskId || !(await confirmDiscard())) return;
+    resetGrant(); setSelectedTaskId(id);
+  };
   const loadProjects = useCallback(async () => {
     setLoading(true);
     try {
@@ -63,6 +78,7 @@ export default function AccessPage() {
   }, []);
 
   const loadProject = useCallback(async (projectId: string) => {
+    const current = beginProjectRequest(projectId); if (!current()) return;
     setLoading(true);
     setError("");
     try {
@@ -70,20 +86,23 @@ export default function AccessPage() {
         request<Task[]>("/projects/" + encodeURIComponent(projectId) + "/tasks"),
         request<Member[]>("/projects/" + encodeURIComponent(projectId) + "/members")
       ]);
+      if (!current()) return;
       setTasks(taskRows);
       setMembers(memberRows);
       setSelectedTaskId((current) => taskRows.some((item) => item.id === current) ? current : taskRows[0]?.id || "");
       setAgentId((current) => memberRows.some((item) => item.agent_id === current && item.enabled) ? current : memberRows.find((item) => item.enabled)?.agent_id || "");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "项目任务或成员读取失败"); }
-    finally { setLoading(false); }
-  }, []);
+    } catch (reason) { if (current()) setError(reason instanceof Error ? reason.message : "项目任务或成员读取失败"); }
+    finally { if (current()) setLoading(false); }
+  }, [beginProjectRequest]);
 
   const loadGrants = useCallback(async (taskId: string) => {
+    const current = beginGrantRequest(taskId); if (!current()) return;
     if (!taskId) { setGrants([]); return; }
     try {
-      setGrants(await request<TaskGrant[]>("/tasks/" + encodeURIComponent(taskId) + "/grants"));
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "任务授权读取失败"); }
-  }, []);
+      const rows = await request<TaskGrant[]>("/tasks/" + encodeURIComponent(taskId) + "/grants");
+      if (current()) setGrants(rows);
+    } catch (reason) { if (current()) setError(reason instanceof Error ? reason.message : "任务授权读取失败"); }
+  }, [beginGrantRequest]);
 
   useEffect(() => { void loadProjects(); }, [loadProjects]);
   useEffect(() => { if (selectedProjectId) void loadProject(selectedProjectId); else { setTasks([]); setMembers([]); } }, [selectedProjectId, loadProject]);
@@ -131,7 +150,7 @@ export default function AccessPage() {
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedProjectId && void loadProject(selectedProjectId)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
       <ErrorNotice message={error} onDismiss={() => setError("")} />
-      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedProjectId} onChange={setSelectedProjectId} /><label className="task-select"><span>授权目标任务</span><select value={selectedTaskId} onChange={(event) => setSelectedTaskId(event.target.value)}><option value="">选择任务…</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label></section>
+      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedProjectId} onChange={id=>void changeProject(id)} disabled={saving} /><label className="task-select"><span>授权目标任务</span><select aria-label="授权目标任务" value={selectedTaskId} disabled={saving || loading} onChange={(event) => void changeTask(event.target.value)}><option value="">选择任务…</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label></section>
       <div className="operations-grid">
         <section className="panel">
           <div className="panel-heading"><div className="panel-title"><KeyRound size={17} /><h3>创建临时授权</h3></div><span className="muted-inline">仅项目成员可被授权</span></div>

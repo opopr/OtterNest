@@ -1,3 +1,5 @@
+import { useConfirmDiscard } from "../components/DraftGuard";
+import { useProjectSelection } from "../components/ProjectSelection";
 import { ErrorNotice, SuccessNotice } from "../components/PageFeedback";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
@@ -63,7 +65,7 @@ const sampleA2UI = JSON.stringify(
 
 export default function CommandCenterPage() {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useProjectSelection(projects);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [taskProjectId, setTaskProjectId] = useState("");
   const [tasksLoading, setTasksLoading] = useState(false);
@@ -84,6 +86,11 @@ export default function CommandCenterPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
+  const confirmDiscard = useConfirmDiscard();
+  const changeProject = async (id: string) => {
+    if (saving || id === selectedId || !(await confirmDiscard())) return;
+    setPlan(null); setPlanLookupId(""); setPlanLookupResult(null); setRecentPlanIds([]); setError(""); setSelectedId(id);
+  };
   const loadProjects = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -224,7 +231,7 @@ export default function CommandCenterPage() {
 
       <section className="panel command-project-bar">
         <label>当前项目
-          <select aria-label="指挥中心项目" value={selectedId} onChange={(event) => setSelectedId(event.target.value)} disabled={loading || saving || projects.length === 0}>
+          <select aria-label="指挥中心项目" value={selectedId} onChange={(event) => void changeProject(event.target.value)} disabled={loading || saving || projects.length === 0}>
             {projects.length === 0 && <option value="">暂无项目</option>}
             {projects.map((project) => <option key={project.id} value={project.id}>{project.name} · {getUiLabel(project.status)}</option>)}
           </select>

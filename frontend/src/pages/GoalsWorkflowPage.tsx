@@ -1,3 +1,4 @@
+import { useProjectSelection } from "../components/ProjectSelection";
 import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
@@ -65,7 +66,7 @@ const runStatus: Record<string, string> = { executed: "已执行", skipped: "已
 export default function GoalsWorkflowPage() {
   const dialog = useDialog();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useProjectSelection(projects);
   const [board, setBoard] = useState<GoalBoard | null>(null);
   const [rules, setRules] = useState<WorkflowRule[]>([]);
   const [runs, setRuns] = useState<WorkflowRun[]>([]);

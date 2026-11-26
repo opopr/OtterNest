@@ -1,3 +1,4 @@
+import { ProjectSelectionProvider } from "./components/ProjectSelection";
 import { lazy } from "react";
 import { createBrowserRouter, createRoutesFromElements, RouterProvider, Navigate, Route } from "react-router-dom";
 import { DraftNavigationProvider } from "./components/DraftGuard";
@@ -29,7 +30,7 @@ const ProjectPortabilityPage = lazy(() => import("./pages/ProjectPortabilityPage
 let router: ReturnType<typeof createBrowserRouter> | undefined;
 function getRouter() {
   return router ??= createBrowserRouter(createRoutesFromElements(
-    <Route element={<DraftNavigationProvider><AppShell /></DraftNavigationProvider>}>
+    <Route element={<ProjectSelectionProvider><DraftNavigationProvider><AppShell /></DraftNavigationProvider></ProjectSelectionProvider>}>
               <Route index element={<OverviewPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/tasks" element={<TaskCenterPage />} />
