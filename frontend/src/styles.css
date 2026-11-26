@@ -1551,3 +1551,36 @@ input, textarea, select { accent-color: var(--accent); }
 .form-validation-message{display:flex;align-items:flex-start;gap:8px;grid-column:1/-1;border:1px solid var(--border);border-radius:8px;background:var(--red-soft);color:var(--red);padding:10px 12px;font-size:13px;line-height:1.55;overflow-wrap:anywhere}
 .form-validation-message svg{flex-shrink:0;margin-top:2px}
 .form-panel :is(input,select,textarea)[aria-invalid="true"],.login-form :is(input,select,textarea)[aria-invalid="true"]{border-color:var(--red);outline-color:var(--red)}
+
+/* Display preferences: preserve readable text and touch targets, adjust desktop whitespace only. */
+.user-menu .display-preferences{display:grid;gap:2px;padding:4px 0 6px;border-bottom:1px solid var(--border);margin-bottom:4px}
+.display-preferences>small{padding:5px 9px;color:var(--muted);font-size:12px}
+.user-menu .display-preferences button{min-width:208px;gap:7px;white-space:nowrap}
+.display-preferences button>span:nth-child(2){flex:1}
+.preference-state{font-size:11px;color:var(--muted)}
+.display-preferences button[aria-pressed="true"] .preference-state{color:var(--brand-deep-teal);font-weight:650}
+.task-center-list-compact .task-center-row{padding-block:8px}
+@media(min-width:1050px){
+ .wide-layout .page-content{max-width:none}
+ .wide-layout .project-grid,.wide-layout .agent-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr))}
+ .wide-layout .memory-grid,.wide-layout .skill-grid,.wide-layout .goal-board{grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr))}
+ .wide-layout .projects-layout{grid-template-columns:clamp(290px,22%,420px) minmax(0,1fr)}
+ .wide-layout .command-chat-transcript{max-height:min(72vh,920px)}
+ .wide-layout .task-detail-dialog{width:min(100%,1120px)}
+ .compact-density .page-stack{gap:14px}
+ .compact-density .panel{padding:14px}
+ .compact-density .panel-heading{margin-bottom:10px}
+ .compact-density .task-center-row,.compact-density .task-row{padding-block:8px}
+ .compact-density .project-list-item{padding-block:7px}
+ .compact-density .artifact-card,.compact-density .runtime-monitor-card{padding:10px;gap:8px}
+ .compact-density :is(.project-grid,.agent-grid,.memory-grid,.skill-grid,.goal-board){gap:10px}
+ .compact-density :is(.project-card,.agent-card,.stat-card){padding:12px}
+}
+@media(max-width:1049px){.display-preferences{display:none!important}}
+/* Remaining hard-coded pale surfaces in dark mode. */
+:root[data-ui-theme="dark"] :is(.command-chat-transcript,.connection-origin-list,.goal-plan-task-tags code){background:var(--legacy-surface-subtle);color:var(--text-soft);border-color:var(--border)}
+:root[data-ui-theme="dark"] :is(.connection-help,.system-mode-banner.protective,.system-mode-banner.protective .system-mode-icon,.a2ui-badge.tone-warning){background:var(--amber-soft);color:var(--amber);border-color:var(--border)}
+:root[data-ui-theme="dark"] :is(.token-panel,.system-mode-banner:not(.protective),.system-mode-banner:not(.protective) .system-mode-icon,.goal-plan-confirmed){background:var(--green-soft);color:var(--green);border-color:var(--border)}
+:root[data-ui-theme="dark"] :is(.form-error,.dispatch-errors){background:var(--red-soft);color:var(--red);border-color:var(--border)}
+:root[data-ui-theme="dark"] :is(.runtime-monitor-card,.artifact-card){border-color:var(--border)}
+:root[data-ui-theme="dark"] :is(.token-panel,.system-mode-banner,.goal-plan-confirmed) :is(p,small,strong){color:inherit}

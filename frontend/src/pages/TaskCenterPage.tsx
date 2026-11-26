@@ -54,7 +54,8 @@ export default function TaskCenterPage() {
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(25);
-  const [compactRows, setCompactRows] = useState(false);
+  const [compactRows, setCompactRows] = useState(() => { try { return localStorage.getItem("otternest-task-compact-rows") === "true"; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem("otternest-task-compact-rows", String(compactRows)); } catch {} }, [compactRows]);
   useEffect(() => { setPageIndex(0); }, [project, status, risk, query, pageSize]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -282,7 +283,7 @@ export default function TaskCenterPage() {
         {loading ? (
           <div className="panel-loading"><span className="spinner" />正在汇总项目任务…</div>
         ) : rows.length ? (
-          <div className="task-center-list">
+          <div className={"task-center-list" + (compactRows ? " task-center-list-compact" : "")}>
             {pageRows.map((t) => (
               <article className="task-center-row" key={t.id}>
                 <div className="task-center-main">

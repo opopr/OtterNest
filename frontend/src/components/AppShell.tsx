@@ -89,6 +89,9 @@ export default function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [darkTheme, setDarkTheme] = useState(() => { try { return localStorage.getItem("otternest-ui-theme") === "dark"; } catch { return false; } });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => { try { return localStorage.getItem("otternest-sidebar-collapsed") === "true"; } catch { return false; } });
+  const [wideLayout, setWideLayout] = useState(() => { try { return localStorage.getItem("otternest-wide-layout") === "true"; } catch { return false; } });
+  const [compactDensity, setCompactDensity] = useState(() => { try { return localStorage.getItem("otternest-compact-density") === "true"; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem("otternest-wide-layout", String(wideLayout)); localStorage.setItem("otternest-compact-density", String(compactDensity)); } catch {} }, [wideLayout,compactDensity]);
   useEffect(() => { document.documentElement.dataset.uiTheme = darkTheme ? "dark" : "light"; try { localStorage.setItem("otternest-ui-theme", darkTheme ? "dark" : "light"); } catch {} }, [darkTheme]);
   useEffect(() => { try { localStorage.setItem("otternest-sidebar-collapsed", String(sidebarCollapsed)); } catch {} }, [sidebarCollapsed]);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -197,7 +200,7 @@ export default function AppShell() {
   const modeLabel = getSystemModeLabel(systemMode?.mode);
 
   return (
-    <div className={"app-shell" + (sidebarCollapsed ? " sidebar-collapsed" : "")}>
+    <div className={"app-shell" + (sidebarCollapsed ? " sidebar-collapsed" : "") + (wideLayout ? " wide-layout" : "") + (compactDensity ? " compact-density" : "")}>
       <aside className={"sidebar" + (mobileNavOpen ? " mobile-open" : "")}>
         <div className="brand-row-mobile">
         <Link className="brand" to="/" aria-label="OtterNest 首页" onClick={() => setMobileNavOpen(false)}>
@@ -371,6 +374,7 @@ export default function AppShell() {
               </button>
               {menuOpen && (
                 <div className="user-menu">
+                  <div className="display-preferences" aria-label="显示设置" role="group"><small>显示设置</small><button type="button" aria-pressed={wideLayout} onClick={()=>setWideLayout(v=>!v)}><Monitor size={15}/><span>宽屏布局</span><span className="preference-state">{wideLayout ? "已开启" : "已关闭"}</span></button><button type="button" aria-pressed={compactDensity} onClick={()=>setCompactDensity(v=>!v)}><ClipboardCheck size={15}/><span>紧凑列表</span><span className="preference-state">{compactDensity ? "已开启" : "已关闭"}</span></button></div>
                   {user?.kind === "owner" && <Link to="/account-security" onClick={() => setMenuOpen(false)}><LockKeyhole size={15}/>账号安全</Link>}
                   <button onClick={() => { setMenuOpen(false); void confirmDiscard().then(allowed => { if (allowed) void logout(); }); }}>
                     <LogOut size={15} />退出登录
