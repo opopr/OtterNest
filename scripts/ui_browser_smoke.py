@@ -160,6 +160,15 @@ def react_checks(browser, name, width, height, problems):
         page.get_by_label("知识状态", exact=True).select_option("published")
         expect(page.get_by_label("知识状态", exact=True)).to_have_value("published")
         visit(page, "/skills", "知识与成果", "技能管理", mobile)
+        # A failed read must surface Chinese feedback and allow an explicit read-only retry.
+        skills_route = "**/api/v1/projects/*/skills"
+        page.route(skills_route, lambda route: route.abort("failed"))
+        page.get_by_role("button", name="刷新", exact=True).click()
+        feedback = page.locator(".page-feedback[role='alert']")
+        expect(feedback).to_contain_text("无法连接服务")
+        page.unroute(skills_route)
+        feedback.get_by_role("button", name="重新读取", exact=True).click()
+        expect(feedback).to_have_count(0)
         page.get_by_label("技能状态", exact=True).select_option("published")
         page.get_by_label("搜索技能", exact=True).fill("不存在的技能")
         page.get_by_role("button", name="清除筛选", exact=True).click()

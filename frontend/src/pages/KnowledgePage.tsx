@@ -1,3 +1,4 @@
+import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import ListPagination, { useListPage } from "../components/ListPagination";
@@ -273,7 +274,7 @@ export default function KnowledgePage() {
         <div><h1>知识库与项目章程</h1></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadProjectData(selectedId, searchQuery)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
-      {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
       <UnsavedDraftNotice dirty={hasUnsavedDraft} />
       <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={id => void changeProject(id)} disabled={saving} /><span className="muted-inline">{memories.length} 条记忆 · {publishedMemories.length} 条已发布</span></section>
       <div className="governance-tabs knowledge-tabs">
@@ -281,7 +282,7 @@ export default function KnowledgePage() {
         <button className={tab === "charter" ? "selected" : ""} onClick={() => setTab("charter")}><ShieldCheck size={16} />项目章程</button>
         <button className={tab === "sharing" ? "selected" : ""} onClick={() => setTab("sharing")}><Share2 size={16} />跨项目共享 <span>{shares.filter((item) => item.status === "proposed").length}</span></button>
       </div>
-      {loading ? <div className="panel-loading"><div className="spinner" />正在读取项目知识…</div> : tab === "memories" ? (
+      {loading ? <LoadingState label="正在读取项目知识…"/> : tab === "memories" ? (
         <section className="panel">
           <div className="panel-heading">
             <div className="panel-title"><Database size={17} /><h3>项目知识</h3><span className="count-chip">{visibleMemories.length}</span></div>

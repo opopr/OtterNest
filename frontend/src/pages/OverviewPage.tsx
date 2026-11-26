@@ -1,3 +1,4 @@
+import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity, AlertCircle, ArrowRight, Bot, CheckCircle2, Clock3,
@@ -182,8 +183,8 @@ export default function OverviewPage() {
     }));
   }, [data]);
 
-  if (loading && !data) return <div className="loading-panel"><div className="spinner" />正在读取项目数据…</div>;
-  if (error && !data) return <div className="error-panel"><AlertCircle size={18} />{error}<button onClick={() => void refresh()}>重试</button></div>;
+  if (loading && !data) return <LoadingState label="正在读取项目数据…"/>;
+  if (error && !data) return <ErrorNotice message={error} onRetry={() => void refresh()} busy={loading} />;
 
   const briefing = data?.briefing;
   const metrics = data?.metrics;
@@ -204,7 +205,7 @@ export default function OverviewPage() {
           </button>
         </div>
       </div>
-      {error && <div className="inline-error">{error}</div>}
+      <ErrorNotice message={error} />
 
 
       <div className="stat-grid">

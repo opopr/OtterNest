@@ -64,7 +64,7 @@ export default function LoginPage() {
             <div className="login-form-heading"><ShieldCheck size={19} /><strong>双重身份验证</strong></div>
             <p className="form-hint">请输入验证器应用的 6 位动态验证码，或 8 位一次性备用恢复码。</p>
             <label>验证码 / 恢复码<input autoFocus value={code} onChange={(event) => setCode(event.target.value)} autoComplete="one-time-code" required /></label>
-            {error && <div className="form-error">{error}</div>}
+            {error && <div className="form-error" role="alert">{error}</div>}
             <button className="primary-button" disabled={busy}>{busy ? "正在验证…" : "验证并进入"}<ArrowRight size={16} /></button>
             <button type="button" className="text-button" onClick={() => { setChallenge(""); setCode(""); setError(""); }}>返回账号登录</button>
           </form>
@@ -97,7 +97,7 @@ export default function LoginPage() {
             <label>显示名称<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} required /></label>
             <label>登录用户名<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required minLength={3} /></label>
             <label>登录密码<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required minLength={8} /></label>
-            {error && <div className="form-error">{error}</div>}
+            {error && <div className="form-error" role="alert">{error}</div>}
             <button className="primary-button" disabled={busy}>{busy ? "正在初始化…" : "创建所有者账户"}<ArrowRight size={16} /></button>
           </form>
         ) : !canBootstrap ? (
@@ -106,7 +106,7 @@ export default function LoginPage() {
           </div>
         ) : (
           <>
-            {authError && !error && <div className="form-error mb-10">{authError}</div>}
+            {authError && !error && <div className="form-error mb-10" role="alert">{authError}</div>}
             <div className="login-tabs">
               <button type="button" aria-pressed={mode === "account"} className={mode === "account" ? "selected" : ""} onClick={() => { setMode("account"); setError(""); }}>账号登录</button>
               <button type="button" aria-pressed={mode === "token"} className={mode === "token" ? "selected" : ""} onClick={() => { setMode("token"); setError(""); }}>管理员令牌</button>
@@ -115,13 +115,13 @@ export default function LoginPage() {
               <form className="login-form" onSubmit={handleLogin}>
                 <label>用户名<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required /></label>
                 <label>密码<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
-                {error && <div className="form-error">{error}</div>}
+                {error && <div className="form-error" role="alert">{error}</div>}
                 <button className="primary-button" disabled={busy}>{busy ? "正在登录…" : "登录"}<ArrowRight size={16} /></button>
               </form>
             ) : (
               <form className="login-form" onSubmit={handleToken}>
                 <label>管理员令牌<input type="password" value={ownerToken} onChange={(event) => setOwnerToken(event.target.value)} autoComplete="off" required /></label>
-                {error && <div className="form-error">{error}</div>}
+                {error && <div className="form-error" role="alert">{error}</div>}
                 <button className="primary-button" disabled={busy}>{busy ? "正在验证…" : "验证令牌"}<KeyRound size={16} /></button>
               </form>
             )}

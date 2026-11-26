@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getSystemModeLabel, getTaskStatusLabel, getTaskStatusTone, getUiLabel, formatApiError } from "./labels";
+import { getSystemModeLabel, getTaskStatusLabel, getTaskStatusTone, getUiLabel, formatApiError, formatTransportError } from "./labels";
 
 test("getTaskStatusLabel maps known and unknown statuses", () => {
   assert.equal(getTaskStatusLabel("waiting_approval"), "等待授权");
@@ -34,4 +34,15 @@ test("API errors include Chinese context and retain the original diagnostic", ()
   assert.equal(formatApiError("任务不存在", 404), "任务不存在");
   assert.equal(formatApiError(null, 503), "服务暂不可用");
   assert.match(formatApiError([{msg:"Field required"}],422), /输入校验失败.*Field required/);
+});
+
+test("transport failures distinguish reads from writes", () => {
+  assert.match(formatTransportError(new TypeError("Failed to fetch")), /刷新后重试/);
+  assert.match(formatTransportError(new TypeError("Failed to fetch"), "POST"), /结果尚不确定/);
+  assert.match(formatTransportError(new DOMException("aborted","AbortError")), /中断或超时/);
+});
+test("validation diagnostics omit echoed input and context", () => {
+  const result = formatApiError([{loc:["body","password"],msg:"Field required",type:"missing",input:"test-secret",ctx:{token:"other-secret"}}],422);
+  assert.match(result,/输入校验失败.*password.*Field required/);
+  assert.doesNotMatch(result,/test-secret|other-secret/);
 });

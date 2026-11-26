@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../components/PageFeedback";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, ClipboardCheck, Eye, Filter, GitBranch, RefreshCw, RotateCcw, ShieldCheck, X } from "lucide-react";
@@ -255,7 +256,7 @@ export default function TaskCenterPage() {
         </section>
       )}
 
-      {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={14} /></button></div>}
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
 
       <section className="panel task-center-panel task-workspace">
         <div className="task-status-switch" role="group" aria-label="快速筛选任务状态">

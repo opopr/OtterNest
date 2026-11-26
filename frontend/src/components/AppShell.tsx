@@ -1,3 +1,4 @@
+import { LoadingState } from "./PageFeedback";
 import { useConfirmDiscard } from "./DraftGuard";
 import { Component, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -381,7 +382,7 @@ export default function AppShell() {
         </header>
         <main className="page-content">
           <RouteErrorBoundary resetKey={location.pathname}>
-            <Suspense fallback={<div className="panel-loading"><div className="spinner" />正在加载页面…</div>}>
+            <Suspense fallback={<LoadingState label="正在加载页面…"/>}>
               <Outlet />
             </Suspense>
           </RouteErrorBoundary>

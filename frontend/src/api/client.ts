@@ -1,4 +1,4 @@
-import { formatApiError } from "../utils/labels";
+import { formatApiError, formatTransportError } from "../utils/labels";
 import {
   buildApiUrl,
   buildWebSocketUrl,
@@ -16,6 +16,26 @@ export class ApiError extends Error {
     super(message);
     this.name = "ApiError";
     this.status = status;
+  }
+}
+
+/** A failed mutation may already have reached the server. Never automatically replay it. */
+async function fetchWithFeedback(input: RequestInfo | URL, init: RequestInit): Promise<Response> {
+  try { return await fetch(input, init); }
+  catch (reason) { throw new ApiError(formatTransportError(reason, init.method), 0); }
+}
+
+async function readResponse(response: Response): Promise<unknown> {
+  if (response.status === 204 || response.status === 205) return null;
+  const contentType = response.headers.get("content-type") || "";
+  try {
+    if (/application\/(?:[\w.+-]+\+)?json/i.test(contentType)) return await response.json();
+    if (response.ok) throw new ApiError("服务返回了非预期的数据格式，请检查接口连接。", response.status);
+    return null; // Never expose raw proxy HTML or arbitrary error pages.
+  } catch (reason) {
+    if (!response.ok) return null;
+    if (reason instanceof ApiError) throw reason;
+    throw new ApiError("服务响应读取失败，请检查网络后刷新。", response.status);
   }
 }
 
@@ -45,18 +65,15 @@ export async function request<T>(
   if (token) headers.set("Authorization", "Bearer " + token);
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
 
-  const response = await fetch(buildApiUrl(API_BASE_URL, path), {
+  const response = await fetchWithFeedback(buildApiUrl(API_BASE_URL, path), {
     ...init,
     headers,
     credentials: "omit"
   });
-  const contentType = response.headers.get("content-type") || "";
-  const payload: unknown = contentType.includes("application/json")
-    ? await response.json()
-    : await response.text();
+  const payload = await readResponse(response);
 
   if (!response.ok) {
-    if (response.status === 401 && token && unauthorizedHandler) {
+    if (response.status === 401 && token && token === accessToken && unauthorizedHandler) {
       unauthorizedHandler();
     }
     const detail =
@@ -78,19 +95,16 @@ export async function binaryRequest(
   const headers = new Headers(init.headers);
   const token = tokenOverride === undefined ? accessToken : tokenOverride;
   if (token) headers.set("Authorization", "Bearer " + token);
-  const response = await fetch(buildApiUrl(API_BASE_URL, path), {
+  const response = await fetchWithFeedback(buildApiUrl(API_BASE_URL, path), {
     ...init,
     headers,
     credentials: "omit"
   });
   if (!response.ok) {
-    if (response.status === 401 && token && unauthorizedHandler) {
+    if (response.status === 401 && token && token === accessToken && unauthorizedHandler) {
       unauthorizedHandler();
     }
-    const contentType = response.headers.get("content-type") || "";
-    const payload: unknown = contentType.includes("application/json")
-      ? await response.json()
-      : await response.text();
+    const payload = await readResponse(response);
     const detail =
       typeof payload === "object" && payload !== null && "detail" in payload
         ? (payload as { detail?: unknown }).detail
@@ -111,7 +125,7 @@ export async function healthRequest(
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 8000);
   try {
-    const response = await fetch(new URL(path, getApiOrigin()), {
+    const response = await fetchWithFeedback(new URL(path, getApiOrigin()), {
       method: "GET",
       credentials: "omit",
       cache: "no-store",

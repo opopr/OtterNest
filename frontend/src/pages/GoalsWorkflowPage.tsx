@@ -1,3 +1,4 @@
+import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import { dependencyLayers } from "../utils/dependencyLayers";
@@ -332,14 +333,14 @@ export default function GoalsWorkflowPage() {
         <div><h1>目标与工作流</h1></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadProjectData(selectedId)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
-      {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
       <UnsavedDraftNotice dirty={hasUnsavedDraft} />
       <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={id => void changeProject(id)} disabled={saving} /><span className="muted-inline">{board?.goals?.length ?? 0} 个目标 · {rules.length} 条规则 · {runs.length} 条运行记录</span></section>
       <div className="governance-tabs">
         <button className={tab === "goals" ? "selected" : ""} onClick={() => setTab("goals")}><GitBranch size={16} />目标依赖图 <span>{board?.goals?.length ?? 0}</span></button>
         <button className={tab === "rules" ? "selected" : ""} onClick={() => setTab("rules")}><Workflow size={16} />工作流规则 <span>{rules.length}</span></button>
       </div>
-      {loading ? <div className="panel-loading"><div className="spinner" />正在读取目标和工作流…</div> : tab === "goals" ? (
+      {loading ? <LoadingState label="正在读取目标和工作流…"/> : tab === "goals" ? (
         <div className="page-stack">
         <details className="panel maintenance-disclosure"><summary>智能目标规划</summary><GoalPlanComposer key={selectedId} projectId={selectedId} onConfirmed={()=>void loadProjectData(selectedId)} /></details>
         <section className="panel">

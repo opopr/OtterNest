@@ -93,8 +93,23 @@ const HTTP_ERROR_LABELS: Record<number, string> = {
 };
 /** Keep original diagnostic text so operators can identify the actual failure. */
 export function formatApiError(detail: unknown, status: number): string {
-  const raw = typeof detail === "string" ? detail : detail == null ? "" : JSON.stringify(detail) || "";
+  // FastAPI validation entries may echo passwords, tokens or entire submitted bodies.
+  const safeDetail = Array.isArray(detail) ? detail.map(entry => {
+    if (entry && typeof entry === "object") {
+      const row = entry as Record<string, unknown>;
+      return { loc: row.loc, msg: row.msg, type: row.type };
+    }
+    return typeof entry === "string" ? entry : undefined;
+  }) : typeof detail === "string" ? detail : null;
+  const raw = (typeof safeDetail === "string" ? safeDetail : safeDetail == null ? "" : JSON.stringify(safeDetail) || "").slice(0,1000);
   if (/[\u3400-\u9fff]/.test(raw) && typeof detail === "string") return raw;
   const message = HTTP_ERROR_LABELS[status] || "请求失败";
   return raw ? message + "（原始信息：" + raw + "）" : message;
+}
+
+export function formatTransportError(reason: unknown, method = "GET"): string {
+  const aborted = reason instanceof Error && reason.name === "AbortError";
+  const readOnly = ["GET","HEAD","OPTIONS"].includes(method.toUpperCase());
+  const message = aborted ? "请求已中断或超时" : "无法连接服务，请检查网络或服务状态";
+  return readOnly ? message + "，可刷新后重试。" : message + "。操作结果尚不确定，请先刷新核对状态，不要直接重复提交。";
 }

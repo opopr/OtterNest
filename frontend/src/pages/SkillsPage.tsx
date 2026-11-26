@@ -1,3 +1,4 @@
+import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import ListPagination, { useListPage } from "../components/ListPagination";
@@ -193,7 +194,7 @@ export default function SkillsPage() {
         <div><h1>技能管理</h1></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadSkills(selectedId)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
-      {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
+      <ErrorNotice message={error} onDismiss={() => setError("")} onRetry={selectedId ? () => void loadSkills(selectedId) : () => void loadProjects()} busy={loading || saving} />
       <UnsavedDraftNotice dirty={hasUnsavedDraft} />
       <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={id => void changeProject(id)} disabled={saving} /><span className="muted-inline">{skills.length} 个技能版本</span></section>
       <section className="panel">
@@ -207,7 +208,7 @@ export default function SkillsPage() {
           <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "提交中…" : "提交提案"}</button></div>
         </form>}
         <div className="skill-grid">
-          {loading ? <div className="panel-loading"><div className="spinner" /></div> : skillPage.rows.map((skill) => <article className="skill-card" key={skill.id}>
+          {loading ? <LoadingState/> : skillPage.rows.map((skill) => <article className="skill-card" key={skill.id}>
             <div className="skill-card-head"><div><strong>{skill.name}</strong><small>版本 {skill.version} · {skill.id.slice(0, 8)}</small></div><span className={"status-tag " + (skill.status === "published" ? "tag-green" : skill.status === "proposed" ? "tag-amber" : "tag-neutral")}>{statusLabel[skill.status] || skill.status}</span></div>
             <details className="library-disclosure"><summary>技能内容</summary><pre className="skill-content">{skill.content}</pre><small className="memory-source">来源：{skill.source}</small></details>
             <details className="library-disclosure skill-evaluations"><summary><span><ClipboardList size={13}/> 评价记录</span><span>{(evaluations[skill.id] || []).length} 条</span></summary>{(evaluations[skill.id] || []).map((item) => <div className="skill-evaluation" key={item.id}><span className={"status-tag " + (item.verdict === "pass" ? "tag-green" : item.verdict === "fail" ? "tag-red" : "tag-amber")}>{verdictLabel[item.verdict]}</span><p>{item.notes}</p></div>)}</details>

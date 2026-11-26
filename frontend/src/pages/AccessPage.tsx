@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../components/PageFeedback";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AlertCircle, KeyRound, Plus, RefreshCw, ShieldCheck, Trash2, X } from "lucide-react";
@@ -129,7 +130,7 @@ export default function AccessPage() {
         <div><h1>任务临时授权</h1></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedProjectId && void loadProject(selectedProjectId)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
-      {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
       <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedProjectId} onChange={setSelectedProjectId} /><label className="task-select"><span>授权目标任务</span><select value={selectedTaskId} onChange={(event) => setSelectedTaskId(event.target.value)}><option value="">选择任务…</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label></section>
       <div className="operations-grid">
         <section className="panel">

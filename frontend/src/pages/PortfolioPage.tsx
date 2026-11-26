@@ -1,3 +1,4 @@
+import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { Link } from "react-router-dom";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { getUiLabel } from "../utils/labels";
@@ -209,8 +210,8 @@ export default function PortfolioPage() {
           <button className="primary-button compact" onClick={() => void runSchedule()} disabled={saving}><Play size={15} />执行公平调度</button>
         </div>
       </div>
-      {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
-      {loading && !metrics ? <div className="panel-loading"><div className="spinner" />正在汇总运营数据…</div> : (
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
+      {loading && !metrics ? <LoadingState label="正在汇总运营数据…"/> : (
         <>
           <div className="stat-grid portfolio-stat-grid">
             <div className="stat-card"><div className="stat-icon tone-violet"><FolderKanbanIcon /></div><div className="stat-copy"><span>项目总数</span><strong>{metrics?.project_count ?? 0}</strong></div></div>

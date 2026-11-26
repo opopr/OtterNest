@@ -1,3 +1,4 @@
+import { ErrorNotice, SuccessNotice } from "../components/PageFeedback";
 import { useDraftGuard } from "../components/DraftGuard";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
@@ -225,8 +226,8 @@ export default function AccountSecurityPage() {
       </div>
       <button className="secondary-button compact" onClick={() => void load()} disabled={loading || saving}><RefreshCw size={14} />刷新</button>
     </div>
-    {error && <div className="inline-error"><AlertCircle size={16} />{error}</div>}
-    {notice && <div className="success-notice"><ShieldCheck size={16} />{notice}<button onClick={() => setNotice("")}>关闭</button></div>}
+    <ErrorNotice message={error} />
+    <SuccessNotice message={notice} onDismiss={() => setNotice("")} />
 
     <section className="panel admin-security-summary">
       <div className="panel-heading"><div className="panel-title"><UserRound size={17} /><h3>当前账户</h3></div><span className="status-tag tag-green">所有者</span></div>

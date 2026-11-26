@@ -1,3 +1,4 @@
+import { ErrorNotice, SuccessNotice } from "../components/PageFeedback";
 import { useDraftGuard } from "../components/DraftGuard";
 import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { AlertCircle, ArchiveRestore, Download, FileJson, RefreshCw, ShieldAlert, ShieldCheck, UploadCloud, X } from "lucide-react";
@@ -155,8 +156,8 @@ export default function ProjectPortabilityPage() {
     <div className="page-heading"><div><h1>项目导入导出</h1>
       </div>
       <button className="secondary-button compact" onClick={() => void refresh()} disabled={loading || busy}><RefreshCw size={14} />刷新</button></div>
-    {error && <div className="inline-error"><AlertCircle size={15} />{error}<button onClick={() => setError("")}><X size={14} /></button></div>}
-    {success && <div className="success-notice"><ShieldCheck size={15} />{success}<button onClick={() => setSuccess("")}>关闭</button></div>}
+    <ErrorNotice message={error} onDismiss={() => setError("")} />
+    <SuccessNotice message={success} onDismiss={() => setSuccess("")} />
 
     <div className="admin-two-column">
       <section className="panel admin-portable-card">

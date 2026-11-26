@@ -1,3 +1,4 @@
+import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useDraftGuard } from "../components/DraftGuard";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
@@ -280,7 +281,7 @@ export default function AgentsPage() {
         </div>
       </div>
 
-      {error && <div className="inline-error">{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
 
       {createdToken && (
         <div className="panel token-panel">
@@ -341,7 +342,7 @@ export default function AgentsPage() {
 
       <div className="panel agent-filter-bar"><label className="agent-search-field"><Search size={16}/><input aria-label="搜索智能体" placeholder="搜索名称、平台或能力" value={agentQuery} onChange={event => setAgentQuery(event.target.value)}/></label>{tab === "active" && <select aria-label="智能体状态" value={agentFilter} onChange={event => setAgentFilter(event.target.value)}><option value="all">全部状态</option><option value="enabled">已启用</option><option value="disabled">已停用</option></select>}<span className="muted-inline">{visibleAgents.length} 项结果</span><button type="button" className="text-button" onClick={() => {setAgentQuery("");setAgentFilter("all");}}>清除筛选</button></div>
       <div className="agent-grid">
-        {loading ? <div className="panel-loading"><div className="spinner" /></div> : visibleAgents.length === 0 ? (
+        {loading ? <LoadingState/> : visibleAgents.length === 0 ? (
           <div className="panel empty-state">
             {tab === "active" ? <Bot size={30} /> : <Trash2 size={30} />}
             <strong>{(tab === "active" ? activeAgents : trashedAgents).length ? "没有符合条件的智能体" : tab === "active" ? "尚未登记智能体" : "回收站为空"}</strong>

@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../components/PageFeedback";
 import { useDraftGuard } from "../components/DraftGuard";
 import { getUiLabel } from "../utils/labels";
 import "./ExternalInterfacesPage.css";
@@ -244,7 +245,7 @@ export default function ExternalInterfacesPage() {
         <RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button>
     </div>
 
-    {error && <div className="inline-error">{error}<button onClick={() => setError("")} aria-label="关闭错误"><X size={15} /></button></div>}
+    <ErrorNotice message={error} onDismiss={() => setError("")} />
     {notice && <div className="connection-help">{notice}<button className="text-button" onClick={() => setNotice("")}>关闭</button></div>}
 
     <section className="panel external-project-selector">

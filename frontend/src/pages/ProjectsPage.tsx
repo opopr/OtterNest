@@ -1,3 +1,4 @@
+import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import { getUiLabel } from "../utils/labels";
@@ -365,7 +366,7 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
 
       {showProjectForm && (
         <form className="panel form-panel" onSubmit={createProject}>
@@ -384,7 +385,7 @@ export default function ProjectsPage() {
           <div className="panel-heading"><div className="panel-title"><FolderKanban size={17} /><h3>项目</h3><span className="count-chip">{projects.length}</span></div></div>
           <div className="search-field"><Search size={15} /><input aria-label="搜索项目" placeholder="搜索项目…" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
           <select className="project-status-filter compact-select" aria-label="项目状态" value={projectStatusFilter} onChange={event => setProjectStatusFilter(event.target.value)}><option value="all">全部项目状态</option><option value="active">运行中</option><option value="paused">已暂停</option><option value="archived">已归档</option></select>
-          {loading ? <div className="panel-loading"><div className="spinner" /></div> : visibleProjects.length === 0 ? (
+          {loading ? <LoadingState/> : visibleProjects.length === 0 ? (
             <div className="empty-mini">没有匹配的项目</div>
           ) : (
             <div className="project-list">
@@ -489,7 +490,7 @@ export default function ProjectsPage() {
 
               <div className="panel task-table-panel">
                 <div className="project-content-filter"><input aria-label="搜索项目任务" placeholder="搜索任务名称或编号" value={taskQuery} onChange={event => setTaskQuery(event.target.value)} /><select aria-label="项目任务状态" value={taskStatusFilter} onChange={event => setTaskStatusFilter(event.target.value)}><option value="all">全部状态</option>{Object.entries(statusLabels).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select><span className="muted-inline">{visibleTasks.length}/{tasks.length} 项</span></div>
-                {detailLoading ? <div className="panel-loading"><div className="spinner" /></div> : visibleTasks.length === 0 ? (
+                {detailLoading ? <LoadingState/> : visibleTasks.length === 0 ? (
                   <div className="empty-state">
                     <strong>{tasks.length ? "没有符合条件的任务" : "暂无任务"}</strong>
                   </div>
@@ -559,7 +560,7 @@ export default function ProjectsPage() {
 
               <div className="panel task-table-panel">
                 <div className="project-content-filter"><input aria-label="搜索项目成员" placeholder="搜索成员或角色" value={memberQuery} onChange={event => setMemberQuery(event.target.value)} /><span className="muted-inline">{visibleMembers.length}/{members.length} 位</span></div>
-                {detailLoading ? <div className="panel-loading"><div className="spinner" /></div> : visibleMembers.length === 0 ? (
+                {detailLoading ? <LoadingState/> : visibleMembers.length === 0 ? (
                   <div className="empty-state"><Users size={24} /><strong>{members.length ? "没有符合条件的成员" : "暂无项目成员"}</strong></div>
                 ) : (
                   <div className="task-list">

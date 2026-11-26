@@ -1,3 +1,4 @@
+import { ErrorNotice, SuccessNotice } from "../components/PageFeedback";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Activity, AlertCircle, CheckCircle2, Clock3, FileCode2, MessageSquare, RefreshCw, Search, ShieldCheck, X } from "lucide-react";
@@ -218,8 +219,8 @@ export default function CommandCenterPage() {
         </button>
       </div>
 
-      {error && <div className="inline-error"><AlertCircle size={15} />{error}<button onClick={() => setError("")}><X size={14} /></button></div>}
-      {notice && <div className="success-notice"><CheckCircle2 size={15} />{notice}<button onClick={() => setNotice("")}><X size={14} /></button></div>}
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
+      <SuccessNotice message={notice} onDismiss={() => setNotice("")} />
 
       <section className="panel command-project-bar">
         <label>当前项目

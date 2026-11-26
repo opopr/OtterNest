@@ -1,3 +1,4 @@
+import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -297,9 +298,9 @@ export default function SystemPage() {
         <div><h1>系统设置与运行事件</h1></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => void loadSystem()} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新状态</button></div>
       </div>
-      {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
 
-      {loading && !systemMode ? <div className="panel-loading"><div className="spinner" />正在读取系统状态…</div> : <>
+      {loading && !systemMode ? <LoadingState label="正在读取系统状态…"/> : <>
         <section className={"system-mode-banner " + (isProtective ? "protective" : "normal")}>
           <div className="system-mode-icon">{isProtective ? <ShieldAlert size={23} /> : <CheckCircle2 size={23} />}</div>
           <div><h2>{modeLabel[systemMode?.mode || "normal"]}</h2><p>{systemMode?.reason || "当前未启用全局保护限制。"}</p></div>

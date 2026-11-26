@@ -1,3 +1,4 @@
+import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -92,7 +93,7 @@ export default function RuntimeMonitorPage(){
 
  return <div className="page-stack">
   <div className="page-heading"><div><h1>运行监控</h1></div><div className="heading-actions"><button className="secondary-button" onClick={()=>void load()} disabled={loading}><RefreshCw size={15} className={loading?"spin":""}/>刷新状态</button><Link className="secondary-button" to="/agents"><Bot size={15}/>智能体管理</Link></div></div>
-  {error&&<div className="inline-error"><AlertCircle size={16}/>{error}<button onClick={()=>setError("")}><X size={14}/></button></div>}
+  <ErrorNotice message={error} onDismiss={()=>setError("")} onRetry={()=>void load()} busy={loading}/>
   {issuedToken&&<section className="panel token-panel runtime-token-panel">
    <div className="token-panel-title"><KeyRound size={18}/><strong>运行实例凭据已签发：请立即保存</strong></div>
    <p>该令牌只在本次响应中显示一次。旧令牌已立即失效，请同步更新对应执行节点的密钥配置，不要提交到 Git。</p>
@@ -110,7 +111,7 @@ export default function RuntimeMonitorPage(){
      <option value="all">全部状态</option><option value="online">在线</option><option value="offline">离线</option><option value="disabled">已禁用</option><option value="missing_token">缺少凭据</option>
     </select><button type="button" className="text-button" onClick={()=>{setFilter("all");setQuery("");}}>清除筛选</button>
    </div>
-   {loading?<div className="panel-loading"><span className="spinner"/>正在汇总运行实例状态…</div>:visible.length?<div className="runtime-monitor-list">{visible.map(row=><article className="runtime-monitor-card" key={row.id}>
+   {loading?<LoadingState label="正在汇总运行实例状态…"/>:visible.length?<div className="runtime-monitor-list">{visible.map(row=><article className="runtime-monitor-card" key={row.id}>
     <div className="runtime-monitor-card-head">
      <div className="runtime-monitor-identity"><div className="runtime-monitor-avatar"><Cpu size={18}/></div><div><strong>{row.label}</strong><small>{row.agent_name} · {row.agent_platform}</small><code>{row.id}</code></div></div>
      <div className="runtime-monitor-badges"><span className={"status-tag "+(!row.enabled?"tag-neutral":row.online?"tag-green":"tag-amber")}>{!row.enabled?"已禁用":row.online?"在线":"离线"}</span><span className="status-tag tag-neutral">{stateLabels[row.status]||getUiLabel(row.status)}</span>{!row.agent_enabled&&<span className="status-tag tag-red">智能体已禁用</span>}</div>

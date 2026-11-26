@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../components/PageFeedback";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
@@ -379,7 +380,7 @@ export default function GovernancePage() {
         <div><h1>审批与治理</h1></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadProjectData(selectedId)} disabled={loading || detailLoading}><RefreshCw size={15} className={loading || detailLoading ? "spin" : ""} />刷新</button></div>
       </div>
-      {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
       <section className="panel governance-toolbar">
         <div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "尚未选择项目"}</strong></div>
         <ProjectSelect projects={projects} value={selectedId} onChange={setSelectedId} />
