@@ -317,7 +317,7 @@ input, textarea, select { accent-color: var(--accent); }
 .runtime-status-switch .task-status-filter span{overflow-wrap:anywhere;white-space:normal}
 .runtime-monitor-list,.runtime-monitor-card,.runtime-monitor-meta,.runtime-health-row{min-width:0;max-width:100%}
 .runtime-monitor-card code,.runtime-health-chip{overflow-wrap:anywhere;white-space:normal}
-.empty-state{min-width:0;padding:24px 16px;gap:8px;text-align:center}
+.empty-state{min-width:0;padding:24px 14px;gap:10px;text-align:center}
 .empty-state svg{color:var(--brand-deep-teal);stroke-width:1.6;flex-shrink:0}
 .empty-state strong{font-size:14px;color:var(--text);font-weight:600;overflow-wrap:anywhere}
 .empty-state p{font-size:13px;line-height:1.6;color:var(--muted);max-width:36em;margin:0}

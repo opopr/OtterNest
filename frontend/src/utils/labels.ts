@@ -29,6 +29,11 @@ export const RISK_LABELS: Record<string, string> = {
   R3: "高风险"
 };
 
+/** Retain the risk code alongside its Chinese meaning for auditability. */
+export function getRiskLabel(risk: string): string {
+  return Object.prototype.hasOwnProperty.call(RISK_LABELS, risk) ? RISK_LABELS[risk] + "（" + risk + "）" : risk;
+}
+
 export const SENSITIVITY_LABELS: Record<string, string> = {
   public: "公开",
   internal: "内部",

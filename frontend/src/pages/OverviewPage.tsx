@@ -1,3 +1,4 @@
+import EmptyState from "../components/EmptyState";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -226,10 +227,9 @@ export default function OverviewPage() {
       </div>
       <div className="project-grid overview-project-grid">
         {projectRows.length === 0 ? (
-          <div className="empty-state">
-            <FolderKanban size={28} /><strong>还没有项目</strong>
+          <EmptyState icon={FolderKanban} title="还没有项目">
             <Link to="/projects" className="primary-button compact">创建项目</Link>
-          </div>
+          </EmptyState>
         ) : projectRows.map((project) => {
           const progress = project.task_total > 0 ? Math.round(project.completed / project.task_total * 100) : 0;
           return (

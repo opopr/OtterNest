@@ -1,3 +1,4 @@
+import EmptyState from "../components/EmptyState";
 import { useProjectSelection } from "../components/ProjectSelection";
 import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, SuccessNotice } from "../components/PageFeedback";
@@ -152,7 +153,7 @@ export default function ProjectPortabilityPage() {
     finally { setBusy(false); }
   };
 
-  if (!isOwner) return <div className="page-stack"><div className="page-heading"><h1>项目导入导出</h1></div><div className="panel empty-state"><ShieldCheck size={26} /><strong>仅所有者可以导入或导出项目包。</strong></div></div>;
+  if (!isOwner) return <div className="page-stack"><div className="page-heading"><h1>项目导入导出</h1></div><EmptyState panel icon={ShieldCheck} title="仅所有者可以导入或导出项目包。"/></div>;
 
   return <div className="page-stack admin-gap-page">
     <div className="page-heading"><div><h1>项目导入导出</h1>

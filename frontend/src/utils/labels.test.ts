@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getSystemModeLabel, getTaskStatusLabel, getTaskStatusTone, getUiLabel, getTaskStatusPresentation, formatApiError, formatTransportError } from "./labels";
+import { getRiskLabel, getSystemModeLabel, getTaskStatusLabel, getTaskStatusTone, getUiLabel, getTaskStatusPresentation, formatApiError, formatTransportError } from "./labels";
 
 test("getTaskStatusLabel maps known and unknown statuses", () => {
   assert.equal(getTaskStatusLabel("waiting_approval"), "等待授权");
@@ -52,4 +52,13 @@ test("task status presentation is consistent and unknown codes stay neutral", ()
   assert.deepEqual(getTaskStatusPresentation("waiting_approval"), {label:"等待授权",tone:"tag-red"});
   assert.deepEqual(getTaskStatusPresentation("constructor"), {label:"constructor",tone:"tag-neutral"});
   assert.deepEqual(getTaskStatusPresentation("future_state"), {label:"future_state",tone:"tag-neutral"});
+});
+
+test("risk labels retain codes and translate their meaning", () => {
+  assert.equal(getRiskLabel("R0"), "低风险（R0）");
+  assert.equal(getRiskLabel("R1"), "一般风险（R1）");
+  assert.equal(getRiskLabel("R2"), "较高风险（R2）");
+  assert.equal(getRiskLabel("R3"), "高风险（R3）");
+  assert.equal(getRiskLabel("constructor"), "constructor");
+  assert.equal(getRiskLabel("future_risk"), "future_risk");
 });

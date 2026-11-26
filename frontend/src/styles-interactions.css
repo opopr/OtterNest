@@ -117,7 +117,4 @@
 .data-table-scroll:focus-visible{outline:2px solid var(--brand-deep-teal);outline-offset:2px}
 @media(max-width:580px){.table-column-settings summary{min-height:36px}.table-column-options label{min-height:32px}.data-table-scroll{width:100%}}
 
-.shared-empty-state{gap:10px;min-width:0;padding:24px 14px;text-align:center}
 .shared-empty-state>svg{color:var(--muted)}
-.shared-empty-state strong{overflow-wrap:anywhere}
-.agent-grid>.shared-empty-state{grid-column:1/-1}

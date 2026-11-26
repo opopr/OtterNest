@@ -1,3 +1,4 @@
+import EmptyState from "../components/EmptyState";
 import ProjectSelect from "../components/ProjectSelect";
 import { useConfirmDiscard } from "../components/DraftGuard";
 import { useProjectSelection } from "../components/ProjectSelection";
@@ -240,11 +241,7 @@ export default function CommandCenterPage() {
       {selectedId ? (
         <CommandChatPanel key={selectedId} projectId={selectedId} tasks={currentTasks} onPlan={handlePlanGenerated} />
       ) : (
-        <div className="panel empty-state">
-          <MessageSquare size={28} />
-          <strong>先创建一个项目</strong>
-          
-        </div>
+        <EmptyState panel icon={MessageSquare} title="先创建一个项目"/>
       )}
 
       <details className="panel command-advanced"><summary>高级工具 <span>计划查询 · 事件与组件校验</span></summary>

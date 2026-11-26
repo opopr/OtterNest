@@ -1,4 +1,4 @@
-import { TASK_STATUS_LABELS as statusLabels } from "../utils/labels";
+import { getRiskLabel, TASK_STATUS_LABELS as statusLabels } from "../utils/labels";
 import TaskStatusBadge from "./TaskStatusBadge";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -232,7 +232,7 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
   return <div className="modal-backdrop task-detail-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)onClose();}}>
     <section className="task-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="task-detail-title">
       <div className="task-detail-header">
-        <div><div className="eyebrow">{selection.projectName}</div><h2 id="task-detail-title">{task?.title||"任务详情"}</h2>{task&&<div className="task-detail-badges"><TaskStatusBadge status={task.status}/><span className="status-tag tag-neutral">{task.risk}</span><span className="status-tag tag-neutral">优先级 {task.priority}</span></div>}</div>
+        <div><div className="eyebrow">{selection.projectName}</div><h2 id="task-detail-title">{task?.title||"任务详情"}</h2>{task&&<div className="task-detail-badges"><TaskStatusBadge status={task.status}/><span className="status-tag tag-neutral">{getRiskLabel(task.risk)}</span><span className="status-tag tag-neutral">优先级 {task.priority}</span></div>}</div>
         <div className="task-detail-header-actions"><button className="secondary-button compact" onClick={()=>void load()} disabled={loading}><RefreshCw size={14} className={loading?"spin":""}/>刷新</button><button className="icon-button" onClick={onClose} aria-label="关闭任务详情"><X size={17}/></button></div>
       </div>
       {error&&<div className="inline-error"><AlertCircle size={15}/>{error}<button onClick={()=>setError("")}><X size={14}/></button></div>}
@@ -280,7 +280,7 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
           <div className="approval-switch dependency-switch" role="group" aria-label="上游依赖筛选"><button type="button" aria-pressed={dependencyView==="all"} className={dependencyView==="all"?"selected":""} onClick={()=>setDependencyView("all")}>全部依赖 <span>{upstream.length}</span></button><button type="button" aria-pressed={dependencyView==="waiting"} className={dependencyView==="waiting"?"selected":""} onClick={()=>setDependencyView("waiting")}>未完成 <span>{upstream.filter(row=>row.status!=="completed").length}</span></button></div><div className="dag-layout">
             <div className="dag-column"><span className="dag-column-label">上游依赖 · {upstream.length}</span>{visibleUpstream.length?visibleUpstream.map(row=>taskNode(row,"upstream")):<div className="dag-empty">{dependencyView==="waiting"?"无未完成上游任务":"无上游依赖"}</div>}</div>
             <div className="dag-arrow"><ArrowRight size={19}/></div>
-            <div className="dag-current"><span className="dag-column-label">当前任务</span><div className="dag-task dag-task-current"><div className="dag-task-title"><strong>{task.title}</strong><TaskStatusBadge status={task.status}/></div><small>{task.risk} · 版本 {task.version}</small><code>{shortId(task.id)}</code></div></div>
+            <div className="dag-current"><span className="dag-column-label">当前任务</span><div className="dag-task dag-task-current"><div className="dag-task-title"><strong>{task.title}</strong><TaskStatusBadge status={task.status}/></div><small>{getRiskLabel(task.risk)} · 版本 {task.version}</small><code>{shortId(task.id)}</code></div></div>
             <div className="dag-arrow"><ArrowRight size={19}/></div>
             <div className="dag-column"><span className="dag-column-label">下游任务 · {downstream.length}</span>{downstream.length?downstream.map(row=>taskNode(row,"downstream")):<div className="dag-empty">暂无下游任务</div>}</div>
           </div>

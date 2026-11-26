@@ -3,7 +3,7 @@ import DataTable from "../components/DataTable";
 import { useDisplayPreference, ViewModeSwitch } from "../components/ViewModeSwitch";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { ErrorNotice } from "../components/PageFeedback";
-import { getUiLabel, TASK_STATUS_LABELS as labels, RISK_LABELS as risks } from "../utils/labels";
+import { getRiskLabel, getUiLabel, TASK_STATUS_LABELS as labels, RISK_LABELS as risks } from "../utils/labels";
 import TaskStatusBadge from "../components/TaskStatusBadge";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, ClipboardCheck, Eye, Filter, GitBranch, RefreshCw, RotateCcw, ShieldCheck, X } from "lucide-react";
@@ -292,7 +292,7 @@ export default function TaskCenterPage() {
               {id:"title",label:"任务",required:true,render:t=><><strong className="data-table-title">{t.title}</strong>{!compactRows && <small className="task-result-excerpt">{t.failure_reason || t.result_summary || t.instruction}</small>}<details className="task-row-identifier"><summary>任务编号</summary><code>{t.id}</code></details></>},
               {id:"project",label:"项目",required:true,render:t=>t.project_name},
               {id:"status",label:"状态",required:true,render:t=><TaskStatusBadge status={t.status}/>},
-              {id:"risk",label:"风险",required:true,render:t=>t.risk},
+              {id:"risk",label:"风险",required:true,render:t=>getRiskLabel(t.risk)},
               {id:"priority",label:"优先级",numeric:true,render:t=>t.priority},
               {id:"sensitivity",label:"敏感级",required:true,render:t=>getUiLabel(t.sensitivity)},
               {id:"actions",label:"操作",required:true,render:renderTaskActions}
@@ -305,7 +305,7 @@ export default function TaskCenterPage() {
                   <div className="task-center-title">
                     <strong>{t.title}</strong>
                     <TaskStatusBadge status={t.status}/>
-                    <span className="status-tag tag-neutral">{t.risk}</span>
+                    <span className="status-tag tag-neutral">{getRiskLabel(t.risk)}</span>
                   </div>
                   <p>{t.project_name} · 优先级 {t.priority} · {getUiLabel(t.sensitivity)}</p>
                   {!compactRows && <small className="task-result-excerpt">{t.failure_reason || t.result_summary || t.instruction}</small>}

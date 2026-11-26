@@ -1,3 +1,4 @@
+import EmptyState from "../components/EmptyState";
 import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, SuccessNotice } from "../components/PageFeedback";
 import { useDraftGuard } from "../components/DraftGuard";
@@ -220,7 +221,7 @@ export default function AccountSecurityPage() {
     finally { setSaving(false); }
   };
 
-  if (!isOwner) return <div className="page-stack"><div className="page-heading"><h1>账号安全</h1></div><div className="panel empty-state"><ShieldCheck size={26} /><strong>只有所有者可访问账号安全设置。</strong></div></div>;
+  if (!isOwner) return <div className="page-stack"><div className="page-heading"><h1>账号安全</h1></div><EmptyState panel icon={ShieldCheck} title="只有所有者可访问账号安全设置。"/></div>;
 
   return <div className="page-stack admin-gap-page">
     <div className="page-heading"><div><h1>账号安全</h1>

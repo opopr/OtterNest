@@ -4,7 +4,7 @@ import { useDraftGuard } from "../components/DraftGuard";
 import { useProjectSelection } from "../components/ProjectSelection";
 import TaskStatusBadge from "../components/TaskStatusBadge";
 import { ErrorNotice } from "../components/PageFeedback";
-import { getUiLabel } from "../utils/labels";
+import { getRiskLabel, getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertCircle, Bot, Check, CheckCircle2, ClipboardCheck, FileSearch, MessageSquare,
@@ -415,7 +415,7 @@ export default function GovernancePage() {
           <div className="approval-switch" role="group" aria-label="审批状态">{[{key:"all",label:"全部待办"},{key:"waiting_approval",label:"待授权"},{key:"submitted",label:"待验收"}].map(item => <button type="button" key={item.key} aria-pressed={approvalFilter === item.key} className={approvalFilter === item.key ? "selected" : ""} onClick={() => setApprovalFilter(item.key)}>{item.label}<span>{item.key === "all" ? pendingTasks.length : pendingTasks.filter(task => task.status === item.key).length}</span></button>)}</div>
           <div className="governance-task-list">
             {pendingTasks.filter(task => approvalFilter === "all" || task.status === approvalFilter).map((task) => <article className="governance-task" key={task.id}>
-              <div className="governance-task-main"><div><strong>{task.title}</strong><TaskStatusBadge status={task.status}/></div><p>{task.id} · {task.risk} · 优先级 {task.priority}</p><small>{task.instruction}</small></div>
+              <div className="governance-task-main"><div><strong>{task.title}</strong><TaskStatusBadge status={task.status}/></div><p>{task.id} · {getRiskLabel(task.risk)} · 优先级 {task.priority}</p><small>{task.instruction}</small></div>
               <div className="governance-task-actions">
                 {task.status === "waiting_approval" ? <button className="primary-button compact" disabled={saving} onClick={() => void createTaskPlan(task, "authorize_task")}><ShieldCheck size={14} />生成授权预览</button> : <>
                   <button className="primary-button compact" disabled={saving} onClick={() => void createTaskPlan(task, "review_task", true)}><Check size={14} />验收通过预览</button>

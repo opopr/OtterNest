@@ -336,6 +336,21 @@ def react_checks(browser, name, width, height, problems):
             except Exception as error:
                 problems.append(f"{case}: {error}")
                 screenshot(page, case + "-error")
+        # A forced empty list must use a theme surface rather than a hard-coded light background.
+        visit(page, "/skills", "知识与成果", "技能管理", mobile)
+        page.get_by_label("搜索技能", exact=True).fill("__ui_smoke_no_matching_skill__")
+        empty = page.locator(".skill-grid .shared-empty-state")
+        expect(empty).to_be_visible()
+        assert empty.evaluate("""el => {
+            const probe = document.createElement("div");
+            probe.style.backgroundColor = "var(--legacy-surface-subtle)";
+            document.body.appendChild(probe);
+            const expected = getComputedStyle(probe).backgroundColor;
+            probe.remove();
+            return getComputedStyle(el).backgroundColor === expected;
+        }"""), "empty-state background must follow the dark theme"
+        check_width(page, f"{name}-dark-empty-skills", problems)
+        page.get_by_role("button", name="清除筛选", exact=True).click()
         page.get_by_role("button", name="切换浅色主题", exact=True).click()
         if not mobile:
             page.get_by_role("button", name="折叠侧边栏", exact=True).click()

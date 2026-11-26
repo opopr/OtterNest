@@ -1,3 +1,4 @@
+import EmptyState from "../components/EmptyState";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import { useProjectSelection } from "../components/ProjectSelection";
 import ValidatedForm from "../components/ValidatedForm";
@@ -240,7 +241,7 @@ export default function ExternalInterfacesPage() {
 
   if (!isOwner) return <div className="page-stack">
     <div className="page-heading"><div><h1>外部接口</h1><p>外部连接和签名配置仅所有者可管理。</p></div></div>
-    <div className="panel empty-state"><ShieldCheck size={28} /><strong>需要所有者权限</strong></div>
+    <EmptyState panel icon={ShieldCheck} title="需要所有者权限"/>
   </div>;
 
   return <div className="page-stack external-page">
@@ -308,7 +309,7 @@ export default function ExternalInterfacesPage() {
           <label>A2A HTTPS URL<input type="url" value={remoteUrl} onChange={(event) => setRemoteUrl(event.target.value)} required placeholder="https://agent.example.com/a2a" /></label>
           <label>远端项目 ID（可选）<input value={remoteProjectId} onChange={(event) => setRemoteProjectId(event.target.value)} maxLength={128} /></label>
           <div className="form-actions"><button className="primary-button compact" disabled={saving || !projectId || !remoteAgentId}>登记远端</button></div>
-          {eligibleRemoteAgents.length === 0 && <p className="form-hint">暂无符合条件的 远程智能体。请先在 智能体管理登记远程智能体，并加入此项目。</p>}
+          {eligibleRemoteAgents.length === 0 && <p className="form-hint">暂无符合条件的远程智能体。请先在智能体管理登记远程智能体，并加入此项目。</p>}
         </ValidatedForm>}
         {loading && <p className="muted-inline">正在刷新连接…</p>}
         <div className="external-endpoint-list">

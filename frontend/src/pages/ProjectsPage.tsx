@@ -5,7 +5,7 @@ import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
 import { useScopedRequest } from "../utils/useScopedRequest";
-import { getUiLabel, TASK_STATUS_LABELS as statusLabels } from "../utils/labels";
+import { getRiskLabel, getUiLabel, TASK_STATUS_LABELS as statusLabels } from "../utils/labels";
 import TaskStatusBadge from "../components/TaskStatusBadge";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Eye, FolderKanban, ListChecks, Pencil, Plus, RefreshCw, Search, Target, Trash2, Users, X } from "lucide-react";
@@ -405,7 +405,7 @@ export default function ProjectsPage() {
 
         <section className="project-detail">
           {!selectedProject ? (
-            <div className="panel empty-state detail-empty"><FolderKanban size={30} /><strong>选择一个项目</strong><p>或者创建一个新项目，开始组织任务。</p></div>
+            <EmptyState panel className="detail-empty" icon={FolderKanban} title="选择一个项目"><p>或者创建一个新项目，开始组织任务。</p></EmptyState>
           ) : (
             <>
               <div className="panel project-detail-header">
@@ -505,7 +505,7 @@ export default function ProjectsPage() {
                         <div className="task-status-mark" />
                         <div className="task-main">
                           <strong>{task.title}</strong>
-                          <small>{task.id.slice(0, 12)} · {task.risk} · {getUiLabel(task.sensitivity)} · 优先级 {task.priority}</small>
+                          <small>{task.id.slice(0, 12)} · {getRiskLabel(task.risk)} · {getUiLabel(task.sensitivity)} · 优先级 {task.priority}</small>
                         </div>
                         <TaskStatusBadge status={task.status}/>
                         <div className="flex-row-gap-sm" onClick={(e) => e.stopPropagation()}>
