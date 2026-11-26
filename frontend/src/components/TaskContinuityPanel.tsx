@@ -92,7 +92,7 @@ export default function TaskContinuityPanel({ taskId, taskStatus, isOwner, onCha
     if (!isOwner || taskStatus !== "running" || !understandFencing || revokeReason.trim().length < 5) return;
     const confirmed = await dialog.confirm({
       title: "高风险：撤销旧执行租约",
-      message: "撤销旧租约只会隔离旧 epoch 的控制平面提交，不能停止外部进程或撤销已发生的副作用。\n\n非 R3 任务可能重新进入可调度状态，务必已在执行节点人工核实进程状态。确定继续？",
+      message: "撤销旧租约只会隔离旧租约代次的控制平面提交，不能停止外部进程或撤销已发生的副作用。\n\n非 R3 任务可能重新进入可调度状态，务必已在执行节点人工核实进程状态。确定继续？",
       confirmText: "撤销旧租约",
       tone: "danger"
     });
@@ -106,7 +106,7 @@ export default function TaskContinuityPanel({ taskId, taskStatus, isOwner, onCha
       );
       setRevokeReason(""); setUnderstandFencing(false);
       await load(); setHandoff(null);
-      setNotice("旧租约已隔离，新 epoch 为 " + result.lease_epoch + "。外部执行已停止：未验证（服务端返回 " + String(result.remote_execution_stopped_verified) + "）。");
+      setNotice("旧租约已隔离，新租约代次为 " + result.lease_epoch + "。外部执行已停止：未验证（服务端返回 " + (result.remote_execution_stopped_verified ? "是" : "否") + "）。");
       onChanged();
     } catch (reason) { setError(message(reason)); }
     finally { setSaving(false); }
@@ -190,7 +190,7 @@ export default function TaskContinuityPanel({ taskId, taskStatus, isOwner, onCha
 
     {isOwner && taskStatus === "running" && <form className="continuity-form continuity-revoke" onSubmit={(event) => void revokeLease(event)}>
       <div className="continuity-ops-heading"><ShieldAlert size={16} /><strong>撤销旧执行租约</strong></div>
-      <p className="continuity-boundary"><AlertTriangle size={14} />此操作只使旧 epoch 无法在控制平面提交，不会终止远端进程。服务端也不验证远端已停止；非 R3 任务可能重新进入调度。</p>
+      <p className="continuity-boundary"><AlertTriangle size={14} />此操作只使旧租约代次无法在控制平面提交，不会终止远端进程。服务端也不验证远端已停止；非 R3 任务可能重新进入调度。</p>
       <label>撤销原因（至少 5 字符）<textarea rows={2} value={revokeReason} maxLength={2000} required minLength={5}
         onChange={(event) => setRevokeReason(event.target.value)} placeholder="说明旧节点故障、外部执行状态核查结果及撤销原因…" /></label>
       <label className="continuity-checkbox"><input type="checkbox" checked={understandFencing} onChange={(event) => setUnderstandFencing(event.target.checked)} />

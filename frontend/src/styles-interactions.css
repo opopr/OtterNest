@@ -43,12 +43,7 @@
 }
 @media(max-width:1049px){.display-preferences{display:none!important}}
 /* Remaining hard-coded pale surfaces in dark mode. */
-:root[data-ui-theme="dark"] :is(.command-chat-transcript,.connection-origin-list,.goal-plan-task-tags code){background:var(--legacy-surface-subtle);color:var(--text-soft);border-color:var(--border)}
-:root[data-ui-theme="dark"] :is(.connection-help,.system-mode-banner.protective,.system-mode-banner.protective .system-mode-icon,.a2ui-badge.tone-warning){background:var(--amber-soft);color:var(--amber);border-color:var(--border)}
-:root[data-ui-theme="dark"] :is(.token-panel,.system-mode-banner:not(.protective),.system-mode-banner:not(.protective) .system-mode-icon,.goal-plan-confirmed){background:var(--green-soft);color:var(--green);border-color:var(--border)}
-:root[data-ui-theme="dark"] :is(.form-error,.dispatch-errors){background:var(--red-soft);color:var(--red);border-color:var(--border)}
 :root[data-ui-theme="dark"] :is(.runtime-monitor-card,.artifact-card){border-color:var(--border)}
-:root[data-ui-theme="dark"] :is(.token-panel,.system-mode-banner,.goal-plan-confirmed) :is(p,small,strong){color:inherit}
 
 /* Keep known task statuses readable in every density and theme. */
 .status-tag[data-task-status]{flex-shrink:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.35}

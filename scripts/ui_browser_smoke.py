@@ -336,6 +336,32 @@ def react_checks(browser, name, width, height, problems):
             except Exception as error:
                 problems.append(f"{case}: {error}")
                 screenshot(page, case + "-error")
+        # Check semantic theme tokens even for warnings not present in the seeded project.
+        assert page.evaluate("""() => {
+            const cases = [
+                ["goal-blockers", "--amber-soft", "--amber"],
+                ["command-preview-warning", "--amber-soft", "--amber"],
+                ["token-panel", "--green-soft", null],
+                ["dispatch-errors", "--red-soft", null],
+                ["a2ui-badge tone-success", "--green-soft", "--green"],
+                ["a2ui-badge tone-warning", "--amber-soft", "--amber"],
+            ];
+            return cases.every(([cls, background, color]) => {
+                const item = document.createElement("div");
+                const probe = document.createElement("div");
+                item.className = cls;
+                probe.style.backgroundColor = "var(" + background + ")";
+                if (color) probe.style.color = "var(" + color + ")";
+                document.body.append(item, probe);
+                const actual = getComputedStyle(item);
+                const expected = getComputedStyle(probe);
+                const match = actual.backgroundColor === expected.backgroundColor
+                    && (!color || actual.color === expected.color);
+                item.remove();
+                probe.remove();
+                return match;
+            });
+        }"""), "semantic warnings and success surfaces must follow the active dark theme"
         # A forced empty list must use a theme surface rather than a hard-coded light background.
         visit(page, "/skills", "知识与成果", "技能管理", mobile)
         page.get_by_label("搜索技能", exact=True).fill("__ui_smoke_no_matching_skill__")

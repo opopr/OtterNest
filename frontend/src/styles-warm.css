@@ -38,7 +38,7 @@ body { font-size: 14px; line-height: 1.5; }
 .tone-blue, .connection-pill { background: var(--blue-soft); color: var(--blue); }
 .tone-green { background: var(--green-soft); color: var(--green); }
 .tone-amber { background: var(--amber-soft); color: var(--amber); }
-.progress-track { background: #ede6dc; }
+.progress-track { background: var(--border); }
 .progress-track span { background: var(--brand-teal); }
 .project-card:hover { transform: none; border-color: var(--brand-coral); box-shadow: var(--shadow); }
 .stat-copy span, .stat-copy small { color: var(--muted); }
@@ -207,7 +207,7 @@ input, textarea, select { accent-color: var(--accent); }
 .command-chat-toolbar label{min-width:0;font-size:13px}
 .command-chat-toolbar select{width:100%;min-width:0;font-size:13px}
 .command-chat-toolbar>.muted-inline{grid-column:1/-1;line-height:1.5}
-.command-chat-transcript{min-height:320px;background:#faf6ef;border-color:var(--border)}
+.command-chat-transcript{min-height:320px;background:var(--legacy-surface-subtle);border-color:var(--border)}
 .chat-welcome{gap:12px}
 .chat-welcome>strong{font-size:16px;color:var(--text)}
 .chat-suggestions button{font-size:13px;min-height:36px}
@@ -439,9 +439,9 @@ input, textarea, select { accent-color: var(--accent); }
 .portfolio-distribution-bar{display:flex;gap:2px;height:18px;border-radius:6px;overflow:hidden;background:var(--border)}
 .portfolio-distribution-bar>span{flex-basis:0;min-width:0}
 .portfolio-distribution-bar>span[style*="flex-grow: 0"]{display:none}
-.distribution-completed{background:#176B4F}
-.distribution-blocked{background:#AD303E}
-.distribution-other{background:#D9C5AD}
+.distribution-completed{background:var(--green)}
+.distribution-blocked{background:var(--red)}
+.distribution-other{background:var(--border-strong)}
 .distribution-legend{display:flex;flex-wrap:wrap;gap:12px 20px;margin-top:12px}
 .distribution-legend>a,.distribution-legend>span{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-soft)}
 .distribution-legend i{width:9px;height:9px;border-radius:2px;flex-shrink:0}

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Bot, CheckCircle2, MessageSquare, RefreshCw, Send, Sparkles, UserRound } from "lucide-react";
 import { request } from "../api/client";
 import type { Task } from "../api/types";
-import { getUiLabel } from "../utils/labels";
+import { getRiskLabel, getUiLabel } from "../utils/labels";
 import A2UIRenderer, { type A2UIResult } from "./A2UIRenderer";
 
 interface ChatTurn {
@@ -170,7 +170,7 @@ export default function CommandChatPanel({ projectId, tasks, onPlan }: Props) {
           <div className="chat-message-avatar">{message.role === "user" ? <UserRound size={15} /> : <Bot size={15} />}</div>
           <div className="chat-message-body"><div className="chat-message-meta"><strong>{message.role === "user" ? "你" : "智能助手"}</strong>{message.status === "plan_ready" && <span className="status-tag tag-green">已生成预览</span>}{message.status === "needs_clarification" && <span className="status-tag tag-amber">需要澄清</span>}</div>
             <p>{message.text}</p>
-            {message.candidates && message.candidates.length > 0 && <div className="chat-candidates"><small>请选择任务：</small>{message.candidates.map((candidate) => <button key={candidate.id} disabled={sending} onClick={() => chooseCandidate(candidate,message.id)}><span><strong>{candidate.title}</strong><small>{statusLabel[candidate.status] || getUiLabel(candidate.status)} · {candidate.risk}</small></span><CheckCircle2 size={15} /></button>)}</div>}
+            {message.candidates && message.candidates.length > 0 && <div className="chat-candidates"><small>请选择任务：</small>{message.candidates.map((candidate) => <button key={candidate.id} disabled={sending} onClick={() => chooseCandidate(candidate,message.id)}><span><strong>{candidate.title}</strong><small>{statusLabel[candidate.status] || getUiLabel(candidate.status)} · {getRiskLabel(candidate.risk)}</small></span><CheckCircle2 size={15} /></button>)}</div>}
             <A2UIRenderer value={message.a2ui} />
           </div>
         </article>)}
