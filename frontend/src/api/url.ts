@@ -20,7 +20,7 @@ export function buildWebSocketUrl(apiOrigin: string, path: string): string {
 export function formatAuthConnectionError(reason: unknown, apiOrigin: string): string {
   if (reason instanceof Error) {
     if (reason.name === "TypeError" || /failed to fetch|networkerror|load failed/i.test(reason.message)) {
-      return `无法连接到后端认证接口 (${apiOrigin}/api/v1/auth/status)。这通常是服务端 CORS 未放行当前前端 Origin，或后端服务暂时不可达。`;
+      return `无法连接到后端认证接口 (${apiOrigin}/api/v1/auth/status)。这通常是服务端 CORS 未放行当前前端来源地址（Origin），或后端服务暂时不可达。`;
     }
     return reason.message || "无法连接 OtterNest 后端服务";
   }

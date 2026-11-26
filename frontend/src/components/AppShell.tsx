@@ -1,16 +1,19 @@
-import { Component, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
+import { LoadingState } from "./PageFeedback";
+import { useConfirmDiscard } from "./DraftGuard";
+import { Component, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
-  Activity, ArchiveRestore, ArrowUpRight, Bell, BookMarked, BookOpen, Bot, CheckCheck, ChevronDown,
+  ArchiveRestore, ArrowUpRight, Bell, BookMarked, BookOpen, Bot, CheckCheck, ChevronDown,
   CircleHelp, ClipboardCheck, FileArchive, FolderKanban, Gauge, GitBranch, KeyRound,
-  LayoutDashboard, LockKeyhole, LogOut, MessageSquare, Monitor, PlugZap, Settings2,
+  LayoutDashboard, LockKeyhole, LogOut, Menu, MessageSquare, Monitor, PlugZap, Search, Settings2, X, Moon, Sun, PanelLeftClose, PanelLeftOpen,
   ShieldCheck, Wifi, type LucideIcon
 } from "lucide-react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { getApiOrigin, request } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { useSystemMode } from "../auth/SystemModeProvider";
 import { getSystemModeLabel } from "../utils/labels";
-import { NAVIGATION_GROUPS, findNavLabel, findNavGroupId, type NavIconKey } from "../utils/navigation";
+import BrandMark from "./BrandMark";
+import { NAVIGATION_GROUPS, findNavLabel, findNavGroupId, searchNavigation, type NavIconKey } from "../utils/navigation";
 
 const NAV_ICONS: Record<NavIconKey, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -81,18 +84,86 @@ interface TopbarNotification {
 
 export default function AppShell() {
   const { user, logout } = useAuth();
+  const confirmDiscard = useConfirmDiscard();
   const { systemMode } = useSystemMode();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [darkTheme, setDarkTheme] = useState(() => { try { return localStorage.getItem("otternest-ui-theme") === "dark"; } catch { return false; } });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => { try { return localStorage.getItem("otternest-sidebar-collapsed") === "true"; } catch { return false; } });
+  const [wideLayout, setWideLayout] = useState(() => { try { return localStorage.getItem("otternest-wide-layout") === "true"; } catch { return false; } });
+  const [compactDensity, setCompactDensity] = useState(() => { try { return localStorage.getItem("otternest-compact-density") === "true"; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem("otternest-wide-layout", String(wideLayout)); localStorage.setItem("otternest-compact-density", String(compactDensity)); } catch {} }, [wideLayout,compactDensity]);
+  useEffect(() => { document.documentElement.dataset.uiTheme = darkTheme ? "dark" : "light"; try { localStorage.setItem("otternest-ui-theme", darkTheme ? "dark" : "light"); } catch {} }, [darkTheme]);
+  useEffect(() => { try { localStorage.setItem("otternest-sidebar-collapsed", String(sidebarCollapsed)); } catch {} }, [sidebarCollapsed]);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<TopbarNotification[]>([]);
   const location = useLocation();
+  const navigate = useNavigate();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [pageQuery, setPageQuery] = useState("");
+  const searchTrigger = useRef<HTMLButtonElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const searchDialog = useRef<HTMLElement>(null);
+  const searchResults = searchNavigation(pageQuery);
+  const closeSearch = useCallback(() => { setSearchOpen(false); searchTrigger.current?.focus(); }, []);
+  const openSearch = useCallback(() => { setPageQuery(""); setMenuOpen(false); setNotifOpen(false); setSearchOpen(true); }, []);
+  useEffect(() => {
+    const onShortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k" && !document.querySelector(".app-dialog-card, .task-detail-dialog, .confirm-dialog")) {
+        event.preventDefault(); openSearch();
+      }
+    };
+    document.addEventListener("keydown", onShortcut);
+    return () => document.removeEventListener("keydown", onShortcut);
+  }, [openSearch]);
+  useEffect(() => {
+    if (!searchOpen) return;
+    searchInput.current?.focus();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); closeSearch(); }
+      if (event.key === "Tab") {
+        const items = Array.from(searchDialog.current?.querySelectorAll<HTMLElement>("button, input, a[href]") || []);
+        const first = items[0], last = items[items.length - 1];
+        if (!first || !last) return;
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => { document.body.style.overflow = previousOverflow; document.removeEventListener("keydown", onKeyDown); };
+  }, [searchOpen, closeSearch]);
   const [expandedNavId, setExpandedNavId] = useState<string | null>(
     () => findNavGroupId(location.pathname)
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setExpandedNavId(findNavGroupId(location.pathname));
+    setMobileNavOpen(false);
+    setMenuOpen(false);
+    setNotifOpen(false);
+    setSearchOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!menuOpen && !notifOpen) return;
+    const closeOnOutside = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (!target.closest(".user-menu-wrap")) setMenuOpen(false);
+      if (!target.closest(".notif-menu-wrap")) setNotifOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setMenuOpen(false); setNotifOpen(false); }
+    };
+    document.addEventListener("pointerdown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [menuOpen, notifOpen]);
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -129,14 +200,17 @@ export default function AppShell() {
   const modeLabel = getSystemModeLabel(systemMode?.mode);
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <Link className="brand" to="/" aria-label="OtterNest 首页">
-          <span className="brand-mascot">🦦</span>
-          <span><strong>OtterNest</strong><small>水獭窝 · AI Team OS</small></span>
+    <div className={"app-shell" + (sidebarCollapsed ? " sidebar-collapsed" : "") + (wideLayout ? " wide-layout" : "") + (compactDensity ? " compact-density" : "")}>
+      <aside className={"sidebar" + (mobileNavOpen ? " mobile-open" : "")}>
+        <div className="brand-row-mobile">
+        <Link className="brand" to="/" aria-label="OtterNest 首页" onClick={() => setMobileNavOpen(false)}>
+          <span className="brand-mascot"><BrandMark /></span>
+          <span><strong>OtterNest</strong><small>水獭窝</small></span>
         </Link>
+        <button type="button" className="mobile-nav-toggle" aria-expanded={mobileNavOpen} aria-controls="main-navigation" onClick={() => setMobileNavOpen(open => !open)}>{mobileNavOpen ? <X size={18} /> : <Menu size={18} />}<span>{mobileNavOpen ? "收起菜单" : "菜单"}</span></button>
+        </div>
 
-        <nav className="side-nav-grouped" aria-label="主导航">
+        <nav id="main-navigation" className="side-nav-grouped" aria-label="主导航">
           {NAVIGATION_GROUPS.map((group) => {
             const Icon = NAV_ICONS[group.icon];
             const onlyItem = group.items.length === 1 ? group.items[0] : null;
@@ -148,6 +222,9 @@ export default function AppShell() {
                   <NavLink
                     to={onlyItem.to}
                     end={onlyItem.end}
+                    title={group.label}
+                    aria-label={group.label}
+                    onClick={() => setMobileNavOpen(false)}
                     className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}
                   >
                     <Icon size={17} strokeWidth={1.8} />
@@ -158,6 +235,8 @@ export default function AppShell() {
                     <button
                       type="button"
                       className={"nav-link nav-parent" + (isActiveGroup ? " active" : "")}
+                      title={group.label}
+                      aria-label={group.label}
                       aria-expanded={isExpanded}
                       aria-controls={"nav-submenu-" + group.id}
                       onClick={() => setExpandedNavId(isExpanded ? null : group.id)}
@@ -176,9 +255,13 @@ export default function AppShell() {
                             key={item.to}
                             to={item.to}
                             end={item.end}
+                            title={item.label}
+                            aria-label={item.label}
+                            onClick={() => setMobileNavOpen(false)}
                             className={({ isActive }) => "nav-sublink" + (isActive ? " active" : "")}
                           >
-                            {item.label}
+                            {(() => { const ItemIcon = NAV_ICONS[item.icon]; return <ItemIcon size={15} aria-hidden="true"/>; })()}
+                            <span>{item.label}</span>
                           </NavLink>
                         ))}
                       </div>
@@ -191,37 +274,46 @@ export default function AppShell() {
         </nav>
 
         <div className="sidebar-spacer" />
-        <div className="sidebar-note">
-          <div className="sidebar-note-icon"><ShieldCheck size={17} /></div>
-          <div><strong>所有者控制</strong><p>重要操作始终经过授权与审查。</p></div>
+        <div className="sidebar-tools">
+        <a className="side-link" title="旧版管理台" aria-label="旧版管理台" href={getApiOrigin() + "/legacy"} target="_blank" rel="noreferrer">
+          <ArrowUpRight size={16} /><span>旧版管理台</span>
+        </a>
+        <a className="side-link" title="接口文档" aria-label="接口文档" href={getApiOrigin() + "/api/docs"} target="_blank" rel="noreferrer">
+          <CircleHelp size={16} /><span>接口文档</span>
+        </a>
         </div>
-        <a className="side-link" href={getApiOrigin() + "/legacy"} target="_blank" rel="noreferrer">
-          <ArrowUpRight size={16} />进入旧版完整管理台
-        </a>
-        <a className="side-link" href={getApiOrigin() + "/api/docs"} target="_blank" rel="noreferrer">
-          <CircleHelp size={16} />API 文档
-        </a>
-        <div className="sidebar-footer">Personal AI Team OS · v0.1.0</div>
+        
       </aside>
 
+      {searchOpen && <div className="modal-backdrop page-search-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) closeSearch(); }}>
+        <section ref={searchDialog} className="panel page-search-dialog" role="dialog" aria-modal="true" aria-labelledby="page-search-title">
+          <div className="panel-heading"><h3 id="page-search-title">搜索页面</h3><button className="icon-button" type="button" aria-label="关闭页面搜索" onClick={closeSearch}><X size={17}/></button></div>
+          <form className="page-search-field" onSubmit={event => { event.preventDefault(); if (searchResults.length) { closeSearch(); navigate(searchResults[0].to); } }}><Search size={18}/><input ref={searchInput} aria-label="搜索菜单" placeholder="输入页面名称或关键词" value={pageQuery} onChange={event => setPageQuery(event.target.value)}/></form>
+          <div className="page-search-results" aria-label="页面搜索结果">{searchResults.map(item => { const Icon = NAV_ICONS[item.icon]; return <Link key={item.to} to={item.to} onClick={closeSearch}><Icon size={17}/><span>{item.label}</span><ArrowUpRight size={14}/></Link>; })}{!searchResults.length && <div className="empty-mini">没有匹配的页面</div>}</div>
+        </section>
+      </div>}
       <div className="workspace">
         <header className="topbar">
           <div className="breadcrumb">
+            <button type="button" className="icon-button desktop-sidebar-toggle" aria-label={sidebarCollapsed ? "展开侧边栏" : "折叠侧边栏"} title={sidebarCollapsed ? "展开侧边栏" : "折叠侧边栏"} aria-expanded={!sidebarCollapsed} aria-controls="main-navigation" onClick={()=>setSidebarCollapsed(v=>!v)}>{sidebarCollapsed ? <PanelLeftOpen size={18}/> : <PanelLeftClose size={18}/>}</button>
             <span>OtterNest</span><span className="breadcrumb-sep">/</span>
             <strong>{findNavLabel(location.pathname)}</strong>
           </div>
           <div className="topbar-actions">
+            <button type="button" className="icon-button theme-toggle" aria-label={darkTheme ? "切换浅色主题" : "切换深色主题"} title={darkTheme ? "切换浅色主题" : "切换深色主题"} aria-pressed={darkTheme} onClick={()=>setDarkTheme(v=>!v)}>{darkTheme ? <Sun size={17}/> : <Moon size={17}/>}</button>
+            <button ref={searchTrigger} type="button" className="page-search-trigger" aria-label="搜索页面" aria-haspopup="dialog" aria-expanded={searchOpen} onClick={openSearch}><Search size={16}/><span>搜索页面</span><kbd>Ctrl K</kbd></button>
             <div className={"system-pill " + (systemMode?.mode === "normal" ? "is-ok" : "is-warn")}>
               <span className="system-dot" />{modeLabel}
             </div>
             <div className={"connection-pill" + (systemMode ? "" : " is-offline")}>
-              <Wifi size={15} />{systemMode ? "API 已连接" : "API 状态未知"}
+              <Wifi size={15} />{systemMode ? "服务已连接" : "连接状态未知"}
             </div>
             <div className="notif-menu-wrap">
               <button
                 type="button"
                 className="notif-button"
                 aria-label="通知收件箱"
+                aria-expanded={notifOpen}
                 onClick={() => {
                   setMenuOpen(false);
                   setNotifOpen((open) => {
@@ -269,20 +361,22 @@ export default function AppShell() {
                     )}
                   </div>
                   <div className="notif-popover-foot">
-                    <Link to="/portfolio" onClick={() => setNotifOpen(false)}>前往 Portfolio 查看完整收件箱 →</Link>
+                    <Link to="/portfolio" onClick={() => setNotifOpen(false)}>查看全部通知</Link>
                   </div>
                 </div>
               )}
             </div>
             <div className="user-menu-wrap">
-              <button className="user-button" onClick={() => { setNotifOpen(false); setMenuOpen((open) => !open); }}>
-                <span className="user-avatar">O</span>
+              <button className="user-button" aria-label="账户菜单" aria-expanded={menuOpen} onClick={() => { setNotifOpen(false); setMenuOpen((open) => !open); }}>
+                <span className="user-avatar" aria-hidden="true">主</span>
                 <span className="user-name">{user?.id === "owner" ? "所有者" : user?.id || "账户"}</span>
                 <ChevronDown size={15} />
               </button>
               {menuOpen && (
                 <div className="user-menu">
-                  <button onClick={() => { setMenuOpen(false); void logout(); }}>
+                  <div className="display-preferences" aria-label="显示设置" role="group"><small>显示设置</small><button type="button" aria-pressed={wideLayout} onClick={()=>setWideLayout(v=>!v)}><Monitor size={15}/><span>宽屏布局</span><span className="preference-state">{wideLayout ? "已开启" : "已关闭"}</span></button><button type="button" aria-pressed={compactDensity} onClick={()=>setCompactDensity(v=>!v)}><ClipboardCheck size={15}/><span>紧凑列表</span><span className="preference-state">{compactDensity ? "已开启" : "已关闭"}</span></button></div>
+                  {user?.kind === "owner" && <Link to="/account-security" onClick={() => setMenuOpen(false)}><LockKeyhole size={15}/>账号安全</Link>}
+                  <button onClick={() => { setMenuOpen(false); void confirmDiscard().then(allowed => { if (allowed) void logout(); }); }}>
                     <LogOut size={15} />退出登录
                   </button>
                 </div>
@@ -292,15 +386,11 @@ export default function AppShell() {
         </header>
         <main className="page-content">
           <RouteErrorBoundary resetKey={location.pathname}>
-            <Suspense fallback={<div className="panel-loading"><div className="spinner" />正在加载页面…</div>}>
+            <Suspense fallback={<LoadingState label="正在加载页面…"/>}>
               <Outlet />
             </Suspense>
           </RouteErrorBoundary>
         </main>
-        <footer className="workspace-footer">
-          <span>OtterNest · 本地优先，个人掌控</span>
-          <span><Activity size={13} />控制平面状态以服务端记录为准</span>
-        </footer>
       </div>
     </div>
   );

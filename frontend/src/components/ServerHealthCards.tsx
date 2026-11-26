@@ -38,7 +38,7 @@ export default function ServerHealthCards() {
     setError("");
     try {
       const response = await request<RuntimeHealth[]>("/runtimes");
-      if (!Array.isArray(response)) throw new Error("Runtime 数据格式无效");
+      if (!Array.isArray(response)) throw new Error("运行实例数据格式无效");
       setRows(response);
       setRefreshedAt(new Date().toISOString());
     } catch (reason) {
@@ -58,11 +58,11 @@ export default function ServerHealthCards() {
           <RefreshCw size={14} className={loading ? "spin" : ""}/>刷新节点
         </button>
       </div>
-      <p className="muted-inline">当前展示已登记 Agent Runtime 的最后一次上报，尚不等于独立服务器的实时硬件监控。在线状态由后端心跳判断。</p>
+      <p className="muted-inline">当前展示已登记 智能体运行实例 的最后一次上报，尚不等于独立服务器的实时硬件监控。在线状态由后端心跳判断。</p>
       {refreshedAt && <p className="muted-inline">页面读取时间：{lastSeen(refreshedAt)}</p>}
       {error ? <div className="inline-error" role="alert"><WifiOff size={16}/>{error}</div> : null}
       {loading ? <div className="panel-loading"><span className="spinner"/>读取节点状态…</div> :
-        rows.length === 0 ? <div className="empty-state"><Server size={25}/><strong>暂无可展示的执行节点</strong><p>请先注册 Agent Runtime 并配置心跳，未接入前不显示虚构服务器数据。</p></div> :
+        rows.length === 0 ? <div className="empty-state"><Server size={25}/><strong>暂无可展示的执行节点</strong><p>请先注册 智能体运行实例 并配置心跳，未接入前不显示虚构服务器数据。</p></div> :
         <div className="stat-grid">
           {rows.map((row) => (
             <article className="stat-card" key={row.id}>
@@ -70,7 +70,7 @@ export default function ServerHealthCards() {
               <div className="stat-copy">
                 <span>{row.agent_name} · {row.environment || "环境未标注"}</span>
                 <strong>{row.label}</strong>
-                <small>{!row.enabled ? "已禁用" : row.online ? "Runtime 在线" : "Runtime 离线 / 未确认"}</small>
+                <small>{!row.enabled ? "已禁用" : row.online ? "运行实例在线" : "运行实例离线 / 未确认"}</small>
                 <small>最后心跳：{lastSeen(row.last_seen)}</small>
                 <small>CPU：{percent(row.last_health, "cpu_percent")} · 内存：{percent(row.last_health, "memory_percent")}</small>
                 <small>磁盘：{percent(row.last_health, "disk_percent")} · GPU：{percent(row.last_health, "gpu_percent")}</small>
@@ -79,7 +79,7 @@ export default function ServerHealthCards() {
           ))}
         </div>
       }
-      <div className="form-actions"><Link className="secondary-button compact" to="/runtimes">查看 Runtime 详情</Link></div>
+      <div className="form-actions"><Link className="secondary-button compact" to="/runtimes">查看运行实例详情</Link></div>
     </section>
   );
 }

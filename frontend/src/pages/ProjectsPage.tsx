@@ -1,5 +1,14 @@
+import EmptyState from "../components/EmptyState";
+import ListPagination, { useListPage } from "../components/ListPagination";
+import { useProjectSelection } from "../components/ProjectSelection";
+import ValidatedForm from "../components/ValidatedForm";
+import { ErrorNotice, LoadingState } from "../components/PageFeedback";
+import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
+import { useScopedRequest } from "../utils/useScopedRequest";
+import { getRiskLabel, getUiLabel, TASK_STATUS_LABELS as statusLabels } from "../utils/labels";
+import TaskStatusBadge from "../components/TaskStatusBadge";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { AlertCircle, Eye, FolderKanban, Pencil, Plus, RefreshCw, Search, Target, Trash2, Users, X } from "lucide-react";
+import { Eye, FolderKanban, ListChecks, Pencil, Plus, RefreshCw, Search, Target, Trash2, Users, X } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { request } from "../api/client";
 import type { Agent, Project, Task } from "../api/types";
@@ -42,11 +51,6 @@ interface ProjectBriefing {
   };
 }
 
-const statusLabels: Record<string, string> = {
-  ready: "待执行", running: "执行中", submitted: "待验收",
-  waiting_approval: "待审批", waiting_dependencies: "等待依赖",
-  blocked: "已阻塞", completed: "已完成", cancelled: "已取消"
-};
 
 export default function ProjectsPage() {
   const { user } = useAuth();
@@ -54,7 +58,7 @@ export default function ProjectsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedProjectId = searchParams.get("project") || "";
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedId, setSelectedId] = useState(requestedProjectId);
+  const [selectedId, setSelectedId] = useProjectSelection(projects, requestedProjectId);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -64,6 +68,7 @@ export default function ProjectsPage() {
   const [newMemberAgentId, setNewMemberAgentId] = useState("");
   const [newMemberRole, setNewMemberRole] = useState<ProjectMember["role"]>("worker");
   const [showMemberForm, setShowMemberForm] = useState(false);
+  const [detailTab, setDetailTab] = useState<"tasks" | "members">("tasks");
   const [editingProject, setEditingProject] = useState(false);
   const [editProjectName, setEditProjectName] = useState("");
   const [editProjectDescription, setEditProjectDescription] = useState("");
@@ -84,7 +89,16 @@ export default function ProjectsPage() {
   const [taskSensitivity, setTaskSensitivity] = useState<"public" | "internal" | "confidential" | "restricted">("internal");
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
+  const [projectStatusFilter, setProjectStatusFilter] = useState("all");
+  const [taskQuery, setTaskQuery] = useState("");
+  const [taskStatusFilter, setTaskStatusFilter] = useState("all");
+  const [memberQuery, setMemberQuery] = useState("");
+  useEffect(() => { setTaskQuery(""); setTaskStatusFilter("all"); setMemberQuery(""); }, [selectedId]);
+  const visibleTasks = tasks.filter(task => (taskStatusFilter === "all" || task.status === taskStatusFilter) && [task.title, task.id, task.instruction].join(" ").toLocaleLowerCase().includes(taskQuery.trim().toLocaleLowerCase()));
+  const visibleMembers = members.filter(member => [member.agent_name, member.agent_id, getUiLabel(member.role)].join(" ").toLocaleLowerCase().includes(memberQuery.trim().toLocaleLowerCase()));
 
+  const taskPage = useListPage(visibleTasks, JSON.stringify([selectedId,taskQuery,taskStatusFilter]));
+  const memberPage = useListPage(visibleMembers, JSON.stringify([selectedId,memberQuery]));
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedId) || null,
     [projects, selectedId]
@@ -110,7 +124,15 @@ export default function ProjectsPage() {
 
   useEffect(() => { void loadProjects(); }, [loadProjects]);
 
+  const beginProjectRequest = useScopedRequest(selectedId);
+  const resetProjectView = () => { setProjectName(""); setProjectDescription(""); setShowProjectForm(false); setTasks([]); setMembers([]); setGoals([]); setBriefing(null); setDetailSelection(null); setEditingProject(false); setShowTaskForm(false); setShowMemberForm(false); setTaskTitle(""); setTaskInstruction(""); setTaskAcceptance(""); setTaskGoalId(""); setTaskRisk("R1"); setTaskPriority("50"); setTaskSensitivity("internal"); setNewMemberAgentId(""); setNewMemberRole("worker"); };
+  const hasUnsavedDraft = Boolean(projectName || projectDescription || taskTitle || taskInstruction || taskAcceptance || taskGoalId || taskRisk !== "R1" || taskPriority !== "50" || taskSensitivity !== "internal" || newMemberAgentId || newMemberRole !== "worker" || (editingProject && selectedProject && (editProjectName !== selectedProject.name || editProjectDescription !== (selectedProject.description || "") || editProjectPriority !== String(selectedProject.priority))));
+  const confirmDiscard = useDraftGuard(hasUnsavedDraft);
+  const changeProject = async (id: string) => { if (id === selectedId || saving) return; if (!(await confirmDiscard())) return; resetProjectView(); setDetailLoading(true); setError(""); setSelectedId(id); setSearchParams({ project: id }); setDetailTab("tasks"); };
+
   const loadProjectDetail = useCallback(async (projectId: string) => {
+    const isCurrent = beginProjectRequest(projectId);
+    if (!isCurrent()) return;
     setDetailLoading(true);
     try {
       const encoded = encodeURIComponent(projectId);
@@ -121,17 +143,18 @@ export default function ProjectsPage() {
         request<GoalSummary[]>("/projects/" + encoded + "/goals").catch(() => [] as GoalSummary[]),
         request<ProjectBriefing>("/projects/" + encoded + "/briefing").catch(() => null)
       ]);
+      if (!isCurrent()) return;
       setTasks(taskRows);
       setMembers(memberRows);
       setAgents(agentRows);
       setGoals(goalRows);
       setBriefing(briefingRow);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "项目详情读取失败");
+      if (isCurrent()) setError(reason instanceof Error ? reason.message : "项目详情读取失败");
     } finally {
-      setDetailLoading(false);
+      if (isCurrent()) setDetailLoading(false);
     }
-  }, []);
+  }, [beginProjectRequest]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -329,16 +352,14 @@ export default function ProjectsPage() {
   };
 
   const visibleProjects = projects.filter((project) =>
-    (project.name + " " + project.description).toLowerCase().includes(query.toLowerCase())
+    (projectStatusFilter === "all" || project.status === projectStatusFilter) && (project.name + " " + project.description).toLowerCase().includes(query.trim().toLowerCase())
   );
 
   return (
     <div className="page-stack">
       <div className="page-heading">
         <div>
-          <div className="eyebrow">PROJECT WORKSPACE</div>
           <h1>项目与任务</h1>
-          <p>项目、任务、成员与简报的统一入口；任务状态与权限仍由服务端治理。</p>
         </div>
         <div className="heading-actions">
           <Link to="/goals-workflows" className="secondary-button compact"><Target size={14} />目标与工作流</Link>
@@ -347,32 +368,34 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
 
       {showProjectForm && (
-        <form className="panel form-panel" onSubmit={createProject}>
-          <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>创建项目</h3></div><button type="button" className="icon-button" onClick={() => setShowProjectForm(false)}><X size={17} /></button></div>
+        <ValidatedForm className="panel form-panel" onSubmit={createProject}>
+          <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>创建项目</h3></div><button type="button" className="icon-button" aria-label="收起创建项目表单" onClick={() => setShowProjectForm(false)}><X size={17} /></button></div>
           <div className="form-grid">
             <label>项目名称<input value={projectName} onChange={(event) => setProjectName(event.target.value)} required maxLength={160} /></label>
             <label>项目说明<input value={projectDescription} onChange={(event) => setProjectDescription(event.target.value)} maxLength={3000} /></label>
           </div>
           <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "保存中…" : "创建项目"}</button></div>
-        </form>
+        </ValidatedForm>
       )}
 
+      <UnsavedDraftNotice dirty={hasUnsavedDraft} />
       <div className="projects-layout">
         <section className="panel project-list-panel">
-          <div className="panel-heading"><div className="panel-title"><FolderKanban size={17} /><h3>项目空间</h3><span className="count-chip">{projects.length}</span></div></div>
-          <div className="search-field"><Search size={15} /><input placeholder="搜索项目…" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
-          {loading ? <div className="panel-loading"><div className="spinner" /></div> : visibleProjects.length === 0 ? (
+          <div className="panel-heading"><div className="panel-title"><FolderKanban size={17} /><h3>项目</h3><span className="count-chip">{projects.length}</span></div></div>
+          <div className="search-field"><Search size={15} /><input aria-label="搜索项目" placeholder="搜索项目…" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+          <select className="project-status-filter compact-select" aria-label="项目状态" value={projectStatusFilter} onChange={event => setProjectStatusFilter(event.target.value)}><option value="all">全部项目状态</option><option value="active">运行中</option><option value="paused">已暂停</option><option value="archived">已归档</option></select>
+          {loading ? <LoadingState/> : visibleProjects.length === 0 ? (
             <div className="empty-mini">没有匹配的项目</div>
           ) : (
             <div className="project-list">
               {visibleProjects.map((project) => (
                 <button key={project.id} className={"project-list-item " + (project.id === selectedId ? "selected" : "")}
-                  onClick={() => { setSelectedId(project.id); setSearchParams({ project: project.id }); }}>
+                  disabled={saving} aria-pressed={project.id === selectedId} onClick={() => void changeProject(project.id)}>
                   <span className="project-list-icon"><FolderKanban size={17} /></span>
-                  <span className="project-list-copy"><strong>{project.name}</strong><small>{project.status} · 优先级 {project.priority}</small></span>
+                  <span className="project-list-copy"><strong>{project.name}</strong><small>{getUiLabel(project.status)} · 优先级 {project.priority}</small></span>
                   <span className="project-list-arrow">›</span>
                 </button>
               ))}
@@ -382,16 +405,16 @@ export default function ProjectsPage() {
 
         <section className="project-detail">
           {!selectedProject ? (
-            <div className="panel empty-state detail-empty"><FolderKanban size={30} /><strong>选择一个项目</strong><p>或者创建一个新项目，开始组织任务。</p></div>
+            <EmptyState panel className="detail-empty" icon={FolderKanban} title="选择一个项目"><p>或者创建一个新项目，开始组织任务。</p></EmptyState>
           ) : (
             <>
               <div className="panel project-detail-header">
                 <div className="project-detail-title">
                   <div className="project-avatar large"><FolderKanban size={21} /></div>
-                  <div><div className="eyebrow">PROJECT</div><h2>{selectedProject.name}</h2><p>{selectedProject.description || "暂无项目说明"}</p></div>
+                  <div><h2>{selectedProject.name}</h2>{selectedProject.description && <p>{selectedProject.description}</p>}</div>
                 </div>
                 <div className="flex-row-gap">
-                  <span className={"status-tag " + (selectedProject.status === "active" ? "tag-green" : "tag-neutral")}>{selectedProject.status}</span>
+                  <span className={"status-tag " + (selectedProject.status === "active" ? "tag-green" : "tag-neutral")}>{getUiLabel(selectedProject.status)}</span>
                   <button className="secondary-button compact" onClick={startEditProject} disabled={saving}><Pencil size={13} />编辑</button>
                   <button className="text-button" onClick={() => void deleteProject()} disabled={saving}><Trash2 size={14} />删除项目</button>
                 </div>
@@ -408,7 +431,7 @@ export default function ProjectsPage() {
               )}
 
               {editingProject && (
-                <form className="panel form-panel" onSubmit={saveEditProject}>
+                <ValidatedForm className="panel form-panel" onSubmit={saveEditProject}>
                   <div className="panel-heading"><div className="panel-title"><Pencil size={16} /><h3>编辑项目</h3></div><button type="button" className="icon-button" onClick={() => setEditingProject(false)}><X size={17} /></button></div>
                   <div className="form-grid three">
                     <label>项目名称<input value={editProjectName} onChange={(e) => setEditProjectName(e.target.value)} required maxLength={160} /></label>
@@ -416,17 +439,22 @@ export default function ProjectsPage() {
                     <label>优先级 (0-100)<input type="number" min={0} max={100} value={editProjectPriority} onChange={(e) => setEditProjectPriority(e.target.value)} /></label>
                   </div>
                   <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "保存中…" : "保存修改"}</button></div>
-                </form>
+                </ValidatedForm>
               )}
 
+              <div className="workspace-switch" role="group" aria-label="项目内容">
+                <button type="button" aria-pressed={detailTab === "tasks"} className={detailTab === "tasks" ? "selected" : ""} onClick={() => setDetailTab("tasks")}>任务 <span>{tasks.length}</span></button>
+                <button type="button" aria-pressed={detailTab === "members"} className={detailTab === "members" ? "selected" : ""} onClick={() => setDetailTab("members")}>成员 <span>{members.length}</span></button>
+              </div>
+              {detailTab === "tasks" && <div className="project-tab-content">
               <div className="section-heading compact-heading">
-                <div><h2>任务列表</h2><p>{tasks.length} 项任务 · 点击任务行或「详情」查看依赖图、检查点与副作用</p></div>
+                <div><h2>任务列表</h2></div>
                 <button className="primary-button compact" onClick={() => setShowTaskForm((value) => !value)}><Plus size={15} />新建任务</button>
               </div>
 
               {showTaskForm && (
-                <form className="panel form-panel" onSubmit={createTask}>
-                  <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>创建任务</h3></div><button type="button" className="icon-button" onClick={() => setShowTaskForm(false)}><X size={17} /></button></div>
+                <ValidatedForm className="panel form-panel" onSubmit={createTask}>
+                  <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>创建任务</h3></div><button type="button" className="icon-button" aria-label="收起创建任务表单" onClick={() => setShowTaskForm(false)}><X size={17} /></button></div>
                   <label>任务标题<input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} required maxLength={240} /></label>
                   <div className="form-grid four">
                     <label>关联目标
@@ -445,10 +473,10 @@ export default function ProjectsPage() {
                     </label>
                     <label>敏感级别
                       <select value={taskSensitivity} onChange={(e) => setTaskSensitivity(e.target.value as "public" | "internal" | "confidential" | "restricted")}>
-                        <option value="public">public（公开）</option>
-                        <option value="internal">internal（内部）</option>
-                        <option value="confidential">confidential（机密）</option>
-                        <option value="restricted">restricted（受限）</option>
+                        <option value="public">公开</option>
+                        <option value="internal">内部</option>
+                        <option value="confidential">机密</option>
+                        <option value="restricted">受限</option>
                       </select>
                     </label>
                     <label>优先级 (0-100)
@@ -459,19 +487,16 @@ export default function ProjectsPage() {
                   <label>验收标准<textarea value={taskAcceptance} onChange={(event) => setTaskAcceptance(event.target.value)} required maxLength={6000} rows={2} /></label>
                   <p className="form-hint">R3 高风险任务创建后将自动进入待授权状态，直到所有者审批通过后才可调度执行。</p>
                   <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "保存中…" : "创建任务"}</button></div>
-                </form>
+                </ValidatedForm>
               )}
 
               <div className="panel task-table-panel">
-                {detailLoading ? <div className="panel-loading"><div className="spinner" /></div> : tasks.length === 0 ? (
-                  <div className="empty-state">
-                    <span className="empty-icon">✓</span>
-                    <strong>这个项目还没有任务</strong>
-                    <p>创建第一个任务，或前往<Link to="/goals-workflows" className="safety-inline-link">目标与工作流</Link>使用结构化目标拆分。</p>
-                  </div>
+                <div className="project-content-filter"><input aria-label="搜索项目任务" placeholder="搜索任务名称或编号" value={taskQuery} onChange={event => setTaskQuery(event.target.value)} /><select aria-label="项目任务状态" value={taskStatusFilter} onChange={event => setTaskStatusFilter(event.target.value)}><option value="all">全部状态</option>{Object.entries(statusLabels).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select><span className="muted-inline">{visibleTasks.length}/{tasks.length} 项</span></div>
+                {detailLoading ? <LoadingState/> : visibleTasks.length === 0 ? (
+                  <EmptyState icon={ListChecks} title={tasks.length ? "没有符合条件的任务" : "暂无任务"}/>
                 ) : (
                   <div className="task-list">
-                    {tasks.map((task) => (
+                    {taskPage.rows.map((task) => (
                       <div
                         className="task-row task-row-clickable"
                         key={task.id}
@@ -480,13 +505,9 @@ export default function ProjectsPage() {
                         <div className="task-status-mark" />
                         <div className="task-main">
                           <strong>{task.title}</strong>
-                          <small>{task.id.slice(0, 12)} · {task.risk} · {task.sensitivity} · 优先级 {task.priority}</small>
+                          <small>{task.id.slice(0, 12)} · {getRiskLabel(task.risk)} · {getUiLabel(task.sensitivity)} · 优先级 {task.priority}</small>
                         </div>
-                        <span className={"status-tag " + (
-                          task.status === "completed" ? "tag-green" :
-                            task.status === "blocked" || task.status === "waiting_approval" ? "tag-red" :
-                              task.status === "running" || task.status === "submitted" ? "tag-blue" : "tag-neutral"
-                        )}>{statusLabels[task.status] || task.status}</span>
+                        <TaskStatusBadge status={task.status}/>
                         <div className="flex-row-gap-sm" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
@@ -505,42 +526,46 @@ export default function ProjectsPage() {
                     ))}
                   </div>
                 )}
+                {!detailLoading && <ListPagination {...taskPage} label="项目任务分页"/>}
               </div>
 
-              <div className="section-heading compact-heading section-spacer-top">
-                <div><h2>项目成员管理</h2><p>{members.length} 位成员 · 支持添加、改角色与移除</p></div>
+              </div>}
+              {detailTab === "members" && <div className="project-tab-content">
+              <div className="section-heading compact-heading">
+                <div><h2>项目成员</h2></div>
                 <button className="secondary-button compact" onClick={() => setShowMemberForm((v) => !v)}><Users size={15} />添加成员</button>
               </div>
 
               {showMemberForm && (
-                <form className="panel form-panel" onSubmit={addMember}>
-                  <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>添加项目成员</h3></div><button type="button" className="icon-button" onClick={() => setShowMemberForm(false)}><X size={17} /></button></div>
+                <ValidatedForm className="panel form-panel" onSubmit={addMember}>
+                  <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>添加项目成员</h3></div><button type="button" className="icon-button" aria-label="收起添加成员表单" onClick={() => setShowMemberForm(false)}><X size={17} /></button></div>
                   <div className="form-grid">
-                    <label>选择 Agent<select value={newMemberAgentId} onChange={(e) => setNewMemberAgentId(e.target.value)} required>
-                      <option value="">选择已启用 Agent…</option>
+                    <label>选择智能体<select value={newMemberAgentId} onChange={(e) => setNewMemberAgentId(e.target.value)} required>
+                      <option value="">选择已启用智能体…</option>
                       {availableAgentsToAdd.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.platform})</option>)}
                     </select></label>
                     <label>项目角色<select value={newMemberRole} onChange={(e) => setNewMemberRole(e.target.value as ProjectMember["role"])}>
-                      <option value="worker">worker（执行者）</option>
-                      <option value="manager">manager（管理者/可建任务）</option>
-                      <option value="reviewer">reviewer（审查者）</option>
-                      <option value="advisor">advisor（顾问）</option>
+                      <option value="worker">执行者</option>
+                      <option value="manager">管理者（可创建任务）</option>
+                      <option value="reviewer">审查者</option>
+                      <option value="advisor">顾问</option>
                     </select></label>
                   </div>
                   <div className="form-actions"><button className="primary-button compact" disabled={saving || !newMemberAgentId}>加入项目</button></div>
-                </form>
+                </ValidatedForm>
               )}
 
               <div className="panel task-table-panel">
-                {members.length === 0 ? (
-                  <div className="empty-state"><Users size={24} /><strong>暂无项目成员</strong><p>点击上方「添加成员」将 Agent 加入当前项目。</p></div>
+                <div className="project-content-filter"><input aria-label="搜索项目成员" placeholder="搜索成员或角色" value={memberQuery} onChange={event => setMemberQuery(event.target.value)} /><span className="muted-inline">{visibleMembers.length}/{members.length} 位</span></div>
+                {detailLoading ? <LoadingState/> : visibleMembers.length === 0 ? (
+                  <EmptyState icon={Users} title={members.length ? "没有符合条件的成员" : "暂无项目成员"}/>
                 ) : (
                   <div className="task-list">
-                    {members.map((member) => (
+                    {memberPage.rows.map((member) => (
                       <div className="task-row flex-row-gap" key={member.id}>
                         <div className="task-main">
                           <strong>{member.agent_name}</strong>
-                          <small>{member.agent_id.slice(0, 12)} · 敏感级上限 {member.max_sensitivity} · {member.enabled ? "已启用" : "已停用"}</small>
+                          <small>{member.agent_id.slice(0, 12)} · 敏感级上限 {getUiLabel(member.max_sensitivity)} · {member.enabled ? "已启用" : "已停用"}</small>
                         </div>
                         <select
                           aria-label={`${member.agent_name} 角色`}
@@ -549,10 +574,10 @@ export default function ProjectsPage() {
                           onChange={(e) => void updateMemberRole(member, e.target.value as ProjectMember["role"])}
                           className="compact-select"
                         >
-                          <option value="worker">worker</option>
-                          <option value="manager">manager</option>
-                          <option value="reviewer">reviewer</option>
-                          <option value="advisor">advisor</option>
+                          <option value="worker">执行者</option>
+                          <option value="manager">管理者</option>
+                          <option value="reviewer">审查者</option>
+                          <option value="advisor">顾问</option>
                         </select>
                         <button className="text-button" disabled={saving} onClick={() => void removeMember(member)} title="移除成员">
                           <Trash2 size={14} />移除
@@ -561,13 +586,15 @@ export default function ProjectsPage() {
                     ))}
                   </div>
                 )}
+                {!detailLoading && <ListPagination {...memberPage} label="项目成员分页"/>}
               </div>
+              </div>}
             </>
           )}
         </section>
       </div>
 
-      {detailSelection && (
+      {detailSelection && detailSelection.projectId === selectedId && (
         <TaskDetailPanel
           selection={detailSelection}
           isOwner={user?.kind === "owner"}

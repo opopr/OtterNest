@@ -51,55 +51,99 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   const [inputValue, setInputValue] = useState("");
   const [inputError, setInputError] = useState("");
   const pendingRef = useRef<PendingDialog | null>(null);
-  pendingRef.current = pending;
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const cardRef = useRef<HTMLElement | null>(null);
+  const setCardRef = useCallback((node: HTMLElement | null) => { cardRef.current = node; }, []);
 
   const confirm = useCallback((options: string | ConfirmOptions) => {
     return new Promise<boolean>((resolve) => {
+      if (!pendingRef.current && document.activeElement instanceof HTMLElement) returnFocusRef.current = document.activeElement;
       if (pendingRef.current) {
         if (pendingRef.current.kind === "confirm") pendingRef.current.resolve(false);
         else pendingRef.current.resolve(null);
       }
       const normalized: ConfirmOptions = typeof options === "string" ? { message: options } : options;
       setInputError("");
-      setPending({ kind: "confirm", options: normalized, resolve });
+      const next: PendingDialog = { kind: "confirm", options: normalized, resolve };
+      pendingRef.current = next;
+      setPending(next);
     });
   }, []);
 
   const prompt = useCallback((options: PromptOptions) => {
     return new Promise<string | null>((resolve) => {
+      if (!pendingRef.current && document.activeElement instanceof HTMLElement) returnFocusRef.current = document.activeElement;
       if (pendingRef.current) {
         if (pendingRef.current.kind === "confirm") pendingRef.current.resolve(false);
         else pendingRef.current.resolve(null);
       }
       setInputValue(options.defaultValue ?? (options.choices?.[0]?.value ?? ""));
       setInputError("");
-      setPending({ kind: "prompt", options, resolve });
+      const next: PendingDialog = { kind: "prompt", options, resolve };
+      pendingRef.current = next;
+      setPending(next);
     });
   }, []);
 
   const cancel = useCallback(() => {
     const active = pendingRef.current;
     if (!active) return;
+    pendingRef.current = null;
     setPending(null);
     setInputError("");
     if (active.kind === "confirm") active.resolve(false);
     else active.resolve(null);
   }, []);
 
+  const isOpen = pending !== null;
   useEffect(() => {
-    if (!pending) return;
+    if (!isOpen) {
+      const previous = returnFocusRef.current;
+      returnFocusRef.current = null;
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+      return;
+    }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
+        event.stopImmediatePropagation();
         cancel();
+      } else if (event.key === "Tab" && cardRef.current) {
+        const items = Array.from(cardRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], [tabindex="0"]'
+        )).filter(el => el.getClientRects().length > 0 && el.tabIndex >= 0);
+        if (!items.length) { event.preventDefault(); return; }
+        const first = items[0], last = items[items.length - 1];
+        const active = document.activeElement;
+        if (!cardRef.current.contains(active) || (event.shiftKey ? active === first : active === last)) {
+          event.preventDefault();
+          (event.shiftKey ? last : first).focus();
+        }
       }
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [pending, cancel]);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown, true);
+    };
+  }, [isOpen, cancel]);
+
+  useEffect(() => {
+    if (pending) cardRef.current?.querySelector<HTMLElement>("[data-initial-focus]")?.focus({ preventScroll: true });
+  }, [pending]);
+
+  useEffect(() => () => {
+    const active = pendingRef.current;
+    pendingRef.current = null;
+    if (active?.kind === "confirm") active.resolve(false);
+    else if (active?.kind === "prompt") active.resolve(null);
+  }, []);
 
   const handleConfirm = () => {
     if (!pending || pending.kind !== "confirm") return;
+    pendingRef.current = null;
     setPending(null);
     pending.resolve(true);
   };
@@ -112,6 +156,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       setInputError(check.error);
       return;
     }
+    pendingRef.current = null;
     setPending(null);
     setInputError("");
     pending.resolve(check.value);
@@ -132,7 +177,9 @@ export function DialogProvider({ children }: { children: ReactNode }) {
               className="confirm-dialog app-dialog-card"
               role="dialog"
               aria-modal="true"
+              ref={setCardRef}
               aria-labelledby="app-dialog-title"
+              aria-describedby={pending.options.message ? "app-dialog-message" : undefined}
             >
               <div className="panel-heading">
                 <div className="panel-title">
@@ -149,14 +196,13 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   <X size={16} />
                 </button>
               </div>
-              <p className="app-dialog-message">{pending.options.message}</p>
+              <p id="app-dialog-message" className="app-dialog-message">{pending.options.message}</p>
               <div className="form-actions">
-                <button type="button" className="secondary-button compact" onClick={cancel}>
+                <button type="button" data-initial-focus className="secondary-button compact" onClick={cancel}>
                   {pending.options.cancelText || "取消"}
                 </button>
                 <button
                   type="button"
-                  autoFocus
                   className={
                     pending.options.tone === "danger"
                       ? "primary-button compact app-dialog-danger-btn"
@@ -173,7 +219,9 @@ export function DialogProvider({ children }: { children: ReactNode }) {
               className="confirm-dialog app-dialog-card"
               role="dialog"
               aria-modal="true"
+              ref={setCardRef}
               aria-labelledby="app-dialog-title"
+              aria-describedby={pending.options.message ? "app-dialog-message" : undefined}
               onSubmit={handlePromptSubmit}
             >
               <div className="panel-heading">
@@ -185,12 +233,14 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   <X size={16} />
                 </button>
               </div>
-              {pending.options.message && <p className="app-dialog-message">{pending.options.message}</p>}
+              {pending.options.message && <p id="app-dialog-message" className="app-dialog-message">{pending.options.message}</p>}
               <label className="app-dialog-field">
                 <span>{pending.options.label || "说明内容"}</span>
                 {pending.options.choices && pending.options.choices.length > 0 ? (
                   <select
-                    autoFocus
+                    data-initial-focus
+                    aria-invalid={Boolean(inputError)}
+                    aria-describedby={inputError ? "app-dialog-error" : undefined}
                     value={inputValue}
                     onChange={(event) => {
                       setInputValue(event.target.value);
@@ -205,7 +255,9 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   </select>
                 ) : pending.options.multiline ? (
                   <textarea
-                    autoFocus
+                    data-initial-focus
+                    aria-invalid={Boolean(inputError)}
+                    aria-describedby={inputError ? "app-dialog-error" : undefined}
                     rows={3}
                     value={inputValue}
                     placeholder={pending.options.placeholder}
@@ -217,7 +269,9 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   />
                 ) : (
                   <input
-                    autoFocus
+                    data-initial-focus
+                    aria-invalid={Boolean(inputError)}
+                    aria-describedby={inputError ? "app-dialog-error" : undefined}
                     value={inputValue}
                     placeholder={pending.options.placeholder}
                     maxLength={pending.options.maxLength ?? 2000}
@@ -228,7 +282,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   />
                 )}
               </label>
-              {inputError && <div className="inline-error">{inputError}</div>}
+              {inputError && <div id="app-dialog-error" className="inline-error" role="alert">{inputError}</div>}
               <div className="form-actions">
                 <button type="button" className="secondary-button compact" onClick={cancel}>
                   {pending.options.cancelText || "取消"}

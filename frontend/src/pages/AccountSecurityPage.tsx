@@ -1,5 +1,10 @@
+import EmptyState from "../components/EmptyState";
+import ValidatedForm from "../components/ValidatedForm";
+import { ErrorNotice, SuccessNotice } from "../components/PageFeedback";
+import { useDraftGuard } from "../components/DraftGuard";
+import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { AlertCircle, Copy, KeyRound, LockKeyhole, RefreshCw, ShieldCheck, ShieldOff, UserRound, History, LogOut } from "lucide-react";
+import { Copy, KeyRound, LockKeyhole, RefreshCw, ShieldCheck, ShieldOff, UserRound, History, LogOut } from "lucide-react";
 import { request } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { useDialog } from "../components/AppDialog";
@@ -77,7 +82,9 @@ export default function AccountSecurityPage() {
   const [disablePassword, setDisablePassword] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [audit, setAudit] = useState<SecurityAuditResult | null>(null);
+  const [auditFilter, setAuditFilter] = useState("all");
   const dialog = useDialog();
+  useDraftGuard(Boolean(currentPassword || newPassword || confirmPassword || newUsername || displayName || setup || setupCode || oneTimeCode || disablePassword || recoveryCodes.length));
 
   const load = useCallback(async () => {
     if (!isOwner) { setLoading(false); return; }
@@ -182,7 +189,7 @@ export default function AccountSecurityPage() {
     const confirmed = await dialog.confirm({
       title: "关闭双重验证（2FA）",
       message: "关闭双重验证会降低账号安全等级。确定继续关闭吗？",
-      confirmText: "确认关闭 2FA",
+      confirmText: "确认关闭双重验证",
       tone: "danger",
     });
     if (!confirmed) return;
@@ -214,15 +221,15 @@ export default function AccountSecurityPage() {
     finally { setSaving(false); }
   };
 
-  if (!isOwner) return <div className="page-stack"><div className="page-heading"><h1>账号安全</h1></div><div className="panel empty-state"><ShieldCheck size={26} /><strong>只有所有者可访问账号安全设置。</strong></div></div>;
+  if (!isOwner) return <div className="page-stack"><div className="page-heading"><h1>账号安全</h1></div><EmptyState panel icon={ShieldCheck} title="只有所有者可访问账号安全设置。"/></div>;
 
   return <div className="page-stack admin-gap-page">
-    <div className="page-heading"><div><div className="eyebrow">OWNER ACCOUNT SECURITY</div><h1>账号安全</h1>
-      <p>管理所有者登录密码、TOTP 双重验证、会话和安全审计记录。</p></div>
+    <div className="page-heading"><div><h1>账号安全</h1>
+      </div>
       <button className="secondary-button compact" onClick={() => void load()} disabled={loading || saving}><RefreshCw size={14} />刷新</button>
     </div>
-    {error && <div className="inline-error"><AlertCircle size={16} />{error}</div>}
-    {notice && <div className="success-notice"><ShieldCheck size={16} />{notice}<button onClick={() => setNotice("")}>关闭</button></div>}
+    <ErrorNotice message={error} />
+    <SuccessNotice message={notice} onDismiss={() => setNotice("")} />
 
     <section className="panel admin-security-summary">
       <div className="panel-heading"><div className="panel-title"><UserRound size={17} /><h3>当前账户</h3></div><span className="status-tag tag-green">所有者</span></div>
@@ -233,28 +240,27 @@ export default function AccountSecurityPage() {
         <div><span>双重验证</span><strong>{account?.user?.totp_enabled ? "已启用" : "未启用"}</strong></div>
         <div><span>活跃会话</span><strong>{account?.active_sessions ?? "—"}</strong></div>
         <div><span>剩余恢复码</span><strong>{account?.user?.recovery_codes_remaining ?? "—"}</strong></div>
-        <div><span>当前身份方式</span><strong>{account?.auth_method === "owner_token" ? "服务器 Owner Token" : account?.auth_method || "—"}</strong></div>
+        <div><span>当前身份方式</span><strong>{account?.auth_method === "owner_token" ? "服务器所有者令牌" : account?.auth_method || "—"}</strong></div>
       </div>}
     </section>
 
     <div className="admin-two-column">
-      <section className="panel">
-        <div className="panel-heading"><div className="panel-title"><LockKeyhole size={17} /><h3>更改登录密码</h3></div></div>
-        <form className="form-panel admin-stack-form" onSubmit={(event) => void updatePassword(event)}>
+      <details className="panel maintenance-disclosure account-password" open={!account?.account_configured}><summary><LockKeyhole size={16} />{account?.account_configured ? "更改登录密码" : "创建登录账号"}</summary>
+        <ValidatedForm className="form-panel admin-stack-form" onSubmit={(event) => void updatePassword(event)}>
           {!account?.account_configured && <label>首次创建用户名<input value={newUsername} onChange={(event) => setNewUsername(event.target.value)} minLength={3} maxLength={64} required autoComplete="username" /></label>}
           <label>显示名称（选填）<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={120} /></label>
-          <label>当前密码{account?.auth_method === "owner_token" ? "（使用服务器 Token 时可不填）" : ""}
+          <label>当前密码{account?.auth_method === "owner_token" ? "（使用服务器令牌时可不填）" : ""}
             <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)}
               required={Boolean(account?.account_configured && account?.auth_method !== "owner_token")} autoComplete="current-password" /></label>
           <label>新密码<input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} maxLength={128} required autoComplete="new-password" /></label>
           <label>确认新密码<input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={8} maxLength={128} required autoComplete="new-password" /></label>
           <p className="form-hint">修改成功会注销所有已有会话，并返回登录页面。</p>
           <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "处理中…" : "保存新密码"}</button></div>
-        </form>
-      </section>
+        </ValidatedForm>
+      </details>
 
       <section className="panel">
-        <div className="panel-heading"><div className="panel-title"><KeyRound size={17} /><h3>TOTP 双重验证</h3></div>
+        <div className="panel-heading"><div className="panel-title"><KeyRound size={17} /><h3>双重验证</h3></div>
           <span className={"status-tag " + (account?.user?.totp_enabled ? "tag-green" : "tag-amber")}>{account?.user?.totp_enabled ? "已启用" : "尚未启用"}</span></div>
         {account?.user?.totp_enabled ? <div className="admin-stack-form">
           <p className="form-hint">恢复码仅在生成时显示。轮换恢复码请使用验证器的有效动态码；关闭 2FA 需当前密码和动态码或恢复码。</p>
@@ -263,9 +269,9 @@ export default function AccountSecurityPage() {
           <label>关闭 2FA 时的当前密码<input type="password" value={disablePassword} onChange={(event) => setDisablePassword(event.target.value)} autoComplete="current-password" /></label>
           <button className="secondary-button compact" disabled={saving || !disablePassword.trim() || !oneTimeCode.trim()} onClick={() => void disableTotp()}><ShieldOff size={14} />关闭双重验证</button>
         </div> : <div className="admin-stack-form">
-          <p className="form-hint">使用身份验证器 App 扫描 otpauth URI 或输入密钥，然后填写 6 位动态码激活。</p>
-          {!setup && <button className="primary-button compact" disabled={saving || !account?.account_configured} onClick={() => void startTotp()}><ShieldCheck size={14} />开始配置 TOTP</button>}
-          {setup && <form className="admin-stack-form" onSubmit={(event) => void enableTotp(event)}>
+          <p className="form-hint">使用身份验证器应用 扫描 otpauth URI 或输入密钥，然后填写 6 位动态码激活。</p>
+          {!setup && <button className="primary-button compact" disabled={saving || !account?.account_configured} onClick={() => void startTotp()}><ShieldCheck size={14} />开始配置</button>}
+          {setup && <ValidatedForm className="admin-stack-form" onSubmit={(event) => void enableTotp(event)}>
             <label>身份验证器密钥（请勿分享）<div className="admin-secret-row"><code>{setup.formatted_secret}</code>
               <button type="button" className="secondary-button compact" onClick={() => void copy(setup.secret)}><Copy size={13} />复制</button></div></label>
             <label>验证器 URI（可手动复制）<div className="admin-secret-row"><code>{setup.otpauth_uri}</code>
@@ -273,7 +279,7 @@ export default function AccountSecurityPage() {
             <label>6 位动态验证码<input value={setupCode} onChange={(event) => setSetupCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" required minLength={6} maxLength={6} /></label>
             <div className="form-actions"><button className="primary-button compact" disabled={saving}>启用双重验证</button>
               <button type="button" className="secondary-button compact" onClick={() => setSetup(null)}>暂不启用</button></div>
-          </form>}
+          </ValidatedForm>}
         </div>}
       </section>
     </div>
@@ -288,7 +294,7 @@ export default function AccountSecurityPage() {
 
     <section className="panel">
       <div className="panel-heading"><div className="panel-title"><LogOut size={17} /><h3>会话控制</h3></div></div>
-      <p className="form-hint">可撤销所有密码登录会话。服务器 Owner Token 由服务器环境配置单独管理，不会因此轮换。</p>
+      <p className="form-hint">可撤销所有密码登录会话。服务器所有者令牌由服务器环境配置单独管理，不会因此轮换。</p>
       <button className="secondary-button compact" onClick={() => void revokeSessions()} disabled={saving || !token}><LogOut size={14} />注销所有会话</button>
     </section>
 
@@ -299,17 +305,18 @@ export default function AccountSecurityPage() {
           {audit.status === "pass" ? "全部通过" : audit.status === "warning" ? `${audit.summary.warning} 项警告` : `${audit.summary.critical} 项严重`}
         </span>}
       </div>
+      <div className="approval-switch" role="group" aria-label="安全自检筛选">{[{key:"all",label:"全部"},{key:"issues",label:"需关注"}].map(item => <button type="button" key={item.key} aria-pressed={auditFilter === item.key} className={auditFilter === item.key ? "selected" : ""} onClick={() => setAuditFilter(item.key)}>{item.label}<span>{audit?.findings.filter(f => item.key === "all" || f.level !== "pass").length ?? 0}</span></button>)}</div>
       <div className="admin-event-list">
-        {audit?.findings.map((finding, idx) => (
+        {audit?.findings.filter(f => auditFilter === "all" || f.level !== "pass").map((finding, idx) => (
           <div className="admin-event-row admin-event-row-gap" key={idx}>
             <div className="admin-event-title">
-              <span className={"status-tag " + (finding.level === "pass" ? "tag-green" : finding.level === "warning" ? "tag-amber" : "tag-neutral")}>{finding.level}</span>
+              <span className={"status-tag " + (finding.level === "pass" ? "tag-green" : finding.level === "warning" ? "tag-amber" : "tag-neutral")}>{getUiLabel(finding.level)}</span>
               <strong>{finding.check}</strong>
             </div>
             <small>{finding.message}</small>
           </div>
         ))}
-        {!audit && !loading && <div className="empty-mini">暂未获取到安全自检结果。</div>}
+        {!audit && !loading && <div className="empty-mini">暂未获取到安全自检结果。</div>}{audit && auditFilter === "issues" && audit.findings.every(f => f.level === "pass") && <div className="empty-mini">暂无需关注的项目</div>}
       </div>
     </section>
 

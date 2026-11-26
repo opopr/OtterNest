@@ -1,8 +1,13 @@
+import EmptyState from "../components/EmptyState";
+import { useProjectSelection } from "../components/ProjectSelection";
+import ValidatedForm from "../components/ValidatedForm";
+import { ErrorNotice, LoadingState } from "../components/PageFeedback";
+import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
+import { useScopedRequest } from "../utils/useScopedRequest";
+import { dependencyLayers } from "../utils/dependencyLayers";
+import ListPagination, { useListPage } from "../components/ListPagination";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import {
-  AlertCircle, ArrowUp, GitBranch, ListChecks, Pencil, Plus, RefreshCw,
-  Trash2, Workflow, X, Zap
-} from "lucide-react";
+import { ArrowUp, GitBranch, ListChecks, Pencil, Plus, RefreshCw, Trash2, Workflow, X, Zap } from "lucide-react";
 import { request } from "../api/client";
 import type { Project } from "../api/types";
 import { useDialog } from "../components/AppDialog";
@@ -62,10 +67,13 @@ const runStatus: Record<string, string> = { executed: "已执行", skipped: "已
 export default function GoalsWorkflowPage() {
   const dialog = useDialog();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useProjectSelection(projects);
   const [board, setBoard] = useState<GoalBoard | null>(null);
   const [rules, setRules] = useState<WorkflowRule[]>([]);
   const [runs, setRuns] = useState<WorkflowRun[]>([]);
+  const [runFilter, setRunFilter] = useState("all");
+  const runPage = useListPage(runs.filter(run => runFilter === "all" || run.status === runFilter), JSON.stringify([selectedId,runFilter]));
+  const goalGraph = useMemo(() => dependencyLayers(board?.goals || []), [board]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -86,6 +94,13 @@ export default function GoalsWorkflowPage() {
   const [cooldown, setCooldown] = useState("60");
   const [dependencySelections, setDependencySelections] = useState<Record<string, string>>({});
   const [tab, setTab] = useState<"goals" | "rules">("goals");
+  const [goalQuery, setGoalQuery] = useState("");
+  const [goalFilter, setGoalFilter] = useState("all");
+  const shownGoals = (board?.goals || []).filter(goal => (goalFilter === "all" || (goalFilter === "waiting" ? !goal.dependencies_satisfied && goal.status !== "completed" : goal.status === goalFilter)) && [goal.title,goal.success_criteria,goal.id].join(" ").toLocaleLowerCase().includes(goalQuery.trim().toLocaleLowerCase()));
+  const [focusedGoal, setFocusedGoal] = useState("");
+  const revealGoal = (id: string) => { setGoalQuery(""); setGoalFilter("all"); setFocusedGoal(id); };
+  useEffect(() => { if (focusedGoal) { const node = document.getElementById("goal-card-" + focusedGoal); node?.scrollIntoView({block:"nearest"}); node?.focus({preventScroll:true}); } }, [focusedGoal, goalQuery, goalFilter]);
+  useEffect(() => { setGoalQuery(""); setGoalFilter("all"); setFocusedGoal(""); }, [selectedId]);
 
   const selectedProject = useMemo(() => projects.find((item) => item.id === selectedId) || null, [projects, selectedId]);
 
@@ -99,7 +114,15 @@ export default function GoalsWorkflowPage() {
     finally { setLoading(false); }
   }, []);
 
+  const beginProjectRequest = useScopedRequest(selectedId);
+  const resetProjectView = () => { setBoard(null); setRules([]); setRuns([]); setEditingGoal(null); setShowGoalForm(false); setShowRuleForm(false); setGoalTitle(""); setGoalCriteria(""); setGoalPriority("50"); setRuleName(""); setActionTitle(""); setEventPrefix("task.completed"); setActionKind("notify_inbox"); setMaxDepth("3"); setCooldown("60"); setDependencySelections({}); setRunFilter("all"); };
+  const hasUnsavedDraft = Boolean(goalTitle || goalCriteria || goalPriority !== "50" || ruleName || actionTitle || eventPrefix !== "task.completed" || actionKind !== "notify_inbox" || maxDepth !== "3" || cooldown !== "60" || (editingGoal && (editGoalTitle !== editingGoal.title || editGoalCriteria !== editingGoal.success_criteria || editGoalPriority !== String(editingGoal.priority))));
+  const confirmDiscard = useDraftGuard(hasUnsavedDraft);
+  const changeProject = async (id: string) => { if (id === selectedId || saving) return; if (!(await confirmDiscard())) return; resetProjectView(); setLoading(true); setError(""); setSelectedId(id);  };
+
   const loadProjectData = useCallback(async (projectId: string) => {
+    const isCurrent = beginProjectRequest(projectId);
+    if (!isCurrent()) return;
     setLoading(true);
     setError("");
     try {
@@ -108,12 +131,13 @@ export default function GoalsWorkflowPage() {
         request<WorkflowRule[]>("/projects/" + encodeURIComponent(projectId) + "/workflow-rules"),
         request<WorkflowRun[]>("/projects/" + encodeURIComponent(projectId) + "/workflow-runs?limit=50")
       ]);
+      if (!isCurrent()) return;
       setBoard(goalBoard);
       setRules(workflowRules);
       setRuns(workflowRuns);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "目标与工作流读取失败"); }
-    finally { setLoading(false); }
-  }, []);
+    } catch (reason) { if (isCurrent()) setError(reason instanceof Error ? reason.message : "目标与工作流读取失败"); }
+    finally { if (isCurrent()) setLoading(false); }
+  }, [beginProjectRequest]);
 
   useEffect(() => { void loadProjects(); }, [loadProjects]);
   useEffect(() => { if (selectedId) void loadProjectData(selectedId); else { setBoard(null); setRules([]); setRuns([]); } }, [selectedId, loadProjectData]);
@@ -306,27 +330,28 @@ export default function GoalsWorkflowPage() {
   return (
     <div className="page-stack">
       <div className="page-heading">
-        <div><div className="eyebrow">GOALS & AUTOMATION</div><h1>目标与工作流</h1><p>目标完成门槛、跨目标依赖、事件触发规则与执行记录。</p></div>
+        <div><h1>目标与工作流</h1></div>
         <div className="heading-actions"><button className="secondary-button" onClick={() => selectedId && void loadProjectData(selectedId)} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : ""} />刷新</button></div>
       </div>
-      {error && <div className="inline-error"><AlertCircle size={16} />{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
-      <section className="panel project-toolbar"><div><div className="eyebrow">PROJECT WORKSPACE</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={setSelectedId} /><span className="muted-inline">{board?.goals?.length ?? 0} 个目标 · {rules.length} 条规则 · {runs.length} 条运行记录</span></section>
-      <div className="governance-tabs">
-        <button className={tab === "goals" ? "selected" : ""} onClick={() => setTab("goals")}><GitBranch size={16} />目标依赖图 <span>{board?.goals?.length ?? 0}</span></button>
-        <button className={tab === "rules" ? "selected" : ""} onClick={() => setTab("rules")}><Workflow size={16} />工作流规则 <span>{rules.length}</span></button>
+      <ErrorNotice message={error} onDismiss={() => setError("")} />
+      <UnsavedDraftNotice dirty={hasUnsavedDraft} />
+      <section className="panel project-toolbar"><div><div className="eyebrow">当前项目</div><strong>{selectedProject?.name || "选择项目"}</strong></div><ProjectSelect projects={projects} value={selectedId} onChange={id => void changeProject(id)} disabled={saving} /><span className="muted-inline">{board?.goals?.length ?? 0} 个目标 · {rules.length} 条规则 · {runs.length} 条运行记录</span></section>
+      <div className="governance-tabs" role="group" aria-label="目标与工作流内容">
+        <button type="button" aria-pressed={tab === "goals"} className={tab === "goals" ? "selected" : ""} onClick={() => setTab("goals")}><GitBranch size={16} />目标依赖图 <span>{board?.goals?.length ?? 0}</span></button>
+        <button type="button" aria-pressed={tab === "rules"} className={tab === "rules" ? "selected" : ""} onClick={() => setTab("rules")}><Workflow size={16} />工作流规则 <span>{rules.length}</span></button>
       </div>
-      {loading && !board ? <div className="panel-loading"><div className="spinner" />正在读取目标和工作流…</div> : tab === "goals" ? (
+      {loading ? <LoadingState label="正在读取目标和工作流…"/> : tab === "goals" ? (
         <div className="page-stack">
-        <GoalPlanComposer projectId={selectedId} onConfirmed={()=>void loadProjectData(selectedId)} />
+        <details className="panel maintenance-disclosure"><summary>智能目标规划</summary><GoalPlanComposer key={selectedId} projectId={selectedId} onConfirmed={()=>void loadProjectData(selectedId)} /></details>
         <section className="panel">
           <div className="panel-heading"><div className="panel-title"><GitBranch size={17} /><h3>目标与前置条件</h3></div><button className="primary-button compact" onClick={() => setShowGoalForm((value) => !value)} disabled={!selectedId}><Plus size={15} />新建目标</button></div>
-          {showGoalForm && <form className="form-panel embedded-form" onSubmit={createGoal}>
+          {showGoalForm && <ValidatedForm className="form-panel embedded-form" onSubmit={createGoal}>
             <label>目标名称<input value={goalTitle} onChange={(event) => setGoalTitle(event.target.value)} required maxLength={240} /></label>
             <label>成功标准<textarea rows={3} value={goalCriteria} onChange={(event) => setGoalCriteria(event.target.value)} required maxLength={5000} /></label>
             <label>优先级（0–100）<input type="number" min="0" max="100" value={goalPriority} onChange={(event) => setGoalPriority(event.target.value)} /></label>
             <div className="form-actions"><button className="primary-button compact" disabled={saving}>创建目标</button></div>
-          </form>}
-          {editingGoal && <form className="form-panel embedded-form" onSubmit={saveEditGoal}>
+          </ValidatedForm>}
+          {editingGoal && <ValidatedForm className="form-panel embedded-form" onSubmit={saveEditGoal}>
             <div className="panel-heading"><div className="panel-title"><Pencil size={15} /><h3>编辑目标：{editingGoal.title}</h3></div><button type="button" className="icon-button" onClick={() => setEditingGoal(null)}><X size={16} /></button></div>
             <div className="form-grid">
               <label>目标名称<input value={editGoalTitle} onChange={(e) => setEditGoalTitle(e.target.value)} required maxLength={240} /></label>
@@ -334,14 +359,19 @@ export default function GoalsWorkflowPage() {
             </div>
             <label>成功标准<textarea rows={3} value={editGoalCriteria} onChange={(e) => setEditGoalCriteria(e.target.value)} required maxLength={5000} /></label>
             <div className="form-actions"><button type="button" className="secondary-button compact" onClick={() => setEditingGoal(null)}>取消</button><button className="primary-button compact" disabled={saving}>保存修改</button></div>
-          </form>}
-          <div className="goal-board">
-            {(board?.goals || []).map((goal, index) => {
+          </ValidatedForm>}
+          {Boolean(board?.goals.length) && <section className="goal-layer-board" aria-label="目标依赖概览">
+            <div className="goal-layer-heading"><strong>目标依赖顺序</strong><span className="muted-inline">按前置依赖分层，不代表执行状态</span></div>
+            <div className="goal-layer-grid">{goalGraph.layers.map((layer,index) => <div className="goal-layer" key={index}><span className="goal-layer-label">第 {index+1} 层</span>{layer.map(goal => <button type="button" key={goal.id} className="goal-layer-node" onClick={() => revealGoal(goal.id)}><strong>{goal.title}</strong><span className={"status-tag " + (goal.status === "completed" ? "tag-green" : !goal.dependencies_satisfied ? "tag-amber" : "tag-neutral")}>{goal.status === "completed" ? "已完成" : !goal.dependencies_satisfied ? "等待前置目标" : goalStatus[goal.status] || goal.status}</span></button>)}</div>)}</div>
+            {goalGraph.unresolved.length > 0 && <div className="inline-error">无法确定依赖顺序：{goalGraph.unresolved.map(goal=>goal.title).join("、")}</div>}
+          </section>}
+          <div className="library-filter-bar"><label>目标<input aria-label="搜索目标" value={goalQuery} onChange={e=>{setGoalQuery(e.target.value);setFocusedGoal("");}} placeholder="搜索目标名称或成功标准"/></label><label>状态<select aria-label="目标状态" value={goalFilter} onChange={e=>{setGoalFilter(e.target.value);setFocusedGoal("");}}><option value="all">全部状态</option><option value="active">进行中</option><option value="waiting">等待前置目标</option><option value="paused">已暂停</option><option value="completed">已完成</option></select></label><span className="muted-inline">{shownGoals.length} 个目标</span></div><div className="goal-board">
+            {shownGoals.map((goal, index) => {
               const predecessorOptions = (board?.goals || []).filter((item) => item.id !== goal.id && !goal.depends_on.some((edge) => edge.id === item.id));
               const progress = goal.task_count ? Math.round(goal.completed_task_count / goal.task_count * 100) : 0;
-              return <article className="goal-card" key={goal.id}>
+              return <article tabIndex={-1} className={"goal-card" + (focusedGoal === goal.id ? " goal-card-focused" : "")} id={"goal-card-" + goal.id} key={goal.id}>
                 <div className="goal-card-top"><span className="goal-number">{String(index + 1).padStart(2, "0")}</span><span className={"status-tag " + (goal.status === "completed" ? "tag-green" : goal.status === "paused" ? "tag-neutral" : "tag-blue")}>{goalStatus[goal.status] || goal.status}</span></div>
-                <h3>{goal.title}</h3><p>{goal.success_criteria}</p>
+                <h3>{goal.title}</h3><details className="library-disclosure"><summary>成功标准</summary><p>{goal.success_criteria}</p></details>
                 <div className="goal-progress-label"><span>关联任务 {goal.completed_task_count}/{goal.task_count}</span><strong>{progress}%</strong></div><div className="progress-track"><span style={{ width: progress + "%" }} /></div>
                 <div className="goal-dependencies"><strong>前置目标</strong>{goal.depends_on.map((dependency) => <div className="goal-dependency" key={dependency.id}><ArrowUp size={13} /><span>{dependency.title}</span><span className={"status-tag " + (dependency.status === "completed" ? "tag-green" : "tag-neutral")}>{goalStatus[dependency.status] || dependency.status}</span><button className="icon-button" title="移除依赖" onClick={() => void removeDependency(goal, dependency.id)}><X size={14} /></button></div>)}{!goal.depends_on.length && <small>无前置目标</small>}
                   {goal.status !== "completed" && predecessorOptions.length > 0 && <div className="dependency-add"><select value={dependencySelections[goal.id] || ""} onChange={(event) => setDependencySelections((current) => ({ ...current, [goal.id]: event.target.value }))}><option value="">选择前置目标…</option>{predecessorOptions.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><button className="secondary-button compact" disabled={!dependencySelections[goal.id] || saving} onClick={() => void addDependency(goal)}>添加</button></div>}
@@ -350,7 +380,7 @@ export default function GoalsWorkflowPage() {
                 <div className="goal-card-actions">{goal.status === "active" && <button className="text-button" onClick={() => void changeGoalStatus(goal, "paused")}>暂停</button>}{goal.status === "paused" && <button className="text-button" onClick={() => void changeGoalStatus(goal, "active")}>恢复</button>}{goal.status !== "completed" && <button className="secondary-button compact" disabled={!goal.can_complete || saving} onClick={() => void changeGoalStatus(goal, "completed")}>完成目标</button>}<button className="text-button" disabled={saving} onClick={() => startEditGoal(goal)}><Pencil size={13} />编辑</button><button className="text-button" disabled={saving} onClick={() => void deleteGoal(goal)}><Trash2 size={13} />删除</button></div>
               </article>;
             })}
-            {!(board?.goals?.length) && <div className="empty-state"><GitBranch size={25} /><strong>尚未定义目标</strong><p>创建目标后，可以为目标添加前置依赖。系统会阻止循环依赖和不满足完成条件的目标被标记为完成。</p></div>}
+            {!shownGoals.length && <EmptyState icon={GitBranch} title={board?.goals.length ? "没有符合条件的目标" : "尚未定义目标"}/>}
           </div>
         </section>
         </div>
@@ -358,7 +388,7 @@ export default function GoalsWorkflowPage() {
         <div className="page-stack">
           <section className="panel">
             <div className="panel-heading"><div className="panel-title"><Workflow size={17} /><h3>事件驱动工作流</h3></div><div className="heading-actions"><button className="secondary-button compact" onClick={() => void evaluateRules()} disabled={!selectedId || saving}><Zap size={14} />评估规则</button><button className="primary-button compact" onClick={() => setShowRuleForm((value) => !value)}><Plus size={14} />新建规则</button></div></div>
-            {showRuleForm && <form className="form-panel embedded-form" onSubmit={createRule}>
+            {showRuleForm && <ValidatedForm className="form-panel embedded-form" onSubmit={createRule}>
               <div className="form-grid">
                 <label>规则名称<input value={ruleName} onChange={(event) => setRuleName(event.target.value)} required maxLength={160} /></label>
                 <label>事件前缀<input value={eventPrefix} onChange={(event) => setEventPrefix(event.target.value)} required pattern="[a-z0-9_.*-]+" placeholder="task.completed" /></label>
@@ -369,17 +399,17 @@ export default function GoalsWorkflowPage() {
               </div>
               <p className="form-hint">规则采用事件前缀匹配，并受最大链深度、冷却时间与重复事件去重保护。</p>
               <div className="form-actions"><button className="primary-button compact" disabled={saving}>保存规则</button></div>
-            </form>}
+            </ValidatedForm>}
             <div className="workflow-rule-list">
               {rules.map((rule) => <article className="workflow-rule-card" key={rule.id}>
                 <div className="workflow-rule-icon"><Zap size={18} /></div><div className="workflow-rule-main"><div><strong>{rule.name}</strong><span className={"status-tag " + (rule.enabled ? "tag-green" : "tag-neutral")}>{rule.enabled ? "已启用" : "已停用"}</span></div><p><code>{rule.event_prefix}</code> → {rule.action_kind === "create_task" ? "创建跟进任务" : "发送收件箱通知"}</p><small>已触发 {rule.triggered_count} 次 · 最大链深度 {rule.max_chain_depth} · 冷却 {rule.cooldown_seconds}s</small></div><div className="flex-row-gap-sm"><button className="secondary-button compact" disabled={saving} onClick={() => void toggleRule(rule)}>{rule.enabled ? "停用" : "启用"}</button><button className="text-button" disabled={saving} onClick={() => void deleteRule(rule)}><Trash2 size={14} />删除</button></div>
               </article>)}
-              {!rules.length && <div className="empty-state"><Workflow size={24} /><strong>尚未配置工作流规则</strong><p>添加事件前缀规则，系统会在显式评估时按约束执行。</p></div>}
+              {!rules.length && <EmptyState icon={Workflow} title="尚未配置工作流规则"><p>添加事件前缀规则，系统会在显式评估时按约束执行。</p></EmptyState>}
             </div>
           </section>
           <section className="panel">
             <div className="panel-heading"><div className="panel-title"><ListChecks size={17} /><h3>工作流运行记录</h3></div><span className="muted-inline">最近 50 条</span></div>
-            <div className="workflow-run-list">{runs.map((run) => <div className="workflow-run-row" key={run.id}><span className={"status-tag " + (run.status === "executed" ? "tag-green" : run.status === "failed" ? "tag-red" : "tag-neutral")}>{runStatus[run.status] || run.status}</span><div><strong>{run.detail || "事件规则执行"}</strong><small>事件 #{run.event_id} · 链深度 {run.chain_depth} · {new Date(run.created_at).toLocaleString("zh-CN", { hour12: false })}</small></div><span className="muted-inline">{run.created_task_id ? "任务已创建" : ""}</span></div>)}{!runs.length && <div className="empty-mini">暂无工作流运行记录</div>}</div>
+            <div className="approval-switch" role="group" aria-label="工作流运行状态">{[{key:"all",label:"全部"},{key:"executed",label:"已执行"},{key:"skipped",label:"已跳过"},{key:"failed",label:"失败"}].map(item=><button type="button" key={item.key} aria-pressed={runFilter===item.key} className={runFilter===item.key?"selected":""} onClick={()=>setRunFilter(item.key)}>{item.label}</button>)}</div><div className="workflow-run-list">{runPage.rows.map((run) => <div className="workflow-run-row" key={run.id}><span className={"status-tag " + (run.status === "executed" ? "tag-green" : run.status === "failed" ? "tag-red" : "tag-neutral")}>{runStatus[run.status] || run.status}</span><div><strong>{run.detail || "事件规则执行"}</strong><small>事件 #{run.event_id} · 链深度 {run.chain_depth} · {new Date(run.created_at).toLocaleString("zh-CN", { hour12: false })}</small></div><span className="muted-inline">{run.created_task_id ? "任务已创建" : ""}</span></div>)}{!runPage.total && <div className="empty-mini">暂无符合条件的运行记录</div>}</div><ListPagination {...runPage} label="工作流分页"/>
           </section>
         </div>
       )}
