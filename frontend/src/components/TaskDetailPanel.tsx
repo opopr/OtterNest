@@ -1,5 +1,7 @@
 import { getRiskLabel, TASK_STATUS_LABELS as statusLabels } from "../utils/labels";
 import TaskStatusBadge from "./TaskStatusBadge";
+import ValidatedForm from "./ValidatedForm";
+import { useDraftGuard, UnsavedDraftNotice } from "./DraftGuard";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, AlertCircle, ArrowRight, Clock3, GitBranch, Info,
@@ -194,8 +196,22 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
   const [editRisk, setEditRisk] = useState<"R0" | "R1" | "R2" | "R3">("R1");
   const [editPriority, setEditPriority] = useState("50");
 
+  const editDirty = Boolean(editingTask && task && (editTitle !== task.title || editInstruction !== task.instruction || editAcceptance !== task.acceptance || editRisk !== task.risk || editPriority !== String(task.priority)));
+  useDraftGuard(editDirty);
+  const confirmEditDiscard = async () => !editDirty || await dialog.confirm({
+    title: "放弃任务修改？", message: "尚未保存的任务修改将丢失。", confirmText: "放弃修改", cancelText: "继续编辑", tone: "warning"
+  });
+  const closeDetails = async () => {
+    if (saving || !(await confirmEditDiscard())) return;
+    onClose();
+  };
+  const closeEditor = async () => {
+    if (saving || !(await confirmEditDiscard())) return;
+    setEditingTask(false);
+    closeRef.current?.focus({preventScroll:true});
+  };
   const startEditTask = () => {
-    if (!task) return;
+    if (!task || editingTask || saving) return;
     setEditTitle(task.title);
     setEditInstruction(task.instruction);
     setEditAcceptance(task.acceptance);
@@ -205,7 +221,12 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
   };
 
   const saveEditTask = async () => {
-    if (!task) return;
+    if (!task || saving) return;
+    const priority = Number(editPriority);
+    if (!editTitle.trim() || !editPriority.trim() || !Number.isInteger(priority) || priority < 0 || priority > 100) {
+      setError("请填写任务标题，并输入 0 至 100 的整数优先级。");
+      return;
+    }
     setSaving(true); setError("");
     try {
       await request("/tasks/" + encodeURIComponent(task.id), {
@@ -215,7 +236,7 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
           instruction: editInstruction.trim(),
           acceptance: editAcceptance.trim(),
           risk: editRisk,
-          priority: Number(editPriority) || 50
+          priority
         })
       });
       setEditingTask(false);
@@ -238,12 +259,12 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
     </div>
   );
 
-  return <div className="modal-backdrop task-detail-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)onClose();}}>
+  return <div className="modal-backdrop task-detail-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)void closeDetails();}}>
     <section ref={panelRef} className="task-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="task-detail-title" onKeyDown={event => {
       // Nested confirmation dialogs handle their own keyboard events in the capture phase.
       if (event.key === "Escape") {
         event.stopPropagation();
-        if (!editingTask && !saving) { event.preventDefault(); onClose(); }
+        event.preventDefault(); if (!saving) void closeDetails();
       } else if (event.key === "Tab") {
         const items = Array.from(panelRef.current?.querySelectorAll<HTMLElement>(
           'button, input, textarea, select, a[href], summary, [tabindex]'
@@ -258,7 +279,7 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
     }}>
       <div className="task-detail-header">
         <div><div className="eyebrow">{selection.projectName}</div><h2 id="task-detail-title">{task?.title||"任务详情"}</h2>{task&&<div className="task-detail-badges"><TaskStatusBadge status={task.status}/><span className="status-tag tag-neutral">{getRiskLabel(task.risk)}</span><span className="status-tag tag-neutral">优先级 {task.priority}</span></div>}</div>
-        <div className="task-detail-header-actions"><button className="secondary-button compact" onClick={()=>void load()} disabled={loading}><RefreshCw size={14} className={loading?"spin":""}/>刷新</button><button ref={closeRef} type="button" className="icon-button" onClick={onClose} aria-label="关闭任务详情"><X size={17}/></button></div>
+        <div className="task-detail-header-actions"><button className="secondary-button compact" onClick={()=>void load()} disabled={loading}><RefreshCw size={14} className={loading?"spin":""}/>刷新</button><button ref={closeRef} type="button" className="icon-button" onClick={()=>void closeDetails()} aria-label="关闭任务详情"><X size={17}/></button></div>
       </div>
       {error&&<div className="inline-error" role="alert"><AlertCircle size={15}/>{error}<button type="button" aria-label="关闭错误提示" onClick={()=>setError("")}><X size={14}/></button></div>}
       {loading&&!task?<div className="panel-loading"><span className="spinner"/>正在读取任务详情…</div>:task&&<>
@@ -286,17 +307,18 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
 
         {editingTask && (
           <section className="task-detail-section task-detail-wide">
-            <div className="task-detail-section-head"><h3><Pencil size={15}/>编辑任务</h3><button type="button" className="icon-button" aria-label="关闭任务编辑" onClick={() => setEditingTask(false)}><X size={15}/></button></div>
-            <div className="form-panel form-panel-flat">
+            <div className="task-detail-section-head"><h3><Pencil size={15}/>编辑任务</h3><button type="button" className="icon-button" aria-label="关闭任务编辑" disabled={saving} onClick={()=>void closeEditor()}><X size={15}/></button></div>
+            <UnsavedDraftNotice dirty={editDirty}/>
+            <ValidatedForm className="form-panel form-panel-flat" onSubmit={event=>{event.preventDefault();void saveEditTask();}}>
               <div className="form-grid three">
                 <label>任务标题<input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required maxLength={240}/></label>
                 <label>风险等级<select value={editRisk} onChange={(e) => setEditRisk(e.target.value as "R0"|"R1"|"R2"|"R3")}><option value="R0">{getRiskLabel("R0")}</option><option value="R1">{getRiskLabel("R1")}</option><option value="R2">{getRiskLabel("R2")}</option><option value="R3">{getRiskLabel("R3")}</option></select></label>
-                <label>优先级<input type="number" min={0} max={100} value={editPriority} onChange={(e) => setEditPriority(e.target.value)}/></label>
+                <label>优先级<input type="number" min={0} max={100} step={1} required value={editPriority} onChange={(e) => setEditPriority(e.target.value)}/></label>
               </div>
               <label>执行说明<textarea rows={3} value={editInstruction} onChange={(e) => setEditInstruction(e.target.value)}/></label>
               <label>验收标准<textarea rows={2} value={editAcceptance} onChange={(e) => setEditAcceptance(e.target.value)}/></label>
-              <div className="form-actions"><button className="primary-button compact" disabled={saving || !editTitle.trim()} onClick={() => void saveEditTask()}>保存任务修改</button></div>
-            </div>
+              <div className="form-actions"><button type="submit" className="primary-button compact" disabled={saving}>保存任务修改</button></div>
+            </ValidatedForm>
           </section>
         )}
 
@@ -330,16 +352,16 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
         <span><Clock3 size={13}/>任务数据以服务端为准</span>
         <div className="flex-row-gap">
           {isOwner && task && !["running", "completed", "cancelled"].includes(task.status) && (
-            <button className="secondary-button compact" disabled={saving} onClick={startEditTask}>
+            <button className="secondary-button compact" disabled={saving || editingTask} onClick={startEditTask}>
               <Pencil size={13}/>编辑任务
             </button>
           )}
           {isOwner && task && task.status !== "running" && (
-            <button className="text-button" disabled={saving} onClick={() => void deleteTask()}>
+            <button className="text-button" disabled={saving || editingTask} onClick={() => void deleteTask()}>
               <Trash2 size={14}/>删除任务
             </button>
           )}
-          <button className="secondary-button compact" onClick={onClose}>关闭</button>
+          <button type="button" className="secondary-button compact" onClick={()=>void closeDetails()}>关闭</button>
         </div>
       </div>
     </section>

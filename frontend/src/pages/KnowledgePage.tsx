@@ -106,7 +106,10 @@ export default function KnowledgePage() {
 
   const beginProjectRequest = useScopedRequest(selectedId);
   const resetProjectView = () => { setMemories([]); setShares([]); setCharter(null); setCharterDraft({scope_boundary:"",stop_conditions:"",max_concurrent_tasks:"5",max_total_tasks:"200"}); setShowMemoryForm(false); setEditingId(""); setMemoryDraft(emptyDraft); setRevisionReason(""); setShareMemoryId(""); setShareRationale(""); setTargetProjectId(""); setSearchQuery(""); setSensitivityFilter("all"); setMemoryStatus("all"); };
-  const hasUnsavedDraft = Boolean(JSON.stringify(memoryDraft) !== JSON.stringify(emptyDraft) || revisionReason || shareMemoryId || shareRationale || (charter && (charterDraft.scope_boundary !== (charter.scope_boundary ?? "") || charterDraft.stop_conditions !== (charter.stop_conditions ?? "") || charterDraft.max_concurrent_tasks !== String(charter.max_concurrent_tasks ?? 5) || charterDraft.max_total_tasks !== String(charter.max_total_tasks ?? 200))));
+  const originalMemory = memories.find(item=>item.id===editingId);
+  const originalMemoryDraft = originalMemory ? {kind:originalMemory.kind,title:originalMemory.title,content:originalMemory.content,source:originalMemory.source,sensitivity:originalMemory.sensitivity} : emptyDraft;
+  const memoryDirty = Boolean(showMemoryForm && (JSON.stringify(memoryDraft) !== JSON.stringify(originalMemoryDraft) || revisionReason));
+  const hasUnsavedDraft = Boolean(memoryDirty || shareMemoryId || shareRationale || (charter && (charterDraft.scope_boundary !== (charter.scope_boundary ?? "") || charterDraft.stop_conditions !== (charter.stop_conditions ?? "") || charterDraft.max_concurrent_tasks !== String(charter.max_concurrent_tasks ?? 5) || charterDraft.max_total_tasks !== String(charter.max_total_tasks ?? 200))));
   const confirmDiscard = useDraftGuard(hasUnsavedDraft);
   const changeProject = async (id: string) => { if (id === selectedId || saving) return; if (!(await confirmDiscard())) return; resetProjectView(); setLoading(true); setError(""); setSelectedId(id);  };
 
@@ -202,7 +205,9 @@ export default function KnowledgePage() {
     finally { setSaving(false); }
   };
 
-  const editMemory = (memory: Memory) => {
+  const confirmMemoryDiscard = async () => !memoryDirty || await dialog.confirm({title:"放弃知识修改？",message:"尚未保存的知识内容将丢失。",confirmText:"放弃修改",cancelText:"继续编辑",tone:"warning"});
+  const editMemory = async (memory: Memory) => {
+    if (saving || !(await confirmMemoryDiscard())) return;
     setEditingId(memory.id);
     setMemoryDraft({ kind: memory.kind, title: memory.title, content: memory.content, source: memory.source, sensitivity: memory.sensitivity });
     setRevisionReason("");
@@ -266,7 +271,9 @@ export default function KnowledgePage() {
     finally { setSaving(false); }
   };
 
-  const cancelMemoryForm = () => { setShowMemoryForm(false); setEditingId(""); setMemoryDraft(emptyDraft); setRevisionReason(""); };
+  const resetMemoryForm = () => { setShowMemoryForm(false); setEditingId(""); setMemoryDraft(emptyDraft); setRevisionReason(""); };
+  const cancelMemoryForm = async () => { if (!saving && await confirmMemoryDiscard()) resetMemoryForm(); };
+  const openNewMemory = async () => { if (saving || !(await confirmMemoryDiscard())) return; resetMemoryForm(); setShowMemoryForm(true); };
 
   return (
     <div className="page-stack">
@@ -310,11 +317,11 @@ export default function KnowledgePage() {
                 <button type="submit" className="secondary-button compact" disabled={!selectedId || loading}><Search size={14} />检索</button>
                 {(searchQuery || sensitivityFilter !== "all" || memoryStatus !== "all") && <button type="button" className="text-button" onClick={() => { setSearchQuery(""); setSensitivityFilter("all"); setMemoryStatus("all"); if (selectedId) void loadProjectData(selectedId, ""); }}>清除</button>}
               </ValidatedForm>
-              <button className="primary-button compact" onClick={() => { cancelMemoryForm(); setShowMemoryForm(true); }} disabled={!selectedId}><Plus size={15} />新增记忆</button>
+              <button className="primary-button compact" onClick={()=>void openNewMemory()} disabled={!selectedId || saving}><Plus size={15} />新增记忆</button>
             </div>
           </div>
           {showMemoryForm && <ValidatedForm className="form-panel embedded-form" onSubmit={saveMemory}>
-            <div className="panel-heading"><div className="panel-title"><FilePlus2 size={16} /><h3>{editingId ? "修订知识记录" : "提出新记忆"}</h3></div><button type="button" className="icon-button" aria-label="关闭记忆表单" onClick={cancelMemoryForm}><X size={16} /></button></div>
+            <div className="panel-heading"><div className="panel-title"><FilePlus2 size={16} /><h3>{editingId ? "修订知识记录" : "提出新记忆"}</h3></div><button type="button" className="icon-button" aria-label="关闭记忆表单" disabled={saving} onClick={()=>void cancelMemoryForm()}><X size={16} /></button></div>
             <div className="form-grid">
               <label>知识类型<select value={memoryDraft.kind} onChange={(event) => setDraftField("kind", event.target.value)}><option value="fact">事实</option><option value="decision">决策</option><option value="experience">经验</option><option value="skill">技能</option><option value="procedure">流程</option></select></label>
               <label>敏感级别<select value={memoryDraft.sensitivity} onChange={(event) => setDraftField("sensitivity", event.target.value)}><option value="public">公开</option><option value="internal">内部</option><option value="confidential">机密</option><option value="restricted">受限</option></select></label>
@@ -334,7 +341,7 @@ export default function KnowledgePage() {
                 <h3>{memory.title}</h3><details className="library-disclosure"><summary>查看知识内容</summary><p className="memory-expanded-content">{memory.content}</p><small className="memory-source">来源：{memory.source}</small></details>
                 <div className="memory-meta"><span><LockKeyhole size={12} />{sensitivityLabel[memory.sensitivity] || memory.sensitivity}</span><span>版本 {memory.version}</span>{typeof displayScore === "number" && <span className="status-tag tag-green">相关度 {displayScore.toFixed(2)}</span>}</div>
 
-                <div className="memory-actions">{memory.status !== "archived" && <button className="text-button" onClick={() => editMemory(memory)}><Pencil size={13} />修订</button>}{memory.status === "proposed" && <button className="secondary-button compact" disabled={saving} onClick={() => void publishMemory(memory)}><Check size={13} />发布</button>}{memory.status !== "archived" && <button className="icon-button" title="归档" disabled={saving} onClick={() => void archiveMemory(memory)}><Archive size={15} /></button>}</div>
+                <div className="memory-actions">{memory.status !== "archived" && <button className="text-button" onClick={() => void editMemory(memory)}><Pencil size={13} />修订</button>}{memory.status === "proposed" && <button className="secondary-button compact" disabled={saving} onClick={() => void publishMemory(memory)}><Check size={13} />发布</button>}{memory.status !== "archived" && <button className="icon-button" title="归档" disabled={saving} onClick={() => void archiveMemory(memory)}><Archive size={15} /></button>}</div>
               </article>;
             })}
             {!visibleMemories.length && <EmptyState icon={BookOpen} title={memories.length ? "当前筛选下暂无记忆" : "暂无项目记忆"}><p>{memories.length ? "请调整敏感级别筛选或检索关键词。" : "先提出事实、决策、经验或流程，再由所有者审核发布。"}</p></EmptyState>}

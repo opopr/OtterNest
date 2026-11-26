@@ -125,8 +125,8 @@ export default function ProjectsPage() {
   useEffect(() => { void loadProjects(); }, [loadProjects]);
 
   const beginProjectRequest = useScopedRequest(selectedId);
-  const resetProjectView = () => { setTasks([]); setMembers([]); setGoals([]); setBriefing(null); setDetailSelection(null); setEditingProject(false); setShowTaskForm(false); setShowMemberForm(false); setTaskTitle(""); setTaskInstruction(""); setTaskAcceptance(""); setTaskGoalId(""); setTaskRisk("R1"); setTaskPriority("50"); setTaskSensitivity("internal"); setNewMemberAgentId(""); setNewMemberRole("worker"); };
-  const hasUnsavedDraft = Boolean(taskTitle || taskInstruction || taskAcceptance || taskGoalId || taskRisk !== "R1" || taskPriority !== "50" || taskSensitivity !== "internal" || newMemberAgentId || newMemberRole !== "worker" || (editingProject && selectedProject && (editProjectName !== selectedProject.name || editProjectDescription !== (selectedProject.description || "") || editProjectPriority !== String(selectedProject.priority))));
+  const resetProjectView = () => { setProjectName(""); setProjectDescription(""); setShowProjectForm(false); setTasks([]); setMembers([]); setGoals([]); setBriefing(null); setDetailSelection(null); setEditingProject(false); setShowTaskForm(false); setShowMemberForm(false); setTaskTitle(""); setTaskInstruction(""); setTaskAcceptance(""); setTaskGoalId(""); setTaskRisk("R1"); setTaskPriority("50"); setTaskSensitivity("internal"); setNewMemberAgentId(""); setNewMemberRole("worker"); };
+  const hasUnsavedDraft = Boolean(projectName || projectDescription || taskTitle || taskInstruction || taskAcceptance || taskGoalId || taskRisk !== "R1" || taskPriority !== "50" || taskSensitivity !== "internal" || newMemberAgentId || newMemberRole !== "worker" || (editingProject && selectedProject && (editProjectName !== selectedProject.name || editProjectDescription !== (selectedProject.description || "") || editProjectPriority !== String(selectedProject.priority))));
   const confirmDiscard = useDraftGuard(hasUnsavedDraft);
   const changeProject = async (id: string) => { if (id === selectedId || saving) return; if (!(await confirmDiscard())) return; resetProjectView(); setDetailLoading(true); setError(""); setSelectedId(id); setSearchParams({ project: id }); setDetailTab("tasks"); };
 
@@ -372,7 +372,7 @@ export default function ProjectsPage() {
 
       {showProjectForm && (
         <ValidatedForm className="panel form-panel" onSubmit={createProject}>
-          <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>创建项目</h3></div><button type="button" className="icon-button" onClick={() => setShowProjectForm(false)}><X size={17} /></button></div>
+          <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>创建项目</h3></div><button type="button" className="icon-button" aria-label="收起创建项目表单" onClick={() => setShowProjectForm(false)}><X size={17} /></button></div>
           <div className="form-grid">
             <label>项目名称<input value={projectName} onChange={(event) => setProjectName(event.target.value)} required maxLength={160} /></label>
             <label>项目说明<input value={projectDescription} onChange={(event) => setProjectDescription(event.target.value)} maxLength={3000} /></label>
@@ -454,7 +454,7 @@ export default function ProjectsPage() {
 
               {showTaskForm && (
                 <ValidatedForm className="panel form-panel" onSubmit={createTask}>
-                  <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>创建任务</h3></div><button type="button" className="icon-button" onClick={() => setShowTaskForm(false)}><X size={17} /></button></div>
+                  <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>创建任务</h3></div><button type="button" className="icon-button" aria-label="收起创建任务表单" onClick={() => setShowTaskForm(false)}><X size={17} /></button></div>
                   <label>任务标题<input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} required maxLength={240} /></label>
                   <div className="form-grid four">
                     <label>关联目标
@@ -538,7 +538,7 @@ export default function ProjectsPage() {
 
               {showMemberForm && (
                 <ValidatedForm className="panel form-panel" onSubmit={addMember}>
-                  <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>添加项目成员</h3></div><button type="button" className="icon-button" onClick={() => setShowMemberForm(false)}><X size={17} /></button></div>
+                  <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>添加项目成员</h3></div><button type="button" className="icon-button" aria-label="收起添加成员表单" onClick={() => setShowMemberForm(false)}><X size={17} /></button></div>
                   <div className="form-grid">
                     <label>选择智能体<select value={newMemberAgentId} onChange={(e) => setNewMemberAgentId(e.target.value)} required>
                       <option value="">选择已启用智能体…</option>
