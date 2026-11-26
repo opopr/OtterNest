@@ -201,12 +201,19 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
   const confirmEditDiscard = async () => !editDirty || await dialog.confirm({
     title: "放弃任务修改？", message: "尚未保存的任务修改将丢失。", confirmText: "放弃修改", cancelText: "继续编辑", tone: "warning"
   });
+  const closingRef = useRef(false);
+  const requestDiscard = async () => {
+    if (saving || closingRef.current) return false;
+    closingRef.current = true;
+    try { return await confirmEditDiscard(); }
+    finally { closingRef.current = false; }
+  };
   const closeDetails = async () => {
-    if (saving || !(await confirmEditDiscard())) return;
+    if (!(await requestDiscard())) return;
     onClose();
   };
   const closeEditor = async () => {
-    if (saving || !(await confirmEditDiscard())) return;
+    if (!(await requestDiscard())) return;
     setEditingTask(false);
     closeRef.current?.focus({preventScroll:true});
   };
@@ -279,7 +286,7 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
     }}>
       <div className="task-detail-header">
         <div><div className="eyebrow">{selection.projectName}</div><h2 id="task-detail-title">{task?.title||"任务详情"}</h2>{task&&<div className="task-detail-badges"><TaskStatusBadge status={task.status}/><span className="status-tag tag-neutral">{getRiskLabel(task.risk)}</span><span className="status-tag tag-neutral">优先级 {task.priority}</span></div>}</div>
-        <div className="task-detail-header-actions"><button className="secondary-button compact" onClick={()=>void load()} disabled={loading}><RefreshCw size={14} className={loading?"spin":""}/>刷新</button><button ref={closeRef} type="button" className="icon-button" onClick={()=>void closeDetails()} aria-label="关闭任务详情"><X size={17}/></button></div>
+        <div className="task-detail-header-actions"><button className="secondary-button compact" onClick={()=>void load()} disabled={loading || saving || editingTask}><RefreshCw size={14} className={loading?"spin":""}/>刷新</button><button ref={closeRef} type="button" className="icon-button" onClick={()=>void closeDetails()} aria-label="关闭任务详情"><X size={17}/></button></div>
       </div>
       {error&&<div className="inline-error" role="alert"><AlertCircle size={15}/>{error}<button type="button" aria-label="关闭错误提示" onClick={()=>setError("")}><X size={14}/></button></div>}
       {loading&&!task?<div className="panel-loading"><span className="spinner"/>正在读取任务详情…</div>:task&&<>
