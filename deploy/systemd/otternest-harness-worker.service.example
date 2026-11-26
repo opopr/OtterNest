@@ -1,0 +1,37 @@
+# TEMPLATE ONLY: do not enable until a reviewed execution command is configured.
+# A monitoring-only Runtime is NOT an execution credential. Register a separate Worker Runtime.
+[Unit]
+Description=OtterNest isolated Harness Worker (operator-configured)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=otternest-worker
+Group=otternest-worker
+EnvironmentFile=/etc/otternest-worker/worker.env
+Environment=PYTHONUNBUFFERED=1
+# Replace APPROVED_SYSTEM_WORKER with a vetted executable installed under /usr.
+# No command is embedded here because unreviewed task execution must never be enabled by default.
+ExecStart=/opt/otternest-node/venv/bin/otternest-runner --server ${OTTERNEST_SERVER_URL} --runtime-id ${OTTERNEST_RUNTIME_ID} --interval 15 --timeout 600 --workspace-root /var/lib/otternest-worker/workspaces --sandbox bwrap --cpu-seconds 580 --address-space-mib 2048 -- /usr/bin/APPROVED_SYSTEM_WORKER
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths=/var/lib/otternest-worker/workspaces
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

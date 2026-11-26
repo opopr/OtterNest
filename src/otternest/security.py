@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from datetime import datetime, timezone
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -56,6 +56,10 @@ def new_runtime_token() -> str:
     return "on_runtime_" + secrets.token_urlsafe(40)
 
 
+def new_monitor_token() -> str:
+    return "on_monitor_" + secrets.token_urlsafe(40)
+
+
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
@@ -84,19 +88,27 @@ def actor_from_token(token: str, db: Session) -> Actor:
         agent = db.scalar(select(Agent).where(Agent.token_hash == hash_token(token), Agent.enabled.is_(True), Agent.deleted_at.is_(None)))
         if agent:
             return Actor("agent", agent.id, "agent_token")
-    if token.startswith("on_runtime_"):
+    if token.startswith(("on_runtime_", "on_monitor_")):
         runtime = db.scalar(select(AgentRuntime).where(AgentRuntime.token_hash == hash_token(token), AgentRuntime.enabled.is_(True)))
         if runtime:
             agent = db.get(Agent, runtime.agent_id)
             if agent and agent.enabled and agent.deleted_at is None:
-                return Actor("agent", agent.id, "runtime_token", runtime_id=runtime.id)
+                return Actor("monitor" if token.startswith("on_monitor_") else "agent", agent.id,
+                             "monitor_token" if token.startswith("on_monitor_") else "runtime_token",
+                             runtime_id=runtime.id)
     raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
 
 
-def authenticate(authorization: str | None = Header(default=None), db: Session = Depends(get_session)) -> Actor:
+def authenticate(request: Request, authorization: str | None = Header(default=None), db: Session = Depends(get_session)) -> Actor:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Bearer token required")
-    return actor_from_token(authorization[7:], db)
+    actor = actor_from_token(authorization[7:], db)
+    if actor.kind == "monitor" and not (
+        request.method == "POST" and
+        request.url.path == f"/api/v1/agent/runtimes/{actor.runtime_id}/heartbeat"
+    ):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Monitor token permits heartbeat only")
+    return actor
 
 
 def owner_only(actor: Actor) -> None:

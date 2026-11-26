@@ -21,7 +21,7 @@ interface RuntimeRow {
 interface RuntimeToken { id:string; agent_id:string; token:string; }
 type Filter = "all"|"online"|"offline"|"disabled"|"missing_token";
 
-const stateLabels:Record<string,string>={idle:"空闲",busy:"忙碌",stopped:"已停止"};
+const stateLabels:Record<string,string>={idle:"空闲",busy:"忙碌",stopped:"已停止",monitoring:"仅监控"};
 const formatTime=(value:string|null)=>value?new Date(value).toLocaleString("zh-CN",{hour12:false}):"从未上报";
 
 export default function RuntimeMonitorPage(){
@@ -67,11 +67,11 @@ export default function RuntimeMonitorPage(){
  },[rows,filter,query]);
  const runtimePage=useListPage(visible,JSON.stringify([filter,query]));
 
- const rotateToken=async(row:RuntimeRow)=>{
-  if(!(await dialog.confirm({title:"轮换运行实例凭据",message:"为「"+row.label+"」轮换独立运行实例凭据？旧凭据将立即失效，必须同步更新对应执行节点的配置。",confirmText:"确认轮换",tone:"warning"})))return;
+ const rotateToken=async(row:RuntimeRow,monitorOnly=false)=>{
+  if(!(await dialog.confirm({title:monitorOnly?"签发只读监控凭据":"轮换运行实例凭据",message:monitorOnly?"为「"+row.label+"」签发仅允许心跳的监控凭据？原有运行实例凭据将立即失效，此节点无法再通过原凭据执行任务。":"为「"+row.label+"」轮换独立运行实例凭据？旧凭据将立即失效，必须同步更新对应执行节点的配置。",confirmText:monitorOnly?"签发监控凭据":"确认轮换",tone:"warning"})))return;
   setSaving(true);setError("");
   try{
-   const token=await request<RuntimeToken>("/agents/"+encodeURIComponent(row.agent_id)+"/runtimes/"+encodeURIComponent(row.id)+"/token",{method:"POST"});
+   const token=await request<RuntimeToken>("/agents/"+encodeURIComponent(row.agent_id)+"/runtimes/"+encodeURIComponent(row.id)+(monitorOnly?"/monitor-token":"/token"),{method:"POST"});
    setIssuedToken(token);
    await load();
   }catch(reason){setError(reason instanceof Error?reason.message:"运行实例凭据轮换失败");}
@@ -94,7 +94,7 @@ export default function RuntimeMonitorPage(){
   catch{setError("浏览器未授予剪贴板权限，请手动复制令牌");}
  };
 
- const renderActions=(row:RuntimeRow)=><div className="runtime-monitor-actions">{row.enabled&&<button className="secondary-button compact" disabled={saving} onClick={()=>void rotateToken(row)}><KeyRound size={13}/>{row.has_token?"轮换凭据":"签发凭据"}</button>}{row.enabled&&<button className="text-button" disabled={saving} onClick={()=>void disableRuntime(row)}><XCircle size={13}/>禁用运行实例</button>}</div>;
+ const renderActions=(row:RuntimeRow)=><div className="runtime-monitor-actions">{row.enabled&&<button className="secondary-button compact" disabled={saving} onClick={()=>void rotateToken(row)}><KeyRound size={13}/>{row.has_token?"轮换凭据":"签发凭据"}</button>}{row.enabled&&<button className="secondary-button compact" disabled={saving} onClick={()=>void rotateToken(row,true)}><KeyRound size={13}/>签发仅监控凭据</button>}{row.enabled&&<button className="text-button" disabled={saving} onClick={()=>void disableRuntime(row)}><XCircle size={13}/>禁用运行实例</button>}</div>;
  if(!isOwner)return <div className="page-stack"><div className="page-heading"><div><h1>运行监控</h1><p>统一查看智能体 运行实例和心跳状态。</p></div></div><div className="panel empty-state"><ShieldCheck size={28}/><strong>仅所有者可以查看运行实例 全局状态</strong><p>智能体 运行实例、独立凭据和健康信息属于平台管理数据。</p></div></div>;
 
  return <div className="page-stack">
@@ -142,6 +142,6 @@ export default function RuntimeMonitorPage(){
    </article>)}</div>):<EmptyState icon={Monitor} title={rows.length?"没有符合条件的运行实例":"尚未登记运行实例"} action={rows.length?{label:"重置搜索",onClick:()=>{setFilter("all");setQuery("");}}:undefined}>{!rows.length&&<Link className="secondary-button" to="/agents">前往智能体管理</Link>}</EmptyState>}
   </section>
   {!loading && <ListPagination {...runtimePage} label="运行实例分页"/>}
-  <p className="runtime-monitor-footnote"><Activity size={13}/>在线状态由服务端按最近 180 秒心跳、运行实例启用状态及空闲/忙碌状态计算。</p>
+  <p className="runtime-monitor-footnote"><Activity size={13}/>在线状态由服务端按最近 180 秒心跳、运行实例启用状态及空闲、忙碌或仅监控状态计算。</p>
  </div>;
 }

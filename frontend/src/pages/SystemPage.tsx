@@ -11,6 +11,7 @@ import type { Project, SystemMode } from "../api/types";
 import { useSystemMode } from "../auth/SystemModeProvider";
 import { useDialog } from "../components/AppDialog";
 import ProjectSelect from "../components/ProjectSelect";
+import ServerHealthCards from "../components/ServerHealthCards";
 
 interface ProjectEvent {
   id: number;
@@ -348,6 +349,7 @@ export default function SystemPage() {
           <ListPagination {...eventPage} label="事件分页" />
         </section>
       </>}
+      <ServerHealthCards />
       <details className="panel maintenance-disclosure"><summary>服务诊断与版本维护</summary><div className="system-maintenance-stack">
       <section className="panel connection-diagnostics-panel">
         <div className="panel-heading">

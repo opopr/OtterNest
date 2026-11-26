@@ -25,6 +25,7 @@ import httpx
 from .sandbox import SandboxError, build_bwrap_command, apply_linux_resource_limits
 from .cgroups import CgroupError, CgroupPolicy, TaskCgroup, validate_parent
 from .cgroup_recovery import CgroupOwnerLock, scan_scopes
+from .host_metrics import collect_host_health
 
 
 class RunnerFailure(Exception):
@@ -408,7 +409,7 @@ class Runner:
     def runtime_heartbeat(self, status: str = "idle") -> None:
         """Opt-in heartbeat for a pre-registered runtime (self-reported status)."""
         if self.runtime_id:
-            self.api("POST", f"/agent/runtimes/{self.runtime_id}/heartbeat", {"status": status})
+            self.api("POST", f"/agent/runtimes/{self.runtime_id}/heartbeat", {"status": status, "health": collect_host_health()})
 
     def run_one(self) -> bool:
         self.runtime_heartbeat("idle")
