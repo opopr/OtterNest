@@ -1,3 +1,4 @@
+import EmptyState from "../components/EmptyState";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { Link } from "react-router-dom";
 import ListPagination, { useListPage } from "../components/ListPagination";
@@ -267,7 +268,7 @@ export default function PortfolioPage() {
                 <div className="notification-copy"><div><strong>{item.title}</strong><span className={"status-tag " + (item.level === "urgent" ? "tag-red" : item.level === "important" ? "tag-blue" : "tag-neutral")}>{levelLabel[item.level] || getUiLabel(item.level)}</span></div><p>{item.body}</p><small>{dateText(item.created_at)} · {projects.find(p => p.id === item.project_id)?.name || (item.project_id ? "项目通知" : "系统通知")}</small></div>
                 {!item.read && <button className="icon-button" title="标记已读" onClick={() => void markRead(item.id)}><Check size={16} /></button>}
               </div>)}
-              {!visibleNotifications.length && <div className="empty-state"><Bell size={24} /><strong>暂无此类通知</strong></div>}
+              {!visibleNotifications.length && <EmptyState icon={Bell} title="暂无此类通知"/>}
             </div>
             <ListPagination {...notificationPage} label="通知分页" />
           </section>
@@ -301,7 +302,7 @@ export default function PortfolioPage() {
                   {experiment.owner_note && <p className="form-hint">所有者记录：{experiment.owner_note}</p>}
                 </article>;
               })}
-              {!experiments.length && <div className="empty-state"><FlaskConical size={24} /><strong>该项目还没有实验</strong><p>创建实验后记录基线、候选分数和样本数，再由所有者决定是否采纳。</p></div>}
+              {!experiments.length && <EmptyState icon={FlaskConical} title="该项目还没有实验"><p>创建实验后记录基线、候选分数和样本数，再由所有者决定是否采纳。</p></EmptyState>}
             </div>
           </section>
           {scheduleResult && <section className="panel"><div className="panel-heading"><div className="panel-title"><TrendingUp size={17} /><h3>最近一次公平调度结果</h3></div><span className="status-tag tag-green">已执行</span></div><div className="briefing-mini-grid"><div><strong>{scheduleResult.projects_evaluated}</strong><small>评估项目</small></div><div><strong>{scheduleResult.total_routes}</strong><small>分配任务数</small></div></div>{scheduleResult.per_project.map((item) => <div className="schedule-row" key={item.project_id}><strong>{item.project_name}</strong><span>优先级 {item.priority}</span><span>{item.routes.length} 项分配</span></div>)}</section>}

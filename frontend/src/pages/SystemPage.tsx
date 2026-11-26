@@ -1,3 +1,4 @@
+import EmptyState from "../components/EmptyState";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import { useDraftGuard } from "../components/DraftGuard";
 import { useProjectSelection } from "../components/ProjectSelection";
@@ -342,7 +343,7 @@ export default function SystemPage() {
               <span className="event-timeline-marker" />
               <div className="event-timeline-content"><div><strong>{eventLabel[event.kind] || event.kind}</strong><code>{event.kind}</code></div><p>对象：{event.subject_id}</p>{Object.keys(event.payload || {}).length > 0 && <details className="library-disclosure event-payload"><summary>事件详情</summary><pre>{JSON.stringify(event.payload, null, 2)}</pre></details>}<small>{new Date(event.created_at).toLocaleString("zh-CN", { hour12: false })} · 事件 #{event.id}</small></div>
             </article>)}
-            {!filteredEvents.length && <div className="empty-state"><Activity size={24} /><strong>{events.length ? "没有符合条件的事件" : "暂无项目事件"}</strong></div>}
+            {!filteredEvents.length && <EmptyState icon={Activity} title={events.length ? "没有符合条件的事件" : "暂无项目事件"}/>}
           </div>
           <ListPagination {...eventPage} label="事件分页" />
         </section>

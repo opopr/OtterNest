@@ -1,3 +1,4 @@
+import EmptyState from "../components/EmptyState";
 import { useProjectSelection } from "../components/ProjectSelection";
 import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
@@ -336,7 +337,7 @@ export default function KnowledgePage() {
                 <div className="memory-actions">{memory.status !== "archived" && <button className="text-button" onClick={() => editMemory(memory)}><Pencil size={13} />修订</button>}{memory.status === "proposed" && <button className="secondary-button compact" disabled={saving} onClick={() => void publishMemory(memory)}><Check size={13} />发布</button>}{memory.status !== "archived" && <button className="icon-button" title="归档" disabled={saving} onClick={() => void archiveMemory(memory)}><Archive size={15} /></button>}</div>
               </article>;
             })}
-            {!visibleMemories.length && <div className="empty-state"><BookOpen size={25} /><strong>{memories.length ? "当前筛选下暂无记忆" : "暂无项目记忆"}</strong><p>{memories.length ? "请调整敏感级别筛选或检索关键词。" : "先提出事实、决策、经验或流程，再由所有者审核发布。"}</p></div>}
+            {!visibleMemories.length && <EmptyState icon={BookOpen} title={memories.length ? "当前筛选下暂无记忆" : "暂无项目记忆"}><p>{memories.length ? "请调整敏感级别筛选或检索关键词。" : "先提出事实、决策、经验或流程，再由所有者审核发布。"}</p></EmptyState>}
           </div>
           {!loading && <ListPagination {...memoryPage} label="知识分页" />}
         </section>
@@ -367,7 +368,7 @@ export default function KnowledgePage() {
             <label>共享理由<textarea rows={2} value={shareRationale} onChange={(event) => setShareRationale(event.target.value)} required minLength={5} maxLength={3000} /></label>
             <div className="form-actions"><button className="primary-button compact" disabled={saving || !publishedMemories.length || !targetProjectId}>提交共享申请</button></div>
           </ValidatedForm>
-          <div className="share-list">{shares.map((share) => <article className="share-row" key={share.id}><div><strong>{projects.find((item) => item.id === share.source_project_id)?.name || share.source_project_id.slice(0, 8)} → {projects.find((item) => item.id === share.target_project_id)?.name || share.target_project_id.slice(0, 8)}</strong><p>{share.rationale}</p><small>{share.item_kind} · {share.source_item_id} · {new Date(share.created_at).toLocaleString("zh-CN", { hour12: false })}</small></div><div className="share-actions"><span className={"status-tag " + (share.status === "approved" ? "tag-green" : share.status === "proposed" ? "tag-amber" : "tag-neutral")}>{share.status === "proposed" ? "待审批" : share.status === "approved" ? "已批准" : "已拒绝"}</span>{share.status === "proposed" && <><button className="secondary-button compact" disabled={saving} onClick={() => void resolveShare(share, true)}>批准</button><button className="text-button" disabled={saving} onClick={() => void resolveShare(share, false)}>拒绝</button></>}</div></article>)}{!shares.length && <div className="empty-state"><Share2 size={24} /><strong>暂无跨项目共享记录</strong><p>只有已发布的知识可以申请共享，审批通过后才会复制到目标项目。</p></div>}</div>
+          <div className="share-list">{shares.map((share) => <article className="share-row" key={share.id}><div><strong>{projects.find((item) => item.id === share.source_project_id)?.name || share.source_project_id.slice(0, 8)} → {projects.find((item) => item.id === share.target_project_id)?.name || share.target_project_id.slice(0, 8)}</strong><p>{share.rationale}</p><small>{kindLabel[share.item_kind] || (share.item_kind === "memory" ? "知识" : share.item_kind)} · {share.source_item_id} · {new Date(share.created_at).toLocaleString("zh-CN", { hour12: false })}</small></div><div className="share-actions"><span className={"status-tag " + (share.status === "approved" ? "tag-green" : share.status === "proposed" ? "tag-amber" : "tag-neutral")}>{share.status === "proposed" ? "待审批" : share.status === "approved" ? "已批准" : "已拒绝"}</span>{share.status === "proposed" && <><button className="secondary-button compact" disabled={saving} onClick={() => void resolveShare(share, true)}>批准</button><button className="text-button" disabled={saving} onClick={() => void resolveShare(share, false)}>拒绝</button></>}</div></article>)}{!shares.length && <EmptyState icon={Share2} title="暂无跨项目共享记录"><p>只有已发布的知识可以申请共享，审批通过后才会复制到目标项目。</p></EmptyState>}</div>
         </section>
       )}
     </div>

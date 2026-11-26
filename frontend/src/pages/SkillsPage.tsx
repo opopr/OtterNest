@@ -1,3 +1,4 @@
+import EmptyState from "../components/EmptyState";
 import { useProjectSelection } from "../components/ProjectSelection";
 import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
@@ -213,7 +214,7 @@ export default function SkillsPage() {
             <details className="library-disclosure skill-evaluations"><summary><span><ClipboardList size={13}/> 评价记录</span><span>{(evaluations[skill.id] || []).length} 条</span></summary>{(evaluations[skill.id] || []).map((item) => <div className="skill-evaluation" key={item.id}><span className={"status-tag " + (item.verdict === "pass" ? "tag-green" : item.verdict === "fail" ? "tag-red" : "tag-amber")}>{verdictLabel[item.verdict]}</span><p>{item.notes}</p></div>)}</details>
             <div className="skill-actions">{skill.status === "proposed" && <button className="secondary-button compact" disabled={saving} onClick={() => void publishSkill(skill)}><ShieldCheck size={13} />所有者发布</button>}{skill.status !== "archived" && <button className="text-button" disabled={saving} onClick={() => void evaluateSkill(skill)}><Check size={13} />记录评价</button>}{skill.status !== "archived" && <button className="icon-button" title="归档" disabled={saving} onClick={() => void archiveSkill(skill)}><Archive size={14} /></button>}</div>
           </article>)}
-          {!loading && !visibleSkills.length && <div className="empty-state"><BookMarked size={25} /><strong>{skills.length ? "没有符合条件的技能" : "暂无技能"}</strong></div>}
+          {!loading && !visibleSkills.length && <EmptyState icon={BookMarked} title={skills.length ? "没有符合条件的技能" : "暂无技能"}/>}
         </div>
         {!loading && <ListPagination {...skillPage} label="技能分页" />}
       </section>

@@ -1,3 +1,4 @@
+import EmptyState from "../components/EmptyState";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import { useDraftGuard } from "../components/DraftGuard";
 import { useProjectSelection } from "../components/ProjectSelection";
@@ -422,7 +423,7 @@ export default function GovernancePage() {
                 </>}
               </div>
             </article>)}
-            {!pendingTasks.some(task => approvalFilter === "all" || task.status === approvalFilter) && <div className="empty-state"><CheckCircle2 size={26} /><strong>暂无此类待办</strong></div>}
+            {!pendingTasks.some(task => approvalFilter === "all" || task.status === approvalFilter) && <EmptyState icon={CheckCircle2} title="暂无此类待办"/>}
           </div>
         </section>
       ) : tab === "decisions" ? (
@@ -436,7 +437,7 @@ export default function GovernancePage() {
             {!decisions.length && <div className="empty-mini">该项目暂无决策记录</div>}
           </section>
           <section className="panel decision-detail-panel">
-            {!selectedDecision ? <div className="empty-state"><MessageSquare size={26} /><strong>选择一项决策</strong><p>查看独立审查意见和讨论过程。</p></div> : <>
+            {!selectedDecision ? <EmptyState icon={MessageSquare} title="选择一项决策"><p>查看独立审查意见和讨论过程。</p></EmptyState> : <>
               <div className="panel-heading"><div className="panel-title"><MessageSquare size={17} /><h3>决策详情</h3></div><span className={"status-tag " + (selectedDecision.status === "proposed" ? "tag-amber" : "tag-green")}>{selectedDecision.status === "proposed" ? "待裁决" : "已批准"}</span></div>
               <div className="decision-question">{selectedDecision.question}</div>
               <div className="decision-answer-grid"><div><small>建议方案</small><p>{selectedDecision.resolution}</p></div><div><small>决策依据</small><p>{selectedDecision.rationale}</p></div></div>

@@ -1,3 +1,4 @@
+import EmptyState from "../components/EmptyState";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import { useDraftGuard } from "../components/DraftGuard";
@@ -174,7 +175,7 @@ export default function AccessPage() {
             <small>敏感级上限：{sensitivityLabels[grant.max_sensitivity] || grant.max_sensitivity}</small>
             <small>到期：{new Date(grant.expires_at).toLocaleString("zh-CN", { hour12: false })}</small>
             {!grant.revoked && new Date(grant.expires_at).getTime() > Date.now() && <button className="text-button grant-revoke" disabled={saving} onClick={() => void revokeGrant(grant)}><Trash2 size={13} />撤销授权</button>}
-          </article>)}{!visibleGrants.length && <div className="empty-state"><KeyRound size={24} /><strong>{grants.length ? "没有符合条件的授权" : "暂无临时授权"}</strong></div>}</div>
+          </article>)}{!visibleGrants.length && <EmptyState icon={KeyRound} title={grants.length ? "没有符合条件的授权" : "暂无临时授权"}/>}</div>
           {!loading && <ListPagination {...grantPage} label="授权分页"/>}
         </section>
       </div>

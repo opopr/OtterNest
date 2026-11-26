@@ -1,3 +1,4 @@
+import EmptyState from "../components/EmptyState";
 import { useProjectSelection } from "../components/ProjectSelection";
 import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
@@ -379,7 +380,7 @@ export default function GoalsWorkflowPage() {
                 <div className="goal-card-actions">{goal.status === "active" && <button className="text-button" onClick={() => void changeGoalStatus(goal, "paused")}>暂停</button>}{goal.status === "paused" && <button className="text-button" onClick={() => void changeGoalStatus(goal, "active")}>恢复</button>}{goal.status !== "completed" && <button className="secondary-button compact" disabled={!goal.can_complete || saving} onClick={() => void changeGoalStatus(goal, "completed")}>完成目标</button>}<button className="text-button" disabled={saving} onClick={() => startEditGoal(goal)}><Pencil size={13} />编辑</button><button className="text-button" disabled={saving} onClick={() => void deleteGoal(goal)}><Trash2 size={13} />删除</button></div>
               </article>;
             })}
-            {!shownGoals.length && <div className="empty-state"><GitBranch size={25} /><strong>{board?.goals.length ? "没有符合条件的目标" : "尚未定义目标"}</strong></div>}
+            {!shownGoals.length && <EmptyState icon={GitBranch} title={board?.goals.length ? "没有符合条件的目标" : "尚未定义目标"}/>}
           </div>
         </section>
         </div>
@@ -403,7 +404,7 @@ export default function GoalsWorkflowPage() {
               {rules.map((rule) => <article className="workflow-rule-card" key={rule.id}>
                 <div className="workflow-rule-icon"><Zap size={18} /></div><div className="workflow-rule-main"><div><strong>{rule.name}</strong><span className={"status-tag " + (rule.enabled ? "tag-green" : "tag-neutral")}>{rule.enabled ? "已启用" : "已停用"}</span></div><p><code>{rule.event_prefix}</code> → {rule.action_kind === "create_task" ? "创建跟进任务" : "发送收件箱通知"}</p><small>已触发 {rule.triggered_count} 次 · 最大链深度 {rule.max_chain_depth} · 冷却 {rule.cooldown_seconds}s</small></div><div className="flex-row-gap-sm"><button className="secondary-button compact" disabled={saving} onClick={() => void toggleRule(rule)}>{rule.enabled ? "停用" : "启用"}</button><button className="text-button" disabled={saving} onClick={() => void deleteRule(rule)}><Trash2 size={14} />删除</button></div>
               </article>)}
-              {!rules.length && <div className="empty-state"><Workflow size={24} /><strong>尚未配置工作流规则</strong><p>添加事件前缀规则，系统会在显式评估时按约束执行。</p></div>}
+              {!rules.length && <EmptyState icon={Workflow} title="尚未配置工作流规则"><p>添加事件前缀规则，系统会在显式评估时按约束执行。</p></EmptyState>}
             </div>
           </section>
           <section className="panel">
