@@ -1,3 +1,4 @@
+import { useDisplayPreference, ViewModeSwitch } from "../components/ViewModeSwitch";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
@@ -54,6 +55,7 @@ export default function AgentsPage() {
 
   const activeAgents = useMemo(() => agents.filter((agent) => !agent.deleted_at), [agents]);
   const trashedAgents = useMemo(() => agents.filter((agent) => Boolean(agent.deleted_at)), [agents]);
+  const [viewMode,setViewMode] = useDisplayPreference("otternest-agent-view","cards");
   const [agentQuery, setAgentQuery] = useState("");
   const [agentFilter, setAgentFilter] = useState("all");
   useDraftGuard(Boolean(name || platform !== "local" || executionMode !== "manual" || capabilities || createdToken || runtimeToken || runtimeLabel || runtimeEnvironment !== "local" || verifiedCapabilities || (editingAgent && (editName !== editingAgent.name || editPlatform !== editingAgent.platform || editExecutionMode !== editingAgent.execution_mode || editCapabilities !== (editingAgent.declared_capabilities || []).join(", ")))));
@@ -343,8 +345,8 @@ export default function AgentsPage() {
         </button>
       </div>
 
-      <div className="panel agent-filter-bar"><label className="agent-search-field"><Search size={16}/><input aria-label="搜索智能体" placeholder="搜索名称、平台或能力" value={agentQuery} onChange={event => setAgentQuery(event.target.value)}/></label>{tab === "active" && <select aria-label="智能体状态" value={agentFilter} onChange={event => setAgentFilter(event.target.value)}><option value="all">全部状态</option><option value="enabled">已启用</option><option value="disabled">已停用</option></select>}<span className="muted-inline">{visibleAgents.length} 项结果</span><button type="button" className="text-button" onClick={() => {setAgentQuery("");setAgentFilter("all");}}>清除筛选</button></div>
-      <div className="agent-grid">
+      <div className="panel agent-filter-bar"><label className="agent-search-field"><Search size={16}/><input aria-label="搜索智能体" placeholder="搜索名称、平台或能力" value={agentQuery} onChange={event => setAgentQuery(event.target.value)}/></label>{tab === "active" && <select aria-label="智能体状态" value={agentFilter} onChange={event => setAgentFilter(event.target.value)}><option value="all">全部状态</option><option value="enabled">已启用</option><option value="disabled">已停用</option></select>}<span className="muted-inline">{visibleAgents.length} 项结果</span><ViewModeSwitch value={viewMode} onChange={setViewMode} label="智能体显示方式" alternate="list"/><button type="button" className="text-button" onClick={() => {setAgentQuery("");setAgentFilter("all");}}>清除筛选</button></div>
+      <div className={"agent-grid" + (viewMode === "list" ? " agent-list-view" : "")}>
         {loading ? <LoadingState/> : visibleAgents.length === 0 ? (
           <div className="panel empty-state">
             {tab === "active" ? <Bot size={30} /> : <Trash2 size={30} />}

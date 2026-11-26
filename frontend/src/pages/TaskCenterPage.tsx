@@ -1,3 +1,4 @@
+import { useDisplayPreference, ViewModeSwitch } from "../components/ViewModeSwitch";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { ErrorNotice } from "../components/PageFeedback";
 import { getUiLabel, TASK_STATUS_LABELS as labels, RISK_LABELS as risks } from "../utils/labels";
@@ -44,6 +45,7 @@ export default function TaskCenterPage() {
   const [risk, setRisk] = useState("all");
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [sortBy,setSortBy] = useState<"attention"|"priority"|"risk"|"title">("attention");
+  const [viewMode,setViewMode] = useDisplayPreference("otternest-task-view","list");
   const [compactRows, setCompactRows] = useState(() => { try { return localStorage.getItem("otternest-task-compact-rows") === "true"; } catch { return false; } });
   useEffect(() => { try { localStorage.setItem("otternest-task-compact-rows", String(compactRows)); } catch {} }, [compactRows]);
   const [loading, setLoading] = useState(true);
@@ -210,6 +212,16 @@ export default function TaskCenterPage() {
       ? `退回返工（${plan.parameters?.reason || "未填原因"}）`
       : "验收通过";
 
+  const renderTaskActions = (t: Row) => (<div className="task-center-actions">
+                  <button className="secondary-button compact" onClick={() => setDetailSelection({ id: t.id, projectId: t.project_id, projectName: t.project_name })}><Eye size={14} />详情</button>
+                  {t.status === "waiting_approval" && <button className="secondary-button compact" disabled={saving} onClick={() => void preview(t, "authorize_task")}><ShieldCheck size={14} />预览授权</button>}
+                  {t.status === "submitted" && (
+                    <>
+                      <button className="secondary-button compact" disabled={saving} onClick={() => void preview(t, "review_task", true)}><CheckCircle2 size={14} />预览验收</button>
+                      <button className="secondary-button compact" disabled={saving} onClick={() => void preview(t, "review_task", false)}><RotateCcw size={14} />退回返工</button>
+                    </>
+                  )}
+                </div>);
   return (
     <div className="page-stack">
       <div className="page-heading">
@@ -269,10 +281,19 @@ export default function TaskCenterPage() {
           <label>风险等级<select aria-label="风险等级" value={risk} onChange={(e) => setRisk(e.target.value)}><option value="all">全部等级</option>{Object.entries(risks).map(([k, v]) => <option key={k} value={k}>{k} · {v}</option>)}</select></label>
           <label>关键词<input aria-label="关键词" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="任务名称、项目或 ID" /></label>
         </div>
-        <div className="panel-heading task-results-heading"><div className="panel-title"><ClipboardCheck size={17}/><h3>任务列表</h3></div><div className="heading-actions"><span className="muted-inline">{rows.length} 条结果</span><label className="task-sort-control">排序<select aria-label="任务排序" value={sortBy} onChange={event=>setSortBy(event.target.value as typeof sortBy)}><option value="attention">待处理优先</option><option value="priority">优先级从高到低</option><option value="risk">风险从高到低</option><option value="title">任务名称</option></select></label><button type="button" className="secondary-button compact" aria-pressed={compactRows} onClick={() => setCompactRows(v => !v)}>{compactRows ? "展开摘要" : "紧凑显示"}</button></div></div>
+        <div className="panel-heading task-results-heading"><div className="panel-title"><ClipboardCheck size={17}/><h3>任务列表</h3></div><div className="heading-actions"><span className="muted-inline">{rows.length} 条结果</span><ViewModeSwitch value={viewMode} onChange={setViewMode} label="任务显示方式" alternate="table"/><label className="task-sort-control">排序<select aria-label="任务排序" value={sortBy} onChange={event=>setSortBy(event.target.value as typeof sortBy)}><option value="attention">待处理优先</option><option value="priority">优先级从高到低</option><option value="risk">风险从高到低</option><option value="title">任务名称</option></select></label><button type="button" className="secondary-button compact" aria-pressed={compactRows} onClick={() => setCompactRows(v => !v)}>{compactRows ? "展开摘要" : "紧凑显示"}</button></div></div>
         {loading ? (
           <div className="panel-loading"><span className="spinner" />正在汇总项目任务…</div>
         ) : rows.length ? (
+          viewMode === "table" ? (
+            <div className="data-table-scroll" role="region" aria-label="任务表格" tabIndex={0}>
+              <table className="data-table task-data-table"><thead><tr><th scope="col">任务</th><th scope="col">项目</th><th scope="col">状态</th><th scope="col">风险</th><th scope="col">优先级</th><th scope="col">敏感级</th><th scope="col">操作</th></tr></thead>
+              <tbody>{taskPage.rows.map(t=><tr key={t.id} className="task-table-row">
+                <td><strong className="data-table-title">{t.title}</strong>{!compactRows && <small className="task-result-excerpt">{t.failure_reason || t.result_summary || t.instruction}</small>}<details className="task-row-identifier"><summary>任务编号</summary><code>{t.id}</code></details></td>
+                <td>{t.project_name}</td><td><TaskStatusBadge status={t.status}/></td><td>{t.risk}</td><td className="numeric-cell">{t.priority}</td><td>{getUiLabel(t.sensitivity)}</td><td>{renderTaskActions(t)}</td>
+              </tr>)}</tbody></table>
+            </div>
+          ) : (
           <div className={"task-center-list" + (compactRows ? " task-center-list-compact" : "")}>
             {taskPage.rows.map((t) => (
               <article className="task-center-row" key={t.id}>
@@ -286,19 +307,11 @@ export default function TaskCenterPage() {
                   {!compactRows && <small className="task-result-excerpt">{t.failure_reason || t.result_summary || t.instruction}</small>}
                   <details className="task-row-identifier"><summary>任务编号</summary><code>{t.id}</code></details>
                 </div>
-                <div className="task-center-actions">
-                  <button className="secondary-button compact" onClick={() => setDetailSelection({ id: t.id, projectId: t.project_id, projectName: t.project_name })}><Eye size={14} />详情</button>
-                  {t.status === "waiting_approval" && <button className="secondary-button compact" disabled={saving} onClick={() => void preview(t, "authorize_task")}><ShieldCheck size={14} />预览授权</button>}
-                  {t.status === "submitted" && (
-                    <>
-                      <button className="secondary-button compact" disabled={saving} onClick={() => void preview(t, "review_task", true)}><CheckCircle2 size={14} />预览验收</button>
-                      <button className="secondary-button compact" disabled={saving} onClick={() => void preview(t, "review_task", false)}><RotateCcw size={14} />退回返工</button>
-                    </>
-                  )}
-                </div>
+                {renderTaskActions(t)}
               </article>
             ))}
           </div>
+          )
         ) : (
           <div className="empty-state"><ClipboardCheck size={24} /><strong>没有符合条件的任务</strong></div>
         )}
