@@ -1,5 +1,6 @@
 import { ErrorNotice } from "../components/PageFeedback";
-import { getUiLabel } from "../utils/labels";
+import { getUiLabel, TASK_STATUS_LABELS as labels, RISK_LABELS as risks } from "../utils/labels";
+import TaskStatusBadge from "../components/TaskStatusBadge";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, ClipboardCheck, Eye, Filter, GitBranch, RefreshCw, RotateCcw, ShieldCheck, X } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
@@ -27,17 +28,6 @@ interface DispatchNotice {
   errors: string[];
   project_count: number;
 }
-const labels: Record<string, string> = {
-  ready: "待执行", waiting_dependencies: "等待依赖", waiting_approval: "等待授权",
-  running: "执行中", submitted: "等待验收", blocked: "已阻塞",
-  completed: "已完成", cancelled: "已取消", failed: "执行失败"
-};
-const tones: Record<string, string> = {
-  ready: "tag-blue", waiting_dependencies: "tag-neutral", waiting_approval: "tag-red",
-  running: "tag-blue", submitted: "tag-amber", blocked: "tag-red",
-  completed: "tag-green", cancelled: "tag-neutral", failed: "tag-red"
-};
-const risks: Record<string, string> = { R0: "低风险", R1: "一般风险", R2: "较高风险", R3: "高风险" };
 const time = (v: string) => new Date(v).toLocaleString("zh-CN", { hour12: false });
 
 export default function TaskCenterPage() {
@@ -289,7 +279,7 @@ export default function TaskCenterPage() {
                 <div className="task-center-main">
                   <div className="task-center-title">
                     <strong>{t.title}</strong>
-                    <span className={"status-tag " + (tones[t.status] || "tag-neutral")}>{labels[t.status] || t.status}</span>
+                    <TaskStatusBadge status={t.status}/>
                     <span className="status-tag tag-neutral">{t.risk}</span>
                   </div>
                   <p>{t.project_name} · 优先级 {t.priority} · {getUiLabel(t.sensitivity)}</p>

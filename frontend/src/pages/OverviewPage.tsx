@@ -11,7 +11,7 @@ import type {
 } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import StatCard from "../components/StatCard";
-import { getSystemModeLabel } from "../utils/labels";
+import { getSystemModeLabel, getUiLabel } from "../utils/labels";
 import { computeReconnectDelayMs } from "../utils/reconnect";
 
 interface OverviewData {
@@ -22,16 +22,8 @@ interface OverviewData {
   system: SystemMode;
 }
 
-function StatusTag({ value }: { value: string }) {
-  const map: Record<string, string> = {
-    active: "进行中", paused: "已暂停", archived: "已归档",
-    ready: "待执行", running: "执行中", submitted: "待验收",
-    waiting_approval: "待审批", blocked: "已阻塞", completed: "已完成", cancelled: "已取消"
-  };
-  const tone = value === "completed" || value === "active" ? "tag-green"
-    : value === "blocked" || value === "waiting_approval" ? "tag-red"
-      : value === "running" || value === "submitted" ? "tag-blue" : "tag-neutral";
-  return <span className={"status-tag " + tone}>{map[value] || value}</span>;
+function StatusTag({value}: {value: string}) {
+  return <span className={"status-tag " + (value === "active" ? "tag-green" : "tag-neutral")}>{getUiLabel(value)}</span>;
 }
 
 function PendingList({ title, items, kind, projectNames }: {

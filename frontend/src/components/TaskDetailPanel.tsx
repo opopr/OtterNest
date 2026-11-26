@@ -1,3 +1,5 @@
+import { TASK_STATUS_LABELS as statusLabels } from "../utils/labels";
+import TaskStatusBadge from "./TaskStatusBadge";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity, AlertCircle, ArrowRight, Clock3, GitBranch, Info,
@@ -32,16 +34,6 @@ interface Props {
   onChanged: () => void;
 }
 
-const statusLabels: Record<string,string> = {
-  ready:"待执行", waiting_dependencies:"等待依赖", waiting_approval:"等待授权",
-  running:"执行中", submitted:"等待验收", blocked:"已阻塞",
-  completed:"已完成", cancelled:"已取消", failed:"执行失败"
-};
-const statusTones: Record<string,string> = {
-  ready:"tag-blue", waiting_dependencies:"tag-neutral", waiting_approval:"tag-red",
-  running:"tag-blue", submitted:"tag-amber", blocked:"tag-red",
-  completed:"tag-green", cancelled:"tag-neutral", failed:"tag-red"
-};
 const eventLabels: Record<string,string> = {
   "task.created":"任务创建", "task.routed":"分配目标智能体",
   "task.authorized":"任务已授权", "task.claimed":"智能体已领取",
@@ -231,7 +223,7 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
   const visibleUpstream = dependencyView === "waiting" ? upstream.filter(row=>row.status!=="completed") : upstream;
   const taskNode = (row:Task,role:"upstream"|"downstream") => (
     <div className="dag-task" key={row.id}>
-      <div className="dag-task-title"><strong>{row.title}</strong><span className={"status-tag "+(statusTones[row.status]||"tag-neutral")}>{statusLabels[row.status]||row.status}</span></div>
+      <div className="dag-task-title"><strong>{row.title}</strong><TaskStatusBadge status={row.status}/></div>
       <small>{role==="upstream"?"必须先完成":"等待当前任务"}</small>
       <code>{shortId(row.id)}</code>
     </div>
@@ -240,7 +232,7 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
   return <div className="modal-backdrop task-detail-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)onClose();}}>
     <section className="task-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="task-detail-title">
       <div className="task-detail-header">
-        <div><div className="eyebrow">{selection.projectName}</div><h2 id="task-detail-title">{task?.title||"任务详情"}</h2>{task&&<div className="task-detail-badges"><span className={"status-tag "+(statusTones[task.status]||"tag-neutral")}>{statusLabels[task.status]||task.status}</span><span className="status-tag tag-neutral">{task.risk}</span><span className="status-tag tag-neutral">优先级 {task.priority}</span></div>}</div>
+        <div><div className="eyebrow">{selection.projectName}</div><h2 id="task-detail-title">{task?.title||"任务详情"}</h2>{task&&<div className="task-detail-badges"><TaskStatusBadge status={task.status}/><span className="status-tag tag-neutral">{task.risk}</span><span className="status-tag tag-neutral">优先级 {task.priority}</span></div>}</div>
         <div className="task-detail-header-actions"><button className="secondary-button compact" onClick={()=>void load()} disabled={loading}><RefreshCw size={14} className={loading?"spin":""}/>刷新</button><button className="icon-button" onClick={onClose} aria-label="关闭任务详情"><X size={17}/></button></div>
       </div>
       {error&&<div className="inline-error"><AlertCircle size={15}/>{error}<button onClick={()=>setError("")}><X size={14}/></button></div>}
@@ -288,7 +280,7 @@ export default function TaskDetailPanel({selection,isOwner,onClose,onChanged}:Pr
           <div className="approval-switch dependency-switch" role="group" aria-label="上游依赖筛选"><button type="button" aria-pressed={dependencyView==="all"} className={dependencyView==="all"?"selected":""} onClick={()=>setDependencyView("all")}>全部依赖 <span>{upstream.length}</span></button><button type="button" aria-pressed={dependencyView==="waiting"} className={dependencyView==="waiting"?"selected":""} onClick={()=>setDependencyView("waiting")}>未完成 <span>{upstream.filter(row=>row.status!=="completed").length}</span></button></div><div className="dag-layout">
             <div className="dag-column"><span className="dag-column-label">上游依赖 · {upstream.length}</span>{visibleUpstream.length?visibleUpstream.map(row=>taskNode(row,"upstream")):<div className="dag-empty">{dependencyView==="waiting"?"无未完成上游任务":"无上游依赖"}</div>}</div>
             <div className="dag-arrow"><ArrowRight size={19}/></div>
-            <div className="dag-current"><span className="dag-column-label">当前任务</span><div className="dag-task dag-task-current"><div className="dag-task-title"><strong>{task.title}</strong><span className={"status-tag "+(statusTones[task.status]||"tag-neutral")}>{statusLabels[task.status]||task.status}</span></div><small>{task.risk} · 版本 {task.version}</small><code>{shortId(task.id)}</code></div></div>
+            <div className="dag-current"><span className="dag-column-label">当前任务</span><div className="dag-task dag-task-current"><div className="dag-task-title"><strong>{task.title}</strong><TaskStatusBadge status={task.status}/></div><small>{task.risk} · 版本 {task.version}</small><code>{shortId(task.id)}</code></div></div>
             <div className="dag-arrow"><ArrowRight size={19}/></div>
             <div className="dag-column"><span className="dag-column-label">下游任务 · {downstream.length}</span>{downstream.length?downstream.map(row=>taskNode(row,"downstream")):<div className="dag-empty">暂无下游任务</div>}</div>
           </div>

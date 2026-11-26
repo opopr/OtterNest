@@ -2,7 +2,8 @@ import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
 import { useScopedRequest } from "../utils/useScopedRequest";
-import { getUiLabel } from "../utils/labels";
+import { getUiLabel, TASK_STATUS_LABELS as statusLabels } from "../utils/labels";
+import TaskStatusBadge from "../components/TaskStatusBadge";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Eye, FolderKanban, Pencil, Plus, RefreshCw, Search, Target, Trash2, Users, X } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -47,11 +48,6 @@ interface ProjectBriefing {
   };
 }
 
-const statusLabels: Record<string, string> = {
-  ready: "待执行", running: "执行中", submitted: "待验收",
-  waiting_approval: "待审批", waiting_dependencies: "等待依赖",
-  blocked: "已阻塞", completed: "已完成", cancelled: "已取消"
-};
 
 export default function ProjectsPage() {
   const { user } = useAuth();
@@ -508,11 +504,7 @@ export default function ProjectsPage() {
                           <strong>{task.title}</strong>
                           <small>{task.id.slice(0, 12)} · {task.risk} · {getUiLabel(task.sensitivity)} · 优先级 {task.priority}</small>
                         </div>
-                        <span className={"status-tag " + (
-                          task.status === "completed" ? "tag-green" :
-                            task.status === "blocked" || task.status === "waiting_approval" ? "tag-red" :
-                              task.status === "running" || task.status === "submitted" ? "tag-blue" : "tag-neutral"
-                        )}>{statusLabels[task.status] || task.status}</span>
+                        <TaskStatusBadge status={task.status}/>
                         <div className="flex-row-gap-sm" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"

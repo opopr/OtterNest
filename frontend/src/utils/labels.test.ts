@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getSystemModeLabel, getTaskStatusLabel, getTaskStatusTone, getUiLabel, formatApiError, formatTransportError } from "./labels";
+import { getSystemModeLabel, getTaskStatusLabel, getTaskStatusTone, getUiLabel, getTaskStatusPresentation, formatApiError, formatTransportError } from "./labels";
 
 test("getTaskStatusLabel maps known and unknown statuses", () => {
   assert.equal(getTaskStatusLabel("waiting_approval"), "等待授权");
@@ -45,4 +45,11 @@ test("validation diagnostics omit echoed input and context", () => {
   const result = formatApiError([{loc:["body","password"],msg:"Field required",type:"missing",input:"test-secret",ctx:{token:"other-secret"}}],422);
   assert.match(result,/输入校验失败.*password.*Field required/);
   assert.doesNotMatch(result,/test-secret|other-secret/);
+});
+
+test("task status presentation is consistent and unknown codes stay neutral", () => {
+  assert.deepEqual(getTaskStatusPresentation("submitted"), {label:"等待验收",tone:"tag-amber"});
+  assert.deepEqual(getTaskStatusPresentation("waiting_approval"), {label:"等待授权",tone:"tag-red"});
+  assert.deepEqual(getTaskStatusPresentation("constructor"), {label:"constructor",tone:"tag-neutral"});
+  assert.deepEqual(getTaskStatusPresentation("future_state"), {label:"future_state",tone:"tag-neutral"});
 });

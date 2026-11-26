@@ -310,7 +310,7 @@ button:disabled { opacity: .58; cursor: wait; }
 
 
 /* React domain pages — shared controls and responsive layouts */
-.tag-amber { background: #fff5df; color: var(--legacy-text-warning); }
+.tag-amber { background: var(--amber-soft); color: var(--amber); }
 .project-select { min-width: 190px; display: inline-flex; align-items: center; gap: 8px; padding: 8px 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--legacy-white); color: var(--legacy-text-secondary); }
 .project-select select { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: var(--legacy-text-heading); font-size: 13px; }
 .project-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
@@ -1073,7 +1073,6 @@ body { font-size: 14px; line-height: 1.5; }
 .stat-copy span, .stat-copy small { color: var(--muted); }
 .stat-copy span { font-size: 13px; }
 .stat-copy strong { font-size: 24px; }
-.status-tag { font-size: 11px; }
 .login-screen { background: var(--bg); }
 .login-decoration, .banner-orb { display: none; }
 .login-card { background: var(--surface); border-color: var(--border); box-shadow: var(--shadow); }
@@ -1140,7 +1139,6 @@ input, textarea, select { accent-color: var(--accent); }
 
 /* Final pass: readable secondary copy, compact mobile navigation, visible system safety state. */
 :root { --muted: #526b66; }
-.tag-amber { color: var(--amber); background: var(--amber-soft); }
 .form-error { color: var(--red); background: var(--red-soft); overflow-wrap: anywhere; }
 .brand-row-mobile { display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; }
 .brand-row-mobile .brand { min-width:0; }
@@ -1584,3 +1582,7 @@ input, textarea, select { accent-color: var(--accent); }
 :root[data-ui-theme="dark"] :is(.form-error,.dispatch-errors){background:var(--red-soft);color:var(--red);border-color:var(--border)}
 :root[data-ui-theme="dark"] :is(.runtime-monitor-card,.artifact-card){border-color:var(--border)}
 :root[data-ui-theme="dark"] :is(.token-panel,.system-mode-banner,.goal-plan-confirmed) :is(p,small,strong){color:inherit}
+
+/* Keep known task statuses readable in every density and theme. */
+.status-tag[data-task-status]{flex-shrink:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.35}
+:root[data-ui-theme="dark"] .status-tag.tag-blue{color:var(--blue);background:var(--blue-soft)}

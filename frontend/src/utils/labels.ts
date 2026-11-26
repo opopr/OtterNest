@@ -43,16 +43,16 @@ export const SYSTEM_MODE_LABELS: Record<string, string> = {
 };
 
 export function getTaskStatusLabel(status: string): string {
-  return TASK_STATUS_LABELS[status] || status;
+  return Object.prototype.hasOwnProperty.call(TASK_STATUS_LABELS,status) ? TASK_STATUS_LABELS[status] : status;
 }
 
 export function getTaskStatusTone(status: string): string {
-  return TASK_STATUS_TONES[status] || "tag-neutral";
+  return Object.prototype.hasOwnProperty.call(TASK_STATUS_TONES,status) ? TASK_STATUS_TONES[status] : "tag-neutral";
 }
 
 export function getSystemModeLabel(mode?: string | null): string {
   if (!mode) return "状态读取中";
-  return SYSTEM_MODE_LABELS[mode] || mode;
+  return Object.prototype.hasOwnProperty.call(SYSTEM_MODE_LABELS,mode) ? SYSTEM_MODE_LABELS[mode] : mode;
 }
 
 /** Display-only labels; never send these translations as API values. */
@@ -112,4 +112,9 @@ export function formatTransportError(reason: unknown, method = "GET"): string {
   const readOnly = ["GET","HEAD","OPTIONS"].includes(method.toUpperCase());
   const message = aborted ? "请求已中断或超时" : "无法连接服务，请检查网络或服务状态";
   return readOnly ? message + "，可刷新后重试。" : message + "。操作结果尚不确定，请先刷新核对状态，不要直接重复提交。";
+}
+
+/** Task statuses have consistent text and severity across all workspaces. */
+export function getTaskStatusPresentation(status: string) {
+  return { label: getTaskStatusLabel(status), tone: getTaskStatusTone(status) };
 }

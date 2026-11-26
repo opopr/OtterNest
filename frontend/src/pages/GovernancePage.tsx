@@ -1,3 +1,4 @@
+import TaskStatusBadge from "../components/TaskStatusBadge";
 import { ErrorNotice } from "../components/PageFeedback";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
@@ -80,7 +81,6 @@ interface CommandPlan {
   result?: Record<string, unknown> | null;
 }
 
-const taskStatus: Record<string, string> = { waiting_approval: "等待授权", submitted: "等待验收" };
 const stanceLabel: Record<string, string> = { support: "支持", oppose: "反对", alternative: "替代方案" };
 const evidenceStatusLabel: Record<string, string> = {
   linked: "已关联项目记录",
@@ -400,7 +400,7 @@ export default function GovernancePage() {
           <div className="approval-switch" role="group" aria-label="审批状态">{[{key:"all",label:"全部待办"},{key:"waiting_approval",label:"待授权"},{key:"submitted",label:"待验收"}].map(item => <button type="button" key={item.key} aria-pressed={approvalFilter === item.key} className={approvalFilter === item.key ? "selected" : ""} onClick={() => setApprovalFilter(item.key)}>{item.label}<span>{item.key === "all" ? pendingTasks.length : pendingTasks.filter(task => task.status === item.key).length}</span></button>)}</div>
           <div className="governance-task-list">
             {pendingTasks.filter(task => approvalFilter === "all" || task.status === approvalFilter).map((task) => <article className="governance-task" key={task.id}>
-              <div className="governance-task-main"><div><strong>{task.title}</strong><span className={"status-tag " + (task.status === "waiting_approval" ? "tag-red" : "tag-blue")}>{taskStatus[task.status]}</span></div><p>{task.id} · {task.risk} · 优先级 {task.priority}</p><small>{task.instruction}</small></div>
+              <div className="governance-task-main"><div><strong>{task.title}</strong><TaskStatusBadge status={task.status}/></div><p>{task.id} · {task.risk} · 优先级 {task.priority}</p><small>{task.instruction}</small></div>
               <div className="governance-task-actions">
                 {task.status === "waiting_approval" ? <button className="primary-button compact" disabled={saving} onClick={() => void createTaskPlan(task, "authorize_task")}><ShieldCheck size={14} />生成授权预览</button> : <>
                   <button className="primary-button compact" disabled={saving} onClick={() => void createTaskPlan(task, "review_task", true)}><Check size={14} />验收通过预览</button>
@@ -472,7 +472,7 @@ export default function GovernancePage() {
 
               <div className="decision-subheading"><strong>第一轮独立审查</strong><span>{reviews.length} 条意见</span></div>
               {reviews.map((review) => <article className="review-card" key={review.id}>
-                <div className="review-card-head"><strong>{memberNameMap.get(review.agent_id) || `Agent ${review.agent_id.slice(0, 8)}`}</strong><span className={"status-tag " + (review.stance === "support" ? "tag-green" : review.stance === "oppose" ? "tag-red" : "tag-amber")}>{stanceLabel[review.stance]}</span></div>
+                <div className="review-card-head"><strong>{memberNameMap.get(review.agent_id) || `智能体 ${review.agent_id.slice(0, 8)}`}</strong><span className={"status-tag " + (review.stance === "support" ? "tag-green" : review.stance === "oppose" ? "tag-red" : "tag-amber")}>{stanceLabel[review.stance]}</span></div>
                 <p>{review.reasoning}</p>
                 {review.evidence.length > 0 && (
                   <div className="evidence-list">
@@ -524,7 +524,7 @@ export default function GovernancePage() {
               {deliberation && <div className="deliberation-panel">
                 <div className="decision-subheading"><strong>第二轮讨论</strong><span className={"status-tag " + (deliberation.status === "open" ? "tag-blue" : "tag-neutral")}>{deliberation.status === "open" ? "讨论中" : "已关闭"}</span></div>
                 <p className="form-hint">第二轮最多一轮，不会自动批准决策。所有者仍需最终裁决。</p>
-                {deliberation.rebuttals.map((reply) => <article className="review-card" key={reply.id}><div className="review-card-head"><strong>{memberNameMap.get(reply.agent_id) || `Agent ${reply.agent_id.slice(0, 8)}`}</strong><span className="status-tag tag-neutral">{stanceLabel[reply.stance] || reply.stance}</span></div><p>{reply.reasoning}</p></article>)}
+                {deliberation.rebuttals.map((reply) => <article className="review-card" key={reply.id}><div className="review-card-head"><strong>{memberNameMap.get(reply.agent_id) || `智能体 ${reply.agent_id.slice(0, 8)}`}</strong><span className="status-tag tag-neutral">{stanceLabel[reply.stance] || reply.stance}</span></div><p>{reply.reasoning}</p></article>)}
                 {deliberation.status === "open" && selectedDecision.status === "proposed" && <div className="form-panel"><label>关闭说明（至少 10 个字符）<textarea rows={2} value={closingNote} onChange={(event) => setClosingNote(event.target.value)} /></label><button className="secondary-button compact" disabled={saving || closingNote.trim().length < 10} onClick={() => void closeSecondRound()}>关闭第二轮</button></div>}
                 {deliberation.closing_note && <p className="form-hint">关闭说明：{deliberation.closing_note}</p>}
               </div>}

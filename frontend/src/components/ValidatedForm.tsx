@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type FormHTMLAttributes } from "react";
+import { useEffect, useId, useState, type FormEvent, type FormHTMLAttributes } from "react";
 import { AlertCircle } from "lucide-react";
 import { constraintMessage } from "../utils/formValidation";
 
@@ -21,7 +21,6 @@ function fieldMessage(field: Field) {
 /** Keep native HTML constraints; replace browser-language bubbles with one Chinese, accessible error. */
 export default function ValidatedForm({children, onSubmit, onInvalidCapture, onInputCapture, onChangeCapture, onReset, ...props}: FormHTMLAttributes<HTMLFormElement>) {
   const id = useId();
-  const batch = useRef(false);
   const [issue, setIssue] = useState<{field: Field; message: string} | null>(null);
   const field = issue?.field;
   useEffect(() => {
@@ -46,10 +45,11 @@ export default function ValidatedForm({children, onSubmit, onInvalidCapture, onI
       onInvalidCapture?.(event);
       if (event.defaultPrevented || !isField(event.target)) return;
       event.preventDefault();
-      if (batch.current) return;
-      batch.current = true;
-      queueMicrotask(() => { batch.current = false; });
-      const current = event.target;
+      // Browsers may run a microtask between invalid events. Always select the
+      // first invalid form control in DOM order rather than the latest event.
+      const current = Array.from(event.currentTarget.elements).find(
+        (element): element is Field => isField(element) && element.willValidate && !element.validity.valid
+      ) ?? event.target;
       setIssue({field: current, message: fieldMessage(current)});
       current.focus();
     }}
