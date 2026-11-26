@@ -1,3 +1,4 @@
+import { useDraftGuard } from "../components/DraftGuard";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { AlertCircle, Copy, KeyRound, LockKeyhole, RefreshCw, ShieldCheck, ShieldOff, UserRound, History, LogOut } from "lucide-react";
@@ -80,6 +81,7 @@ export default function AccountSecurityPage() {
   const [audit, setAudit] = useState<SecurityAuditResult | null>(null);
   const [auditFilter, setAuditFilter] = useState("all");
   const dialog = useDialog();
+  useDraftGuard(Boolean(currentPassword || newPassword || confirmPassword || newUsername || displayName || setup || setupCode || oneTimeCode || disablePassword || recoveryCodes.length));
 
   const load = useCallback(async () => {
     if (!isOwner) { setLoading(false); return; }

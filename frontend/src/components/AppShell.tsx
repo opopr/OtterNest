@@ -1,3 +1,4 @@
+import { useConfirmDiscard } from "./DraftGuard";
 import { Component, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArchiveRestore, ArrowUpRight, Bell, BookMarked, BookOpen, Bot, CheckCheck, ChevronDown,
@@ -82,6 +83,7 @@ interface TopbarNotification {
 
 export default function AppShell() {
   const { user, logout } = useAuth();
+  const confirmDiscard = useConfirmDiscard();
   const { systemMode } = useSystemMode();
   const [menuOpen, setMenuOpen] = useState(false);
   const [darkTheme, setDarkTheme] = useState(() => { try { return localStorage.getItem("otternest-ui-theme") === "dark"; } catch { return false; } });
@@ -369,7 +371,7 @@ export default function AppShell() {
               {menuOpen && (
                 <div className="user-menu">
                   {user?.kind === "owner" && <Link to="/account-security" onClick={() => setMenuOpen(false)}><LockKeyhole size={15}/>账号安全</Link>}
-                  <button onClick={() => { setMenuOpen(false); void logout(); }}>
+                  <button onClick={() => { setMenuOpen(false); void confirmDiscard().then(allowed => { if (allowed) void logout(); }); }}>
                     <LogOut size={15} />退出登录
                   </button>
                 </div>

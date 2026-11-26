@@ -1,3 +1,4 @@
+import { useDraftGuard } from "./DraftGuard";
 import { useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, GitBranch, LoaderCircle, LockKeyhole, Sparkles } from "lucide-react";
 import { request } from "../api/client";
@@ -44,6 +45,7 @@ export default function GoalPlanComposer({projectId,onConfirmed}:Props){
  const [confirming,setConfirming]=useState(false);
  const [error,setError]=useState("");
  const dialog=useDialog();
+  useDraftGuard(Boolean(!confirmed && (text.trim() || draft)));
 
  useEffect(()=>{
   setDraft(null);setConfirmed(null);setError("");setText("");

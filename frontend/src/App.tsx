@@ -1,5 +1,6 @@
 import { lazy } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { createBrowserRouter, createRoutesFromElements, RouterProvider, Navigate, Route } from "react-router-dom";
+import { DraftNavigationProvider } from "./components/DraftGuard";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { SystemModeProvider } from "./auth/SystemModeProvider";
 import { DialogProvider } from "./components/AppDialog";
@@ -25,24 +26,10 @@ const ExternalInterfacesPage = lazy(() => import("./pages/ExternalInterfacesPage
 const AccountSecurityPage = lazy(() => import("./pages/AccountSecurityPage"));
 const ProjectPortabilityPage = lazy(() => import("./pages/ProjectPortabilityPage"));
 
-function AuthGate() {
-  const { checking, isAuthenticated } = useAuth();
-  if (checking) {
-    return (
-      <div className="boot-screen">
-        <div className="boot-mascot"><BrandMark /></div>
-        <div className="spinner" />
-        <p>正在连接服务…</p>
-      </div>
-    );
-  }
-  if (!isAuthenticated) return <LoginPage />;
-  return (
-    <SystemModeProvider>
-      <DialogProvider>
-        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <Routes>
-            <Route element={<AppShell />}>
+let router: ReturnType<typeof createBrowserRouter> | undefined;
+function getRouter() {
+  return router ??= createBrowserRouter(createRoutesFromElements(
+    <Route element={<DraftNavigationProvider><AppShell /></DraftNavigationProvider>}>
               <Route index element={<OverviewPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/tasks" element={<TaskCenterPage />} />
@@ -62,8 +49,25 @@ function AuthGate() {
               <Route path="/artifacts" element={<ArtifactsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
-          </Routes>
-        </BrowserRouter>
+  ), {future:{v7_relativeSplatPath:true}});
+}
+
+function AuthGate() {
+  const { checking, isAuthenticated } = useAuth();
+  if (checking) {
+    return (
+      <div className="boot-screen">
+        <div className="boot-mascot"><BrandMark /></div>
+        <div className="spinner" />
+        <p>正在连接服务…</p>
+      </div>
+    );
+  }
+  if (!isAuthenticated) return <LoginPage />;
+  return (
+    <SystemModeProvider>
+      <DialogProvider>
+        <RouterProvider router={getRouter()} future={{ v7_startTransition: true }} />
       </DialogProvider>
     </SystemModeProvider>
   );

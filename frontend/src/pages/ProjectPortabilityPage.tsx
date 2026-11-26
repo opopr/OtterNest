@@ -1,3 +1,4 @@
+import { useDraftGuard } from "../components/DraftGuard";
 import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { AlertCircle, ArchiveRestore, Download, FileJson, RefreshCw, ShieldAlert, ShieldCheck, UploadCloud, X } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -56,6 +57,7 @@ export default function ProjectPortabilityPage() {
   const [confirmed, setConfirmed] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const dialog = useDialog();
+  useDraftGuard(Boolean(bundle && !result));
 
   const refresh = useCallback(async () => {
     if (!isOwner) { setLoading(false); return; }

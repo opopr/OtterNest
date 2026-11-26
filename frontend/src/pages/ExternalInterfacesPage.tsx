@@ -1,3 +1,4 @@
+import { useDraftGuard } from "../components/DraftGuard";
 import { getUiLabel } from "../utils/labels";
 import "./ExternalInterfacesPage.css";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
@@ -88,6 +89,7 @@ export default function ExternalInterfacesPage() {
   const [remoteUrl, setRemoteUrl] = useState("");
   const [remoteProjectId, setRemoteProjectId] = useState("");
   const [newRemote, setNewRemote] = useState<A2ARemoteCreated | null>(null);
+  const confirmDiscard = useDraftGuard(Boolean(webhookUrl || eventPrefix !== "task." || remoteAgentId || remoteUrl || remoteProjectId || newWebhookSecret || newRemote));
 
   const apiOrigin = getApiOrigin();
 
@@ -247,9 +249,7 @@ export default function ExternalInterfacesPage() {
 
     <section className="panel external-project-selector">
       <div><strong>当前项目</strong></div>
-      <ProjectSelect projects={projects} value={projectId} onChange={(value) => {
-        setProjectId(value); setNewWebhookSecret(null); setNewRemote(null); setSelectedTaskId(""); setNotice("");
-      }} />
+      <ProjectSelect projects={projects} value={projectId} disabled={saving} onChange={value => { if (value === projectId || saving) return; void confirmDiscard().then(allowed => { if (!allowed) return; setProjectId(value); setNewWebhookSecret(null); setNewRemote(null); setSelectedTaskId(""); setNotice(""); setWebhookUrl(""); setEventPrefix("task."); setRemoteAgentId(""); setRemoteUrl(""); setRemoteProjectId(""); setShowWebhookForm(false); setShowRemoteForm(false); }); }} />
     </section>
 
     {newWebhookSecret && <section className="panel token-panel" aria-label="回调签名密钥">

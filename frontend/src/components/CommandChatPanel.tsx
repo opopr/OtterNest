@@ -1,3 +1,4 @@
+import { useDraftGuard } from "./DraftGuard";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Bot, CheckCircle2, MessageSquare, RefreshCw, Send, Sparkles, UserRound } from "lucide-react";
 import { request } from "../api/client";
@@ -65,6 +66,7 @@ export default function CommandChatPanel({ projectId, tasks, onPlan }: Props) {
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"template" | "model">("template");
   const [plannerStatus, setPlannerStatus] = useState<PlannerStatus>({ enabled: false, model: null });
+  useDraftGuard(Boolean(text.trim()));
 
   useEffect(() => {
     let active = true;

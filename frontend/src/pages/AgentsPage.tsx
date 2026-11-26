@@ -1,3 +1,4 @@
+import { useDraftGuard } from "../components/DraftGuard";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
@@ -52,6 +53,7 @@ export default function AgentsPage() {
   const trashedAgents = useMemo(() => agents.filter((agent) => Boolean(agent.deleted_at)), [agents]);
   const [agentQuery, setAgentQuery] = useState("");
   const [agentFilter, setAgentFilter] = useState("all");
+  useDraftGuard(Boolean(name || platform !== "local" || executionMode !== "manual" || capabilities || createdToken || runtimeToken || runtimeLabel || runtimeEnvironment !== "local" || verifiedCapabilities || (editingAgent && (editName !== editingAgent.name || editPlatform !== editingAgent.platform || editExecutionMode !== editingAgent.execution_mode || editCapabilities !== (editingAgent.declared_capabilities || []).join(", ")))));
   const visibleAgents = useMemo(() => (tab === "active" ? activeAgents : trashedAgents).filter(agent => (tab === "trash" || agentFilter === "all" || agent.enabled === (agentFilter === "enabled")) && [agent.name, agent.platform, agent.id, ...(agent.declared_capabilities || []), ...(agent.verified_capabilities || [])].join(" ").toLocaleLowerCase().includes(agentQuery.trim().toLocaleLowerCase())), [tab, activeAgents, trashedAgents, agentQuery, agentFilter]);
   const selectedAgent = useMemo(() => agents.find((agent) => agent.id === selectedAgentId) || null, [agents, selectedAgentId]);
 
