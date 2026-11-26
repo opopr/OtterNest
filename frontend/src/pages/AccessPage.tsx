@@ -1,7 +1,7 @@
 import { ErrorNotice } from "../components/PageFeedback";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { AlertCircle, KeyRound, Plus, RefreshCw, ShieldCheck, Trash2, X } from "lucide-react";
+import { KeyRound, Plus, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import { request } from "../api/client";
 import type { Project, Task } from "../api/types";
 import { useDialog } from "../components/AppDialog";

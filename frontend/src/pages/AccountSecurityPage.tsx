@@ -1,8 +1,9 @@
+import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, SuccessNotice } from "../components/PageFeedback";
 import { useDraftGuard } from "../components/DraftGuard";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { AlertCircle, Copy, KeyRound, LockKeyhole, RefreshCw, ShieldCheck, ShieldOff, UserRound, History, LogOut } from "lucide-react";
+import { Copy, KeyRound, LockKeyhole, RefreshCw, ShieldCheck, ShieldOff, UserRound, History, LogOut } from "lucide-react";
 import { request } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { useDialog } from "../components/AppDialog";
@@ -244,7 +245,7 @@ export default function AccountSecurityPage() {
 
     <div className="admin-two-column">
       <details className="panel maintenance-disclosure account-password" open={!account?.account_configured}><summary><LockKeyhole size={16} />{account?.account_configured ? "更改登录密码" : "创建登录账号"}</summary>
-        <form className="form-panel admin-stack-form" onSubmit={(event) => void updatePassword(event)}>
+        <ValidatedForm className="form-panel admin-stack-form" onSubmit={(event) => void updatePassword(event)}>
           {!account?.account_configured && <label>首次创建用户名<input value={newUsername} onChange={(event) => setNewUsername(event.target.value)} minLength={3} maxLength={64} required autoComplete="username" /></label>}
           <label>显示名称（选填）<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={120} /></label>
           <label>当前密码{account?.auth_method === "owner_token" ? "（使用服务器令牌时可不填）" : ""}
@@ -254,7 +255,7 @@ export default function AccountSecurityPage() {
           <label>确认新密码<input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={8} maxLength={128} required autoComplete="new-password" /></label>
           <p className="form-hint">修改成功会注销所有已有会话，并返回登录页面。</p>
           <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "处理中…" : "保存新密码"}</button></div>
-        </form>
+        </ValidatedForm>
       </details>
 
       <section className="panel">
@@ -269,7 +270,7 @@ export default function AccountSecurityPage() {
         </div> : <div className="admin-stack-form">
           <p className="form-hint">使用身份验证器应用 扫描 otpauth URI 或输入密钥，然后填写 6 位动态码激活。</p>
           {!setup && <button className="primary-button compact" disabled={saving || !account?.account_configured} onClick={() => void startTotp()}><ShieldCheck size={14} />开始配置</button>}
-          {setup && <form className="admin-stack-form" onSubmit={(event) => void enableTotp(event)}>
+          {setup && <ValidatedForm className="admin-stack-form" onSubmit={(event) => void enableTotp(event)}>
             <label>身份验证器密钥（请勿分享）<div className="admin-secret-row"><code>{setup.formatted_secret}</code>
               <button type="button" className="secondary-button compact" onClick={() => void copy(setup.secret)}><Copy size={13} />复制</button></div></label>
             <label>验证器 URI（可手动复制）<div className="admin-secret-row"><code>{setup.otpauth_uri}</code>
@@ -277,7 +278,7 @@ export default function AccountSecurityPage() {
             <label>6 位动态验证码<input value={setupCode} onChange={(event) => setSetupCode(event.target.value)} inputMode="numeric" autoComplete="one-time-code" required minLength={6} maxLength={6} /></label>
             <div className="form-actions"><button className="primary-button compact" disabled={saving}>启用双重验证</button>
               <button type="button" className="secondary-button compact" onClick={() => setSetup(null)}>暂不启用</button></div>
-          </form>}
+          </ValidatedForm>}
         </div>}
       </section>
     </div>

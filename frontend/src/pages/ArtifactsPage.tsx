@@ -4,10 +4,7 @@ import { useScopedRequest } from "../utils/useScopedRequest";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  AlertCircle, Archive, Check, Download, FileArchive, FileCheck2, FileUp,
-  RefreshCw, RotateCcw, Trash2, X
-} from "lucide-react";
+import { Archive, Check, Download, FileArchive, FileCheck2, FileUp, RefreshCw, RotateCcw, Trash2, X } from "lucide-react";
 import { binaryRequest, request } from "../api/client";
 import type { Project, Task } from "../api/types";
 import { useDialog } from "../components/AppDialog";

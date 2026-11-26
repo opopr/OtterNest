@@ -1,7 +1,8 @@
+import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, SuccessNotice } from "../components/PageFeedback";
 import { useDraftGuard } from "../components/DraftGuard";
 import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from "react";
-import { AlertCircle, ArchiveRestore, Download, FileJson, RefreshCw, ShieldAlert, ShieldCheck, UploadCloud, X } from "lucide-react";
+import { ArchiveRestore, Download, FileJson, RefreshCw, ShieldAlert, ShieldCheck, UploadCloud } from "lucide-react";
 import { Link } from "react-router-dom";
 import { request } from "../api/client";
 import type { Project } from "../api/types";
@@ -192,13 +193,13 @@ export default function ProjectPortabilityPage() {
             <li>智能体身份恢复为禁用状态，密钥与外部连接不会恢复。</li>
             <li>成果仅恢复元数据，需要重新校验并恢复二进制文件。</li></ul>
         </div></div>
-      <form className="form-panel admin-stack-form" onSubmit={(event) => void restore(event)}>
+      <ValidatedForm className="form-panel admin-stack-form" onSubmit={(event) => void restore(event)}>
         <label>新项目名称<input required maxLength={160} value={newName} onChange={(event) => setNewName(event.target.value)} /></label>
         <label className="admin-confirm"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
           <span>我已查看预检摘要，理解新项目将被暂停，所有外部能力必须重新授权和验证。</span></label>
         <div className="form-actions"><button className="primary-button compact" disabled={!confirmed || !newName.trim() || busy}>
           <ArchiveRestore size={15} />{busy ? "恢复中…" : "确认创建新项目"}</button></div>
-      </form>
+      </ValidatedForm>
     </section>}
 
     {result && <section className="panel">

@@ -1,13 +1,11 @@
+import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import { dependencyLayers } from "../utils/dependencyLayers";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import {
-  AlertCircle, ArrowUp, GitBranch, ListChecks, Pencil, Plus, RefreshCw,
-  Trash2, Workflow, X, Zap
-} from "lucide-react";
+import { ArrowUp, GitBranch, ListChecks, Pencil, Plus, RefreshCw, Trash2, Workflow, X, Zap } from "lucide-react";
 import { request } from "../api/client";
 import type { Project } from "../api/types";
 import { useDialog } from "../components/AppDialog";
@@ -345,13 +343,13 @@ export default function GoalsWorkflowPage() {
         <details className="panel maintenance-disclosure"><summary>智能目标规划</summary><GoalPlanComposer key={selectedId} projectId={selectedId} onConfirmed={()=>void loadProjectData(selectedId)} /></details>
         <section className="panel">
           <div className="panel-heading"><div className="panel-title"><GitBranch size={17} /><h3>目标与前置条件</h3></div><button className="primary-button compact" onClick={() => setShowGoalForm((value) => !value)} disabled={!selectedId}><Plus size={15} />新建目标</button></div>
-          {showGoalForm && <form className="form-panel embedded-form" onSubmit={createGoal}>
+          {showGoalForm && <ValidatedForm className="form-panel embedded-form" onSubmit={createGoal}>
             <label>目标名称<input value={goalTitle} onChange={(event) => setGoalTitle(event.target.value)} required maxLength={240} /></label>
             <label>成功标准<textarea rows={3} value={goalCriteria} onChange={(event) => setGoalCriteria(event.target.value)} required maxLength={5000} /></label>
             <label>优先级（0–100）<input type="number" min="0" max="100" value={goalPriority} onChange={(event) => setGoalPriority(event.target.value)} /></label>
             <div className="form-actions"><button className="primary-button compact" disabled={saving}>创建目标</button></div>
-          </form>}
-          {editingGoal && <form className="form-panel embedded-form" onSubmit={saveEditGoal}>
+          </ValidatedForm>}
+          {editingGoal && <ValidatedForm className="form-panel embedded-form" onSubmit={saveEditGoal}>
             <div className="panel-heading"><div className="panel-title"><Pencil size={15} /><h3>编辑目标：{editingGoal.title}</h3></div><button type="button" className="icon-button" onClick={() => setEditingGoal(null)}><X size={16} /></button></div>
             <div className="form-grid">
               <label>目标名称<input value={editGoalTitle} onChange={(e) => setEditGoalTitle(e.target.value)} required maxLength={240} /></label>
@@ -359,7 +357,7 @@ export default function GoalsWorkflowPage() {
             </div>
             <label>成功标准<textarea rows={3} value={editGoalCriteria} onChange={(e) => setEditGoalCriteria(e.target.value)} required maxLength={5000} /></label>
             <div className="form-actions"><button type="button" className="secondary-button compact" onClick={() => setEditingGoal(null)}>取消</button><button className="primary-button compact" disabled={saving}>保存修改</button></div>
-          </form>}
+          </ValidatedForm>}
           {Boolean(board?.goals.length) && <section className="goal-layer-board" aria-label="目标依赖概览">
             <div className="goal-layer-heading"><strong>目标依赖顺序</strong><span className="muted-inline">按前置依赖分层，不代表执行状态</span></div>
             <div className="goal-layer-grid">{goalGraph.layers.map((layer,index) => <div className="goal-layer" key={index}><span className="goal-layer-label">第 {index+1} 层</span>{layer.map(goal => <button type="button" key={goal.id} className="goal-layer-node" onClick={() => revealGoal(goal.id)}><strong>{goal.title}</strong><span className={"status-tag " + (goal.status === "completed" ? "tag-green" : !goal.dependencies_satisfied ? "tag-amber" : "tag-neutral")}>{goal.status === "completed" ? "已完成" : !goal.dependencies_satisfied ? "等待前置目标" : goalStatus[goal.status] || goal.status}</span></button>)}</div>)}</div>
@@ -388,7 +386,7 @@ export default function GoalsWorkflowPage() {
         <div className="page-stack">
           <section className="panel">
             <div className="panel-heading"><div className="panel-title"><Workflow size={17} /><h3>事件驱动工作流</h3></div><div className="heading-actions"><button className="secondary-button compact" onClick={() => void evaluateRules()} disabled={!selectedId || saving}><Zap size={14} />评估规则</button><button className="primary-button compact" onClick={() => setShowRuleForm((value) => !value)}><Plus size={14} />新建规则</button></div></div>
-            {showRuleForm && <form className="form-panel embedded-form" onSubmit={createRule}>
+            {showRuleForm && <ValidatedForm className="form-panel embedded-form" onSubmit={createRule}>
               <div className="form-grid">
                 <label>规则名称<input value={ruleName} onChange={(event) => setRuleName(event.target.value)} required maxLength={160} /></label>
                 <label>事件前缀<input value={eventPrefix} onChange={(event) => setEventPrefix(event.target.value)} required pattern="[a-z0-9_.*-]+" placeholder="task.completed" /></label>
@@ -399,7 +397,7 @@ export default function GoalsWorkflowPage() {
               </div>
               <p className="form-hint">规则采用事件前缀匹配，并受最大链深度、冷却时间与重复事件去重保护。</p>
               <div className="form-actions"><button className="primary-button compact" disabled={saving}>保存规则</button></div>
-            </form>}
+            </ValidatedForm>}
             <div className="workflow-rule-list">
               {rules.map((rule) => <article className="workflow-rule-card" key={rule.id}>
                 <div className="workflow-rule-icon"><Zap size={18} /></div><div className="workflow-rule-main"><div><strong>{rule.name}</strong><span className={"status-tag " + (rule.enabled ? "tag-green" : "tag-neutral")}>{rule.enabled ? "已启用" : "已停用"}</span></div><p><code>{rule.event_prefix}</code> → {rule.action_kind === "create_task" ? "创建跟进任务" : "发送收件箱通知"}</p><small>已触发 {rule.triggered_count} 次 · 最大链深度 {rule.max_chain_depth} · 冷却 {rule.cooldown_seconds}s</small></div><div className="flex-row-gap-sm"><button className="secondary-button compact" disabled={saving} onClick={() => void toggleRule(rule)}>{rule.enabled ? "停用" : "启用"}</button><button className="text-button" disabled={saving} onClick={() => void deleteRule(rule)}><Trash2 size={14} />删除</button></div>

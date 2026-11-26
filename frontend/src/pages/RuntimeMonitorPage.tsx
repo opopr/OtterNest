@@ -1,10 +1,7 @@
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Activity, AlertCircle, Bot, Copy, Cpu, KeyRound,
-  Monitor, RefreshCw, Search, ShieldCheck, Wifi, WifiOff, X, XCircle
-} from "lucide-react";
+import { Activity, Bot, Copy, Cpu, KeyRound, Monitor, RefreshCw, Search, ShieldCheck, Wifi, WifiOff, XCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { request } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";

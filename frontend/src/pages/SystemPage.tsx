@@ -1,10 +1,7 @@
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  AlertCircle, Activity, CheckCircle2, Clock3, DownloadCloud, RefreshCw,
-  Shield, ShieldAlert, X
-} from "lucide-react";
+import { Activity, CheckCircle2, Clock3, DownloadCloud, RefreshCw, Shield, ShieldAlert } from "lucide-react";
 import { getApiOrigin, healthRequest, request } from "../api/client";
 import type { Project, SystemMode } from "../api/types";
 import { useSystemMode } from "../auth/SystemModeProvider";

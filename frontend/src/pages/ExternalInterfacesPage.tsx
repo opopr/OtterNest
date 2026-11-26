@@ -1,9 +1,10 @@
+import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice } from "../components/PageFeedback";
 import { useDraftGuard } from "../components/DraftGuard";
 import { getUiLabel } from "../utils/labels";
 import "./ExternalInterfacesPage.css";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Activity, ArrowUpRight, Bot, Copy, Globe2, Link2, Network, Plus, RefreshCw, ShieldCheck, Webhook, X } from "lucide-react";
+import { Activity, ArrowUpRight, Bot, Copy, Globe2, Link2, Network, Plus, RefreshCw, ShieldCheck, Webhook } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getApiOrigin, request } from "../api/client";
 import type { Agent, Project } from "../api/types";
@@ -273,11 +274,11 @@ export default function ExternalInterfacesPage() {
           <div className="heading-actions"><span className="count-chip">{webhooks.length}</span>
             <button className="secondary-button compact" onClick={() => setShowWebhookForm((v) => !v)} disabled={!projectId || saving}><Plus size={14} />添加</button></div></div>
         <p className="form-hint">向允许列表中的 HTTPS 服务器推送项目事件。需要服务端配置签名密钥、允许的主机和 回调执行节点。</p>
-        {showWebhookForm && <form className="form-panel external-form" onSubmit={(event) => void createWebhook(event)}>
+        {showWebhookForm && <ValidatedForm className="form-panel external-form" onSubmit={(event) => void createWebhook(event)}>
           <label>目标 HTTPS URL<input type="url" value={webhookUrl} onChange={(event) => setWebhookUrl(event.target.value)} required placeholder="https://hooks.example.com/otternest" /></label>
           <label>事件前缀<input value={eventPrefix} onChange={(event) => setEventPrefix(event.target.value)} required maxLength={100} placeholder="task." /></label>
           <div className="form-actions"><button className="primary-button compact" disabled={saving || !projectId}>创建回调</button></div>
-        </form>}
+        </ValidatedForm>}
         {loading && <p className="muted-inline">正在刷新连接…</p>}
         <div className="external-endpoint-list">
           {webhooks.map((hook) => <div className="external-endpoint" key={hook.id}>
@@ -295,7 +296,7 @@ export default function ExternalInterfacesPage() {
           <div className="heading-actions"><span className="count-chip">{remotes.length}</span>
             <button className="secondary-button compact" onClick={() => setShowRemoteForm((v) => !v)} disabled={!projectId || saving}><Plus size={14} />添加</button></div></div>
         <p className="form-hint">登记有真实 A2A 能力的远端智能体。必须先登记 远程智能体 并加入当前项目，后端还需 HTTPS 主机允许列表和独立远端凭据。</p>
-        {showRemoteForm && <form className="form-panel external-form" onSubmit={(event) => void createRemote(event)}>
+        {showRemoteForm && <ValidatedForm className="form-panel external-form" onSubmit={(event) => void createRemote(event)}>
           <label>项目内 远程智能体<select value={remoteAgentId} onChange={(event) => setRemoteAgentId(event.target.value)} required>
             <option value="">选择远程智能体…</option>{eligibleRemoteAgents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
           </select></label>
@@ -303,7 +304,7 @@ export default function ExternalInterfacesPage() {
           <label>远端项目 ID（可选）<input value={remoteProjectId} onChange={(event) => setRemoteProjectId(event.target.value)} maxLength={128} /></label>
           <div className="form-actions"><button className="primary-button compact" disabled={saving || !projectId || !remoteAgentId}>登记远端</button></div>
           {eligibleRemoteAgents.length === 0 && <p className="form-hint">暂无符合条件的 远程智能体。请先在 智能体管理登记远程智能体，并加入此项目。</p>}
-        </form>}
+        </ValidatedForm>}
         {loading && <p className="muted-inline">正在刷新连接…</p>}
         <div className="external-endpoint-list">
           {remotes.map((remote) => <div className="external-endpoint" key={remote.id}>

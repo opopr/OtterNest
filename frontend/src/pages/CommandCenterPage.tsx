@@ -1,7 +1,7 @@
 import { ErrorNotice, SuccessNotice } from "../components/PageFeedback";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { Activity, AlertCircle, CheckCircle2, Clock3, FileCode2, MessageSquare, RefreshCw, Search, ShieldCheck, X } from "lucide-react";
+import { Activity, Clock3, FileCode2, MessageSquare, RefreshCw, Search, ShieldCheck, X } from "lucide-react";
 import { request } from "../api/client";
 import type { Project, Task } from "../api/types";
 import A2UIRenderer, { type A2UIResult } from "../components/A2UIRenderer";

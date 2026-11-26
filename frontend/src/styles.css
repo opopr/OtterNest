@@ -1546,3 +1546,8 @@ input, textarea, select { accent-color: var(--accent); }
 .page-feedback button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 .panel-loading[role="status"]{min-height:64px;display:flex;align-items:center;justify-content:center;gap:10px;color:var(--muted)}
 @media(max-width:580px){.page-feedback{flex-wrap:wrap}.feedback-message{flex-basis:calc(100% - 32px)}.page-feedback .feedback-retry{margin-left:24px}}
+
+/* Form constraints, independent of the browser display language. */
+.form-validation-message{display:flex;align-items:flex-start;gap:8px;grid-column:1/-1;border:1px solid var(--border);border-radius:8px;background:var(--red-soft);color:var(--red);padding:10px 12px;font-size:13px;line-height:1.55;overflow-wrap:anywhere}
+.form-validation-message svg{flex-shrink:0;margin-top:2px}
+.form-panel :is(input,select,textarea)[aria-invalid="true"],.login-form :is(input,select,textarea)[aria-invalid="true"]{border-color:var(--red);outline-color:var(--red)}

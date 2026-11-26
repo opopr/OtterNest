@@ -1,12 +1,10 @@
+import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import {
-  AlertCircle, Archive, BookOpen, Check, Database, FilePlus2, Globe2,
-  LockKeyhole, Pencil, Plus, RefreshCw, Search, Share2, ShieldCheck, X
-} from "lucide-react";
+import { Archive, BookOpen, Check, Database, FilePlus2, Globe2, LockKeyhole, Pencil, Plus, RefreshCw, Search, Share2, ShieldCheck, X } from "lucide-react";
 import { request } from "../api/client";
 import type { Project } from "../api/types";
 import { useDialog } from "../components/AppDialog";
@@ -287,7 +285,7 @@ export default function KnowledgePage() {
           <div className="panel-heading">
             <div className="panel-title"><Database size={17} /><h3>项目知识</h3><span className="count-chip">{visibleMemories.length}</span></div>
             <div className="heading-actions flex-row-gap">
-              <form onSubmit={(e) => { e.preventDefault(); if (selectedId) void loadProjectData(selectedId, searchQuery); }} className="flex-row-gap-sm">
+              <ValidatedForm onSubmit={(e) => { e.preventDefault(); if (selectedId) void loadProjectData(selectedId, searchQuery); }} className="flex-row-gap-sm">
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -309,11 +307,11 @@ export default function KnowledgePage() {
                 <select className="compact-select" aria-label="知识状态" value={memoryStatus} onChange={e => setMemoryStatus(e.target.value)}><option value="all">全部状态</option><option value="proposed">待发布</option><option value="published">已发布</option><option value="archived">已归档</option></select>
                 <button type="submit" className="secondary-button compact" disabled={!selectedId || loading}><Search size={14} />检索</button>
                 {(searchQuery || sensitivityFilter !== "all" || memoryStatus !== "all") && <button type="button" className="text-button" onClick={() => { setSearchQuery(""); setSensitivityFilter("all"); setMemoryStatus("all"); if (selectedId) void loadProjectData(selectedId, ""); }}>清除</button>}
-              </form>
+              </ValidatedForm>
               <button className="primary-button compact" onClick={() => { cancelMemoryForm(); setShowMemoryForm(true); }} disabled={!selectedId}><Plus size={15} />新增记忆</button>
             </div>
           </div>
-          {showMemoryForm && <form className="form-panel embedded-form" onSubmit={saveMemory}>
+          {showMemoryForm && <ValidatedForm className="form-panel embedded-form" onSubmit={saveMemory}>
             <div className="panel-heading"><div className="panel-title"><FilePlus2 size={16} /><h3>{editingId ? "修订知识记录" : "提出新记忆"}</h3></div><button type="button" className="icon-button" onClick={cancelMemoryForm}><X size={16} /></button></div>
             <div className="form-grid">
               <label>知识类型<select value={memoryDraft.kind} onChange={(event) => setDraftField("kind", event.target.value)}><option value="fact">事实</option><option value="decision">决策</option><option value="experience">经验</option><option value="skill">技能</option><option value="procedure">流程</option></select></label>
@@ -325,7 +323,7 @@ export default function KnowledgePage() {
             {editingId && <label>修订原因（至少 5 个字符）<textarea rows={2} value={revisionReason} onChange={(event) => setRevisionReason(event.target.value)} required minLength={5} /></label>}
             <p className="form-hint">新记忆默认进入待审核状态。只有所有者发布后，智能体才能把它作为正式项目知识使用。</p>
             <div className="form-actions"><button className="primary-button compact" disabled={saving || (Boolean(editingId) && revisionReason.trim().length < 5)}>{saving ? "保存中…" : editingId ? "保存修订" : "提交记忆"}</button></div>
-          </form>}
+          </ValidatedForm>}
           <div className="memory-grid">
             {memoryPage.rows.map((memory) => {
               const displayScore = typeof memory.relevance_score === "number" ? memory.relevance_score : memory.score;
@@ -349,25 +347,25 @@ export default function KnowledgePage() {
             <div><strong>{charter?.active_total_tasks ?? 0}/{charter?.max_total_tasks ?? 200}</strong><small>累计有效任务</small></div>
             <div><strong>{charter?.configured ? "自定义" : "默认"}</strong><small>预算来源</small></div>
           </div>
-          <form className="form-panel embedded-form" onSubmit={saveCharter}>
+          <ValidatedForm className="form-panel embedded-form" onSubmit={saveCharter}>
             <label>范围边界<textarea rows={4} value={charterDraft.scope_boundary} onChange={(event) => setCharterDraft((current) => ({ ...current, scope_boundary: event.target.value }))} maxLength={4000} placeholder="明确项目允许做什么、不允许做什么，以及交付范围。" /></label>
             <label>停止条件<textarea rows={4} value={charterDraft.stop_conditions} onChange={(event) => setCharterDraft((current) => ({ ...current, stop_conditions: event.target.value }))} maxLength={4000} placeholder="明确何时必须暂停执行并请求所有者介入。" /></label>
             <div className="form-grid"><label>最大并发任务<input type="number" min="1" max="50" value={charterDraft.max_concurrent_tasks} onChange={(event) => setCharterDraft((current) => ({ ...current, max_concurrent_tasks: event.target.value }))} /></label><label>最大任务总量<input type="number" min="1" max="2000" value={charterDraft.max_total_tasks} onChange={(event) => setCharterDraft((current) => ({ ...current, max_total_tasks: event.target.value }))} /></label></div>
             <p className="form-hint">并发上限不得大于任务总量。章程是后端强制执行的预算边界，不是单纯展示说明。</p>
             <div className="form-actions"><button className="primary-button compact" disabled={saving || Number(charterDraft.max_concurrent_tasks) > Number(charterDraft.max_total_tasks)}>保存项目章程</button></div>
-          </form>
+          </ValidatedForm>
         </section>
       ) : (
         <section className="panel">
           <div className="panel-heading"><div className="panel-title"><Globe2 size={17} /><h3>跨项目知识共享</h3></div><span className="muted-inline">共享会在目标项目创建独立副本</span></div>
-          <form className="form-panel embedded-form" onSubmit={proposeShare}>
+          <ValidatedForm className="form-panel embedded-form" onSubmit={proposeShare}>
             <div className="form-grid">
               <label>已发布的源记忆<select value={shareMemoryId} onChange={(event) => setShareMemoryId(event.target.value)} required><option value="">选择记忆…</option>{publishedMemories.map((memory) => <option key={memory.id} value={memory.id}>{memory.title}</option>)}</select></label>
               <label>目标项目<select value={targetProjectId} onChange={(event) => setTargetProjectId(event.target.value)} required><option value="">选择目标项目…</option>{projects.filter((item) => item.id !== selectedId && item.status === "active").map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
             </div>
             <label>共享理由<textarea rows={2} value={shareRationale} onChange={(event) => setShareRationale(event.target.value)} required minLength={5} maxLength={3000} /></label>
             <div className="form-actions"><button className="primary-button compact" disabled={saving || !publishedMemories.length || !targetProjectId}>提交共享申请</button></div>
-          </form>
+          </ValidatedForm>
           <div className="share-list">{shares.map((share) => <article className="share-row" key={share.id}><div><strong>{projects.find((item) => item.id === share.source_project_id)?.name || share.source_project_id.slice(0, 8)} → {projects.find((item) => item.id === share.target_project_id)?.name || share.target_project_id.slice(0, 8)}</strong><p>{share.rationale}</p><small>{share.item_kind} · {share.source_item_id} · {new Date(share.created_at).toLocaleString("zh-CN", { hour12: false })}</small></div><div className="share-actions"><span className={"status-tag " + (share.status === "approved" ? "tag-green" : share.status === "proposed" ? "tag-amber" : "tag-neutral")}>{share.status === "proposed" ? "待审批" : share.status === "approved" ? "已批准" : "已拒绝"}</span>{share.status === "proposed" && <><button className="secondary-button compact" disabled={saving} onClick={() => void resolveShare(share, true)}>批准</button><button className="text-button" disabled={saving} onClick={() => void resolveShare(share, false)}>拒绝</button></>}</div></article>)}{!shares.length && <div className="empty-state"><Share2 size={24} /><strong>暂无跨项目共享记录</strong><p>只有已发布的知识可以申请共享，审批通过后才会复制到目标项目。</p></div>}</div>
         </section>
       )}

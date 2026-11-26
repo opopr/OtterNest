@@ -1,9 +1,10 @@
+import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { AlertCircle, Eye, FolderKanban, Pencil, Plus, RefreshCw, Search, Target, Trash2, Users, X } from "lucide-react";
+import { Eye, FolderKanban, Pencil, Plus, RefreshCw, Search, Target, Trash2, Users, X } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { request } from "../api/client";
 import type { Agent, Project, Task } from "../api/types";
@@ -369,14 +370,14 @@ export default function ProjectsPage() {
       <ErrorNotice message={error} onDismiss={() => setError("")} />
 
       {showProjectForm && (
-        <form className="panel form-panel" onSubmit={createProject}>
+        <ValidatedForm className="panel form-panel" onSubmit={createProject}>
           <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>创建项目</h3></div><button type="button" className="icon-button" onClick={() => setShowProjectForm(false)}><X size={17} /></button></div>
           <div className="form-grid">
             <label>项目名称<input value={projectName} onChange={(event) => setProjectName(event.target.value)} required maxLength={160} /></label>
             <label>项目说明<input value={projectDescription} onChange={(event) => setProjectDescription(event.target.value)} maxLength={3000} /></label>
           </div>
           <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "保存中…" : "创建项目"}</button></div>
-        </form>
+        </ValidatedForm>
       )}
 
       <UnsavedDraftNotice dirty={hasUnsavedDraft} />
@@ -429,7 +430,7 @@ export default function ProjectsPage() {
               )}
 
               {editingProject && (
-                <form className="panel form-panel" onSubmit={saveEditProject}>
+                <ValidatedForm className="panel form-panel" onSubmit={saveEditProject}>
                   <div className="panel-heading"><div className="panel-title"><Pencil size={16} /><h3>编辑项目</h3></div><button type="button" className="icon-button" onClick={() => setEditingProject(false)}><X size={17} /></button></div>
                   <div className="form-grid three">
                     <label>项目名称<input value={editProjectName} onChange={(e) => setEditProjectName(e.target.value)} required maxLength={160} /></label>
@@ -437,7 +438,7 @@ export default function ProjectsPage() {
                     <label>优先级 (0-100)<input type="number" min={0} max={100} value={editProjectPriority} onChange={(e) => setEditProjectPriority(e.target.value)} /></label>
                   </div>
                   <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "保存中…" : "保存修改"}</button></div>
-                </form>
+                </ValidatedForm>
               )}
 
               <div className="workspace-switch" role="group" aria-label="项目内容">
@@ -451,7 +452,7 @@ export default function ProjectsPage() {
               </div>
 
               {showTaskForm && (
-                <form className="panel form-panel" onSubmit={createTask}>
+                <ValidatedForm className="panel form-panel" onSubmit={createTask}>
                   <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>创建任务</h3></div><button type="button" className="icon-button" onClick={() => setShowTaskForm(false)}><X size={17} /></button></div>
                   <label>任务标题<input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} required maxLength={240} /></label>
                   <div className="form-grid four">
@@ -485,7 +486,7 @@ export default function ProjectsPage() {
                   <label>验收标准<textarea value={taskAcceptance} onChange={(event) => setTaskAcceptance(event.target.value)} required maxLength={6000} rows={2} /></label>
                   <p className="form-hint">R3 高风险任务创建后将自动进入待授权状态，直到所有者审批通过后才可调度执行。</p>
                   <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "保存中…" : "创建任务"}</button></div>
-                </form>
+                </ValidatedForm>
               )}
 
               <div className="panel task-table-panel">
@@ -540,7 +541,7 @@ export default function ProjectsPage() {
               </div>
 
               {showMemberForm && (
-                <form className="panel form-panel" onSubmit={addMember}>
+                <ValidatedForm className="panel form-panel" onSubmit={addMember}>
                   <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>添加项目成员</h3></div><button type="button" className="icon-button" onClick={() => setShowMemberForm(false)}><X size={17} /></button></div>
                   <div className="form-grid">
                     <label>选择智能体<select value={newMemberAgentId} onChange={(e) => setNewMemberAgentId(e.target.value)} required>
@@ -555,7 +556,7 @@ export default function ProjectsPage() {
                     </select></label>
                   </div>
                   <div className="form-actions"><button className="primary-button compact" disabled={saving || !newMemberAgentId}>加入项目</button></div>
-                </form>
+                </ValidatedForm>
               )}
 
               <div className="panel task-table-panel">

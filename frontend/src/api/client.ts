@@ -30,6 +30,7 @@ async function readResponse(response: Response): Promise<unknown> {
   const contentType = response.headers.get("content-type") || "";
   try {
     if (/application\/(?:[\w.+-]+\+)?json/i.test(contentType)) return await response.json();
+    if (response.ok && /^text\/plain\b/i.test(contentType)) return await response.text();
     if (response.ok) throw new ApiError("服务返回了非预期的数据格式，请检查接口连接。", response.status);
     return null; // Never expose raw proxy HTML or arbitrary error pages.
   } catch (reason) {

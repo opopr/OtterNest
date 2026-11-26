@@ -1,12 +1,10 @@
+import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useDraftGuard, UnsavedDraftNotice } from "../components/DraftGuard";
 import { useScopedRequest } from "../utils/useScopedRequest";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import {
-  AlertCircle, Archive, BookMarked, Check, ClipboardList, Plus,
-  RefreshCw, ShieldCheck, X
-} from "lucide-react";
+import { Archive, BookMarked, Check, ClipboardList, Plus, RefreshCw, ShieldCheck } from "lucide-react";
 import { request } from "../api/client";
 import type { Project } from "../api/types";
 import { useDialog } from "../components/AppDialog";
@@ -200,13 +198,13 @@ export default function SkillsPage() {
       <section className="panel">
         <div className="panel-heading"><div className="panel-title"><BookMarked size={17} /><h3>项目技能</h3><span className="count-chip">{visibleSkills.length}</span></div><button className="primary-button compact" onClick={() => setShowForm((value) => !value)} disabled={!selectedId}><Plus size={15} />提交技能提案</button></div>
         <div className="library-filter-bar"><label>关键词<input aria-label="搜索技能" value={skillQuery} onChange={event => setSkillQuery(event.target.value)} placeholder="搜索名称、版本或内容" /></label><label>状态<select aria-label="技能状态" value={skillFilter} onChange={event => setSkillFilter(event.target.value)}><option value="all">全部状态</option><option value="proposed">待发布</option><option value="published">已发布</option><option value="archived">已归档</option></select></label><button className="text-button" type="button" onClick={() => { setSkillQuery(""); setSkillFilter("all"); }}>清除筛选</button></div>
-        {showForm && <form className="form-panel embedded-form" onSubmit={createSkill}>
+        {showForm && <ValidatedForm className="form-panel embedded-form" onSubmit={createSkill}>
           <div className="form-grid"><label>技能名称<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={120} /></label><label>版本号<input value={version} onChange={(event) => setVersion(event.target.value)} required maxLength={40} /></label></div>
           <label>技能内容<textarea rows={7} value={content} onChange={(event) => setContent(event.target.value)} required maxLength={20000} placeholder="填写智能体可执行的操作步骤、约束和验收要求。提案在发布前不会对项目智能体开放。" /></label>
           <label>来源与依据<input value={source} onChange={(event) => setSource(event.target.value)} required maxLength={3000} /></label>
           <p className="form-hint">同一项目内技能名称与版本组合必须唯一。发布是单独的所有者审批动作。</p>
           <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "提交中…" : "提交提案"}</button></div>
-        </form>}
+        </ValidatedForm>}
         <div className="skill-grid">
           {loading ? <LoadingState/> : skillPage.rows.map((skill) => <article className="skill-card" key={skill.id}>
             <div className="skill-card-head"><div><strong>{skill.name}</strong><small>版本 {skill.version} · {skill.id.slice(0, 8)}</small></div><span className={"status-tag " + (skill.status === "published" ? "tag-green" : skill.status === "proposed" ? "tag-amber" : "tag-neutral")}>{statusLabel[skill.status] || skill.status}</span></div>

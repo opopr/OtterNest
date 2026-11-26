@@ -3,10 +3,7 @@ import { Link } from "react-router-dom";
 import ListPagination, { useListPage } from "../components/ListPagination";
 import { getUiLabel } from "../utils/labels";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import {
-  Activity, AlertCircle, Bell, Check, CheckCheck, Clock3, FlaskConical,
-  FolderKanban, Gauge, Play, Plus, RefreshCw, ShieldAlert, TrendingUp, X
-} from "lucide-react";
+import { Activity, Bell, Check, CheckCheck, Clock3, FlaskConical, FolderKanban, Gauge, Play, Plus, RefreshCw, ShieldAlert, TrendingUp } from "lucide-react";
 import { request } from "../api/client";
 import type { DailyBriefing, PortfolioMetrics, Project } from "../api/types";
 import { useDialog } from "../components/AppDialog";

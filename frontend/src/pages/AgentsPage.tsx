@@ -1,3 +1,4 @@
+import ValidatedForm from "../components/ValidatedForm";
 import { ErrorNotice, LoadingState } from "../components/PageFeedback";
 import { useDraftGuard } from "../components/DraftGuard";
 import { getUiLabel } from "../utils/labels";
@@ -302,7 +303,7 @@ export default function AgentsPage() {
       )}
 
       {showForm && (
-        <form className="panel form-panel" onSubmit={createAgent}>
+        <ValidatedForm className="panel form-panel" onSubmit={createAgent}>
           <div className="panel-heading"><div className="panel-title"><Plus size={17} /><h3>登记智能体</h3></div><button type="button" className="icon-button" onClick={() => setShowForm(false)}><X size={17} /></button></div>
           <div className="form-grid three">
             <label>智能体名称<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={120} /></label>
@@ -312,11 +313,11 @@ export default function AgentsPage() {
           <label>能力声明（逗号分隔）<input value={capabilities} onChange={(event) => setCapabilities(event.target.value)} placeholder="python, browser, filesystem" /></label>
           <p className="form-hint">能力声明不等于可信能力。所有者必须独立核验后，智能体才能被分配要求该能力的任务。</p>
           <div className="form-actions"><button className="primary-button compact" disabled={saving}>{saving ? "创建中…" : "创建智能体"}</button></div>
-        </form>
+        </ValidatedForm>
       )}
 
       {editingAgent && (
-        <form className="panel form-panel" onSubmit={updateAgent}>
+        <ValidatedForm className="panel form-panel" onSubmit={updateAgent}>
           <div className="panel-heading"><div className="panel-title"><Edit3 size={17} /><h3>编辑智能体：{editingAgent.name}</h3></div><button type="button" className="icon-button" onClick={() => setEditingAgent(null)}><X size={17} /></button></div>
           <div className="form-grid three">
             <label>智能体名称<input value={editName} onChange={(event) => setEditName(event.target.value)} required maxLength={120} /></label>
@@ -328,7 +329,7 @@ export default function AgentsPage() {
             <button className="primary-button compact" disabled={saving}>{saving ? "保存中…" : "保存修改"}</button>
             <button type="button" className="secondary-button compact" onClick={() => setEditingAgent(null)}>取消</button>
           </div>
-        </form>
+        </ValidatedForm>
       )}
 
       <div className="governance-tabs">
@@ -411,7 +412,7 @@ export default function AgentsPage() {
             <button className="secondary-button compact" disabled={saving} onClick={() => void saveVerifiedCapabilities()}>保存核验</button>
           </div>
           <div className="panel-heading runtime-heading"><div className="panel-title"><Cpu size={16} /><h3>独立运行实例</h3><span className="count-chip">{runtimes.length}</span></div><button className="primary-button compact" onClick={() => setShowRuntimeForm((value) => !value)} disabled={!selectedAgent.enabled}><Plus size={14} />注册运行实例</button></div>
-          {showRuntimeForm && <form className="form-panel embedded-form" onSubmit={createRuntime}><div className="form-grid"><label>实例标签<input value={runtimeLabel} onChange={(event) => setRuntimeLabel(event.target.value)} required maxLength={120} placeholder="oracle-arm-runner-01" /></label><label>运行环境<input value={runtimeEnvironment} onChange={(event) => setRuntimeEnvironment(event.target.value)} required maxLength={160} placeholder="Oracle ARM / WSL2 / local" /></label></div><div className="form-actions"><button className="primary-button compact" disabled={saving}>创建运行实例</button></div></form>}
+          {showRuntimeForm && <ValidatedForm className="form-panel embedded-form" onSubmit={createRuntime}><div className="form-grid"><label>实例标签<input value={runtimeLabel} onChange={(event) => setRuntimeLabel(event.target.value)} required maxLength={120} placeholder="oracle-arm-runner-01" /></label><label>运行环境<input value={runtimeEnvironment} onChange={(event) => setRuntimeEnvironment(event.target.value)} required maxLength={160} placeholder="Oracle ARM / WSL2 / local" /></label></div><div className="form-actions"><button className="primary-button compact" disabled={saving}>创建运行实例</button></div></ValidatedForm>}
           <div className="runtime-list">{runtimes.map((runtime) => <article className="runtime-card" key={runtime.id}>
             <div className="runtime-card-head"><div><strong>{runtime.label}</strong><small>{runtime.environment} · {runtime.id.slice(0, 12)}</small></div><span className={"status-tag " + (runtime.online ? "tag-green" : runtime.enabled ? "tag-amber" : "tag-neutral")}>{!runtime.enabled ? "已禁用" : runtime.online ? "在线" : "离线"}</span></div>
             <div className="runtime-meta"><span>状态：{getUiLabel(runtime.status)}</span><span>最近心跳：{runtime.last_seen ? new Date(runtime.last_seen).toLocaleString("zh-CN", { hour12: false }) : "从未上报"}</span><span>独立凭据：{runtime.has_token ? "已签发" : "未签发"}</span></div>
