@@ -1,3 +1,4 @@
+import LocalizedFilePicker from "../components/LocalizedFilePicker";
 import EmptyState from "../components/EmptyState";
 import { useDisplayPreference, ViewModeSwitch } from "../components/ViewModeSwitch";
 import DataTable from "../components/DataTable";
@@ -282,7 +283,7 @@ export default function ArtifactsPage() {
         <div className="panel-heading"><div className="panel-title"><FileCheck2 size={17} /><h3>成果版本</h3><span className="count-chip">{artifacts.length}</span></div></div>
         <p className="form-hint">任务：{selectedTask?.title || "未选择任务"}</p>
         <details className="library-disclosure artifact-upload-disclosure"><summary>上传新版本</summary><div className="artifact-upload">
-          <label>上传文件<input key={selectedTaskId} type="file" disabled={saving} onChange={(event) => setUploadFile(event.target.files?.[0] || null)} /></label>
+          <label>上传文件<LocalizedFilePicker key={selectedTaskId} label="上传文件" fileName={uploadFile?.name} disabled={saving} onChange={(event) => {setUploadFile(event.target.files?.[0] || null);event.target.value="";}} /></label>
           <label>敏感级<select value={sensitivity} onChange={(event) => setSensitivity(event.target.value)}><option value="public">公开</option><option value="internal">内部</option><option value="confidential">机密</option><option value="restricted">受限</option></select></label>
           <button className="primary-button compact" disabled={saving || !selectedTaskId || !uploadFile} onClick={() => void uploadArtifact()}>
             <FileUp size={14} />{uploadProgress !== null ? `上传中 ${uploadProgress}%` : "上传为新版本"}
@@ -306,7 +307,7 @@ export default function ArtifactsPage() {
           <div className="panel-heading"><div className="panel-title"><FileArchive size={17} /><h3>成果归档</h3></div></div>
           <p className="form-hint">导出当前项目内可读取且 SHA-256 校验通过的文件。恢复前会先完整验证归档包，再写入目标文件。</p>
           <div className="artifact-archive-actions"><button className="secondary-button compact" disabled={saving || !selectedProjectId} onClick={() => void exportArchive()}><Download size={14} />导出 .tar.gz</button></div>
-          <label className="field-label">选择归档包<input key={selectedProjectId} disabled={saving} type="file" accept=".gz,.tgz,application/gzip" onChange={(event) => setRestoreFile(event.target.files?.[0] || null)} /></label>
+          <label className="field-label">选择归档包<LocalizedFilePicker key={selectedProjectId} label="选择归档包" fileName={restoreFile?.name} disabled={saving} accept=".gz,.tgz,application/gzip" onChange={(event) => {setRestoreFile(event.target.files?.[0] || null);event.target.value="";}} /></label>
           <div className="form-actions"><button className="primary-button compact" disabled={saving || !restoreFile || !selectedProjectId} onClick={() => void restoreArchive()}><RotateCcw size={14} />校验并恢复</button></div>
           {restoreResult && <pre className="json-preview">{JSON.stringify(restoreResult, null, 2)}</pre>}
         </section>

@@ -84,6 +84,10 @@ def check_width(page, name, problems):
     })""")
     if widths["document"] > widths["viewport"] + 2:
         problems.append(f"{name}: horizontal overflow {widths}")
+    if widths["viewport"] <= 720:
+        oversized = page.locator(".project-picker .project-select:visible").evaluate_all("(items) => items.map(item => item.getBoundingClientRect().height).filter(height => height > 64)")
+        if oversized:
+            problems.append(f"{name}: oversized project selector {oversized}")
 
 
 def visit(page, path, group, label, mobile):
@@ -134,6 +138,11 @@ def react_checks(browser, name, width, height, problems):
                 problems.append(f"{case}: {error}")
                 screenshot(page, case + "-error")
 
+        visit(page, "/project-portability", "项目与任务", "项目导入导出", mobile)
+        picker = page.locator(".localized-file-picker")
+        expect(picker.get_by_text("选择文件", exact=True)).to_be_visible()
+        expect(picker.get_by_text("未选择文件", exact=True)).to_be_visible()
+        expect(picker.locator("input[type=file]")).to_have_attribute("aria-label", "选择 JSON 项目包")
         # Exercise the redesigned navigation and filters without mutating business data.
         visit(page, "/", None, "总览", mobile)
         page.get_by_role("link", name="查看执行阻塞", exact=True).click()

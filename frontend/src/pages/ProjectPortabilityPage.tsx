@@ -1,3 +1,4 @@
+import LocalizedFilePicker from "../components/LocalizedFilePicker";
 import EmptyState from "../components/EmptyState";
 import { useProjectSelection } from "../components/ProjectSelection";
 import ValidatedForm from "../components/ValidatedForm";
@@ -56,6 +57,7 @@ export default function ProjectPortabilityPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [bundle, setBundle] = useState<Bundle | null>(null);
+  const [fileName, setFileName] = useState("");
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [newName, setNewName] = useState("");
   const [confirmed, setConfirmed] = useState(false);
@@ -102,7 +104,7 @@ export default function ProjectPortabilityPage() {
   const readFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
-    setBundle(null); setPreview(null); setResult(null); setNewName(""); setConfirmed(false); setSuccess(""); setError("");
+    setBundle(null); setFileName(""); setPreview(null); setResult(null); setNewName(""); setConfirmed(false); setSuccess(""); setError("");
     if (!file) return;
     if (file.size > MAX_FILE_SIZE) { setError("项目包超过前端 10 MiB 限制。"); return; }
     try {
@@ -112,7 +114,7 @@ export default function ProjectPortabilityPage() {
       if (candidate.schema_version !== "otternest.export.v1" || !candidate.sha256_digest) {
         throw new Error("仅支持 otternest.export.v1 项目包。");
       }
-      setBundle(candidate);
+      setBundle(candidate); setFileName(file.name);
     } catch (reason) { setError(failText(reason)); }
   };
 
@@ -146,7 +148,7 @@ export default function ProjectPortabilityPage() {
         body: JSON.stringify({ bundle, new_name: newName.trim(), confirm_restore: true })
       });
       setResult(imported);
-      setBundle(null); setPreview(null); setConfirmed(false);
+      setBundle(null); setFileName(""); setPreview(null); setConfirmed(false);
       setSuccess("项目已恢复到暂停状态。请先审核内容、恢复必要连接，再手动激活。");
       await refresh();
     } catch (reason) { setError(failText(reason)); }
@@ -175,7 +177,7 @@ export default function ProjectPortabilityPage() {
         <div className="panel-heading"><div className="panel-title"><UploadCloud size={17} /><h3>导入项目包</h3></div></div>
         <div className="import-steps" aria-label="导入进度">{["选择文件","安全预检","确认恢复"].map((label,index)=><div key={label} className={(result ? 3 : preview ? 2 : bundle ? 1 : 0) >= index ? "current" : ""}><span>{index+1}</span>{label}</div>)}</div><p className="form-hint">仅通过服务端完整性预检后才能恢复。</p>
         <label className="admin-file-field"><FileJson size={19} />选择 JSON 项目包（最大 10 MiB）
-          <input type="file" accept=".json,application/json" onChange={(event) => void readFile(event)} disabled={busy} /></label>
+          <LocalizedFilePicker label="选择 JSON 项目包" accept=".json,application/json" fileName={fileName} onChange={(event) => void readFile(event)} disabled={busy} /></label>
         {bundle && <div className="admin-bundle-brief"><strong>{bundle.project?.name || "待校验项目"}</strong>
           <code>{bundle.sha256_digest}</code>
           <span>等待安全预检</span></div>}
